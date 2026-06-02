@@ -16,6 +16,7 @@ import {
   ScrollText,
   Settings,
   Briefcase,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@prisma/client";
@@ -42,6 +43,7 @@ const TRIAGE: Role[] = ["agency_admin", "agency_lead", "department_lead", "proje
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, allow: "all" },
+  { href: "/workspaces", label: "Workspaces", icon: Layers, allow: "all" },
   { href: "/agency/dashboard", label: "Agency Dashboard", icon: Briefcase, allow: ["agency_lead"] },
   { href: "/agency/skills", label: "Skills Marketplace", icon: Users, allow: ["agency_lead"] },
   { href: "/inbox", label: "Inbox", icon: Inbox, allow: TRIAGE },

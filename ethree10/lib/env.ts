@@ -16,17 +16,18 @@ const serverSchema = z.object({
 
   INTEGRATION_SECRET_KEY: z.string().length(64),
 
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  STORAGE_ENDPOINT: z.string().url(),
+  STORAGE_ACCESS_KEY: z.string().min(1),
+  STORAGE_SECRET_KEY: z.string().min(1),
+  STORAGE_BUCKET: z.string().min(1),
+  STORAGE_PUBLIC_URL: z.string().url(),
 
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 
 const clientSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  NEXT_PUBLIC_STORAGE_URL: z.string().url(),
   NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
 });
 
@@ -54,7 +55,6 @@ export const env: ServerEnv =
 
 export const clientEnv: ClientEnv = clientSchema.parse({
   NEXT_PUBLIC_APP_URL: process.env["NEXT_PUBLIC_APP_URL"],
-  NEXT_PUBLIC_SUPABASE_URL: process.env["NEXT_PUBLIC_SUPABASE_URL"],
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+  NEXT_PUBLIC_STORAGE_URL: process.env["NEXT_PUBLIC_STORAGE_URL"],
   NEXT_PUBLIC_SENTRY_DSN: process.env["NEXT_PUBLIC_SENTRY_DSN"],
 });

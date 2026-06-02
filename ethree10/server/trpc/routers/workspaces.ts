@@ -9,6 +9,26 @@ const slugify = (s: string) =>
 
 export const workspacesRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
+    // Super admins see all workspaces; regular users see only their memberships.
+    const user = await ctx.db.user.findUnique({
+      where: { id: ctx.userId },
+      select: { isSuperAdmin: true },
+    });
+
+    if (user?.isSuperAdmin) {
+      const workspaces = await ctx.db.workspace.findMany({
+        where: { archivedAt: null },
+        select: { id: true, name: true, slug: true, type: true, logoUrl: true, archivedAt: true },
+        orderBy: { name: "asc" },
+      });
+      return workspaces.map((ws) => ({
+        membershipId: null,
+        role: "super_admin" as Role,
+        isPrimary: false,
+        workspace: ws,
+      }));
+    }
+
     const memberships = await ctx.db.membership.findMany({
       where: { userId: ctx.userId, removedAt: null, acceptedAt: { not: null } },
       select: {
@@ -53,7 +73,7 @@ export const workspacesRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const slug = slugify(input.name);
-      return ctx.db.workspace.create({
+      const workspace = await ctx.db.workspace.create({
         data: {
           name: input.name,
           slug,
@@ -61,6 +81,20 @@ export const workspacesRouter = router({
           description: input.description,
         },
       });
+      // Auto-enrol the creating super admin so they appear as a member.
+      const creatorId = (ctx as { userId?: string }).userId;
+      if (creatorId) {
+        await ctx.db.membership.create({
+          data: {
+            userId: creatorId,
+            workspaceId: workspace.id,
+            role: Role.super_admin,
+            isPrimary: false,
+            acceptedAt: new Date(),
+          },
+        });
+      }
+      return workspace;
     }),
 
   update: workspaceProcedure

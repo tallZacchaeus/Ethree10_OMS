@@ -36,15 +36,12 @@ jobs:
       - name: Send failure email
         if: failure()
         run: |
-          set -euo pipefail
           curl -sS -X POST "https://api.resend.com/emails" \
             -H "Authorization: Bearer ${{ secrets.RESEND_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d @- <<'JSON'
-          {
-            "from": "Ethree10 Deploy <noreply@theincubatorhub.org>",
-            "to": ["softdevs@theincubatorhub.org"],
-            "subject": "Ethree10 VPS deploy failed",
-            "html": "<p>The Ethree10 OMS GitHub Actions deployment failed. Check the latest workflow run in GitHub Actions.</p>"
-          }
-          JSON
+            -d '{
+              "from": "Ethree10 Deploy <noreply@oms.ethree10.com>",
+              "to": ["softdevs@theincubatorhub.org"],
+              "subject": "Ethree10 VPS deploy failed",
+              "html": "<h2>Deployment Failed</h2><p>A push to <strong>main</strong> triggered a deployment that failed.</p><p><a href=\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View failed run →</a></p>"
+            }'

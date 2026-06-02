@@ -1,6 +1,184 @@
-# Staging & Production Deployment
+# Ethree10 OMS — Production Deployment
 
-## Prerequisites
+> **This app is deployed on a Hostinger VPS, not Vercel.**
+> The original Vercel/cloud instructions are preserved below for reference.
+
+---
+
+## Live environment
+
+| Item | Value |
+|---|---|
+| Domain | https://oms.ethree10.com |
+| VPS IP | 85.209.95.137 |
+| Repo path | `/srv/ethree10/` |
+| App path | `/srv/ethree10/ethree10/` |
+| Deploy script | `/srv/ethree10/deploy.sh` |
+| Public storage URL | `https://oms.ethree10.com/files/{key}` |
+
+---
+
+## Stack
+
+| Component | Technology | Location |
+|---|---|---|
+| App server | Next.js 14 on port 3001 | Supervisor: `ethree10-web` |
+| Background worker | BullMQ (tsx) | Supervisor: `ethree10-worker` |
+| Database | PostgreSQL 15 | Docker: `ethree10-postgres-1` |
+| Cache / queue | Redis 7 | Docker: `ethree10-redis-1` |
+| File storage | MinIO | Docker: `ethree10-minio-1` |
+| Reverse proxy | Nginx | `/etc/nginx/sites-available/ethree10-oms` |
+| SSL | Let's Encrypt (auto-renews every 12h) | Certbot |
+| Process manager | Supervisor | `/etc/supervisor/conf.d/ethree10.conf` |
+
+---
+
+## Auto-deploy (CI/CD)
+
+Push to `main` triggers:
+1. **CI** (`.github/workflows/ci.yml`) — typecheck, lint, unit tests, build
+2. **Deploy** (`.github/workflows/deploy.yml`) — SSHes into VPS, runs `/srv/ethree10/deploy.sh`
+
+If deploy fails, an email is sent to `softdevs@theincubatorhub.org`.
+
+GitHub Actions secrets required:
+| Secret | Purpose |
+|---|---|
+| `VPS_HOST` | `85.209.95.137` |
+| `VPS_SSH_KEY` | ED25519 private key for root SSH access |
+| `RESEND_API_KEY` | Resend key for failure notification emails |
+
+---
+
+## Common commands
+
+### Logs
+```bash
+tail -f /var/log/ethree10/web.log            # Next.js app
+tail -f /var/log/ethree10/worker.log         # BullMQ worker
+tail -f /var/log/ethree10/backup-db.log      # DB backup runs
+tail -f /var/log/ethree10/backup-minio.log   # MinIO backup runs
+```
+
+### Restart
+```bash
+supervisorctl restart ethree10-web               # app only
+supervisorctl restart ethree10-worker            # worker only
+supervisorctl restart ethree10-web ethree10-worker  # both
+supervisorctl status                             # check all
+```
+
+### Redeploy manually
+```bash
+bash /srv/ethree10/deploy.sh
+```
+
+### Rollback to a previous commit
+```bash
+cd /srv/ethree10
+git checkout <sha>     # e.g. git checkout abc1234
+cd ethree10
+pnpm run build
+fuser -k 3001/tcp 2>/dev/null; sleep 2
+supervisorctl restart ethree10-web ethree10-worker
+```
+
+---
+
+## Environment variables
+
+File: `/srv/ethree10/ethree10/.env`
+
+- **Server-only vars** (no `NEXT_PUBLIC_` prefix): `supervisorctl restart ethree10-web` — no rebuild needed.
+- **Client vars** (`NEXT_PUBLIC_*`): require `pnpm run build` then restart.
+
+| Variable | Status |
+|---|---|
+| `DATABASE_URL` / `DIRECT_URL` | ✅ Configured (local Postgres) |
+| `AUTH_SECRET` / `AUTH_URL` | ✅ Configured |
+| `RESEND_API_KEY` / `EMAIL_FROM` | ✅ Configured |
+| `REDIS_URL` | ✅ Configured (local Redis) |
+| `INTEGRATION_SECRET_KEY` | ✅ Configured |
+| `STORAGE_*` / `NEXT_PUBLIC_STORAGE_URL` | ✅ Configured (local MinIO) |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | ⏳ Add when Google OAuth is ready |
+| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | ⏳ Add when Sentry is ready |
+
+---
+
+## File storage (MinIO)
+
+MinIO runs internally at `http://127.0.0.1:9000`. Files are served publicly via Nginx at `https://oms.ethree10.com/files/`.
+
+**Use in server code:**
+```ts
+import { uploadFile, deleteFile, publicUrl, presignedUrl } from "@/lib/storage";
+
+// Upload a file, returns its public URL
+const url = await uploadFile("avatars/user-123.png", buffer, "image/png");
+
+// Get public URL for an existing file
+const src = publicUrl("avatars/user-123.png");
+// → https://oms.ethree10.com/files/avatars/user-123.png
+
+// Generate a short-lived presigned URL (for private files)
+const link = await presignedUrl("reports/q1.pdf", 3600);
+```
+
+**Access MinIO console (admin UI)** via SSH tunnel on your local machine:
+```bash
+ssh -L 9001:127.0.0.1:9001 root@85.209.95.137
+# Then open http://localhost:9001
+```
+
+---
+
+## Backups
+
+| Backup | Schedule | Location | Retention |
+|---|---|---|---|
+| PostgreSQL dump | Daily 02:00 UTC | `/srv/ethree10/backups/db/` | 14 days |
+| MinIO files | Weekly Sunday 03:00 UTC | `/srv/ethree10/backups/minio/` | 7 days |
+
+Run manually:
+```bash
+bash /srv/ethree10/backup-db.sh
+bash /srv/ethree10/backup-minio.sh
+```
+
+---
+
+## Docker services
+
+```bash
+docker ps                                                        # view all containers
+cd /srv/ethree10 && docker compose -f docker-compose.prod.yml restart  # restart all
+docker logs ethree10-minio-1 --tail 50 -f                       # MinIO logs
+docker logs ethree10-postgres-1 --tail 50 -f                    # Postgres logs
+```
+
+---
+
+## Nginx
+
+Config: `/etc/nginx/sites-available/ethree10-oms`
+
+```bash
+nginx -t               # test config before applying
+systemctl reload nginx # apply without downtime
+```
+
+SSL check: `certbot certificates`
+
+---
+
+---
+
+## Original cloud deployment guide (Vercel / reference)
+
+> The following is the original developer guide for Vercel-based deployment.
+> It is kept for reference only — the live app runs on the VPS above.
+
+### Prerequisites
 
 | Service | Purpose | Free tier? |
 |---------|---------|-----------|
@@ -10,116 +188,3 @@
 | Resend | Transactional email | ✅ 100 emails/day |
 | Google Cloud Console | OAuth 2.0 credentials | ✅ |
 | Railway / Render | BullMQ worker process | ✅ Starter |
-
----
-
-## Step 1 — Postgres (Neon recommended)
-
-1. Create a project at https://neon.tech
-2. Copy the **pooled connection string** → `DATABASE_URL`
-3. Copy the **direct (non-pooled) string** → `DIRECT_URL` (used by Prisma migrations)
-4. Run migrations from your local machine pointing at the staging DB:
-   ```bash
-   DATABASE_URL="<direct-url>" DIRECT_URL="<direct-url>" pnpm db:migrate
-   DATABASE_URL="<direct-url>" DIRECT_URL="<direct-url>" pnpm db:seed
-   ```
-
-## Step 2 — Redis (Upstash)
-
-1. Create a database at https://upstash.com
-2. Copy the **Redis URL** (starts with `rediss://`) → `REDIS_URL`
-
-## Step 3 — Email (Resend)
-
-1. Sign up at https://resend.com and verify your sending domain (`r4c.global`)
-2. Create an API key → `RESEND_API_KEY`
-3. Set `EMAIL_FROM="Ethree10 <noreply@ethree10.r4c.global>"`
-
-## Step 4 — Google OAuth
-
-1. Go to https://console.cloud.google.com → APIs & Services → Credentials
-2. Create an **OAuth 2.0 Client ID** (Web application)
-3. Add authorised redirect URI: `https://<your-domain>/api/auth/callback/google`
-4. Copy **Client ID** → `AUTH_GOOGLE_ID` and **Client Secret** → `AUTH_GOOGLE_SECRET`
-
-## Step 5 — Storage (Supabase, for file uploads)
-
-1. Create a project at https://supabase.com
-2. Copy `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
-3. Copy `anon public key` → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-4. Copy `service_role key` → `SUPABASE_SERVICE_ROLE_KEY`
-
-## Step 6 — Generate secrets
-
-```bash
-# AUTH_SECRET (32-byte base64)
-openssl rand -base64 32
-
-# INTEGRATION_SECRET_KEY (32-byte hex)
-openssl rand -hex 32
-```
-
-## Step 7 — Deploy to Vercel
-
-```bash
-# Install Vercel CLI if needed
-npm i -g vercel
-
-# Link and deploy
-cd ethree10
-vercel --prod
-```
-
-Set all environment variables in the Vercel dashboard (Project → Settings → Environment Variables), or push them with:
-
-```bash
-vercel env add DATABASE_URL production
-# repeat for each variable
-```
-
-Required variables:
-- `DATABASE_URL`
-- `DIRECT_URL`
-- `AUTH_SECRET`
-- `AUTH_URL` (e.g. `https://staging.ethree10.r4c.global`)
-- `AUTH_GOOGLE_ID`
-- `AUTH_GOOGLE_SECRET`
-- `RESEND_API_KEY`
-- `EMAIL_FROM`
-- `REDIS_URL`
-- `INTEGRATION_SECRET_KEY`
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `NEXT_PUBLIC_APP_URL`
-
-## Step 8 — Deploy the BullMQ worker
-
-The worker (`pnpm worker`) must run as a **separate always-on process** — Vercel serverless functions are not suitable for it.
-
-**Option A — Railway (easiest)**
-
-1. Create a new Railway project, connect the same repo
-2. Set the start command to `pnpm worker`
-3. Add all environment variables (same as above)
-4. Deploy
-
-**Option B — Render**
-
-1. Create a new Background Worker service
-2. Build command: `pnpm install && pnpm db:generate`
-3. Start command: `pnpm worker`
-4. Add environment variables
-
-## Step 9 — Verify
-
-After deployment:
-1. Visit `https://<domain>/login` — confirm the login page loads
-2. Request a magic link with your email — confirm you receive it
-3. Log in and create a test project
-4. Check the worker logs — confirm the notification job fired
-5. Navigate to `/reports` and generate a weekly report — confirm the PDF downloads
-
-## Custom domain
-
-In Vercel dashboard → Project → Domains, add `staging.ethree10.r4c.global` and follow the DNS instructions (CNAME or A record at your registrar).
