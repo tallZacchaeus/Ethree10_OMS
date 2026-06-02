@@ -1,5 +1,7 @@
 # Push only the application project from this repository root.
 *
 !/.gitignore
+!/.github/
+!/.github/**
 !/ethree10/
 !/ethree10/**
