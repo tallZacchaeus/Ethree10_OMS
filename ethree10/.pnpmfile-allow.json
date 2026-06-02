@@ -1,0 +1,1 @@
+{"allow":["@prisma/engines","esbuild","prisma","unrs-resolver","@sentry/cli","msgpackr-extract"]}

@@ -1,0 +1,870 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// AUTH (magic-link + OAuth verification)
+// ============================================================
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================================
+// IDENTITY
+// ============================================================
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  emailVerified  DateTime?
+  hashedPassword String?
+  name           String
+  avatarUrl      String?
+  phone          String?
+  phoneVerifiedAt DateTime?
+  phoneVerificationCode String?
+  timezone       String   @default("Africa/Lagos")
+  workingHoursPerWeek Int @default(40)
+  isSuperAdmin   Boolean  @default(false)
+  mfaEnabled     Boolean  @default(false)
+  mfaSecret      String?
+  mfaRecoveryCodes String[]
+  deactivatedAt  DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  memberships      Membership[]
+  skills           UserSkill[]
+  notifications    Notification[]
+  notificationPreferences NotificationPreference[]
+  auditLogs        AuditLog[]     @relation("ActorAuditLogs")
+  authoredComments TaskComment[]
+  authoredReports  Report[]       @relation("ReportAuthoredBy")
+  timeLogs         TimeLog[]      @relation("UserTimeLogs")
+  oauthAccounts    OAuthAccount[]
+
+  @@index([email])
+}
+
+model OAuthAccount {
+  id                String    @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  createdAt         DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// ============================================================
+// WORKSPACES, MEMBERSHIPS, DEPARTMENTS
+// ============================================================
+
+enum WorkspaceType {
+  agency
+  internal_client
+  master_org
+  external_client
+}
+
+model Workspace {
+  id              String        @id @default(cuid())
+  type            WorkspaceType
+  name            String
+  slug            String        @unique
+  description     String?
+  logoUrl         String?
+  brandColor      String?
+  defaultCurrency String        @default("NGN")
+  archivedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  memberships      Membership[]
+  departments      Department[]
+  requests         Request[]
+  projects         Project[]
+  leads            Lead[]
+  invoices         Invoice[]
+  approvalRules    ApprovalRule[]
+  scorecardConfigs ScorecardConfig[]
+
+  @@index([type])
+}
+
+enum Role {
+  super_admin
+  agency_admin
+  agency_lead
+  department_lead
+  subunit_lead
+  member
+  project_manager
+  requester_admin
+  requester_member
+  requester_observer
+}
+
+model Membership {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        Role
+  departmentId String?
+  subUnitId   String?
+  title       String?
+  isPrimary   Boolean   @default(false)
+  invitedAt   DateTime?
+  acceptedAt  DateTime?
+  removedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id])
+  subUnit    SubUnit?    @relation(fields: [subUnitId], references: [id])
+
+  @@unique([userId, workspaceId, role, departmentId, subUnitId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+model Department {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  slug        String
+  description String?
+  color       String?
+  icon        String?
+  leadId      String?
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  subUnits         SubUnit[]
+  memberships      Membership[]
+  integrations     Integration[]
+  requestsRoutedTo Request[]     @relation("RequestRoutedDepartment")
+  projects         Project[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+}
+
+model SubUnit {
+  id           String    @id @default(cuid())
+  departmentId String
+  name         String
+  slug         String
+  description  String?
+  leadId       String?
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  department   Department    @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  memberships  Membership[]
+  tasks        Task[]
+  integrations Integration[]
+
+  @@unique([departmentId, slug])
+  @@index([departmentId])
+}
+
+// ============================================================
+// SKILLS
+// ============================================================
+
+model Skill {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  category  String?
+  createdAt DateTime  @default(now())
+
+  users UserSkill[]
+}
+
+enum SkillLevel {
+  beginner
+  intermediate
+  advanced
+  expert
+}
+
+model UserSkill {
+  id        String     @id @default(cuid())
+  userId    String
+  skillId   String
+  level     SkillLevel @default(intermediate)
+  createdAt DateTime   @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillId])
+  @@index([userId])
+}
+
+// ============================================================
+// LEADS, REQUESTS, PROJECTS
+// ============================================================
+
+enum LeadStatus {
+  new
+  contacted
+  converted
+  rejected
+}
+
+model Lead {
+  id           String     @id @default(cuid())
+  name         String
+  email        String
+  phone        String?
+  organization String?
+  message      String
+  source       String?
+  status       LeadStatus @default(new)
+  workspaceId  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+
+  @@index([status])
+}
+
+enum Urgency {
+  low
+  medium
+  high
+  critical
+}
+
+enum RequestStage {
+  submitted
+  pending_approval
+  under_review
+  scoping
+  proposal
+  approved
+  in_progress
+  in_review
+  delivered
+  closed
+  rejected
+  on_hold
+  cancelled
+}
+
+model Request {
+  id                 String       @id @default(cuid())
+  code               String       @unique
+  workspaceId        String
+  submittedById      String
+  title              String
+  description        String
+  projectType        String
+  urgency            Urgency      @default(medium)
+  deadline           DateTime?
+  stage              RequestStage @default(submitted)
+  routedDepartmentId String?
+  primaryContact     String?
+  externalRef        String?
+  approvedById       String?
+  rejectedReason     String?
+  budgetEstimate     Decimal?     @db.Decimal(14, 2)
+  currency           String       @default("NGN")
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  workspace        Workspace          @relation(fields: [workspaceId], references: [id])
+  routedDepartment Department?        @relation("RequestRoutedDepartment", fields: [routedDepartmentId], references: [id])
+  project          Project?
+  proposals        Proposal[]         @relation("RequestProposals")
+  stageEvents      RequestStageEvent[]
+  attachments      Attachment[]       @relation("RequestAttachments")
+  comments         TaskComment[]      @relation("RequestComments")
+
+  @@index([workspaceId])
+  @@index([stage])
+  @@index([routedDepartmentId])
+}
+
+model ApprovalRule {
+  id               String   @id @default(cuid())
+  workspaceId      String   // Agency workspace ID
+  name             String
+  triggerCondition Json     // e.g. { clientType: "external_client", minBudget: 500000 }
+  requiredRole     Role
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model RequestStageEvent {
+  id        String        @id @default(cuid())
+  requestId String
+  fromStage RequestStage?
+  toStage   RequestStage
+  actorId   String
+  note      String?
+  createdAt DateTime      @default(now())
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+}
+
+enum ProjectStatus {
+  active
+  in_review
+  delivered
+  closed
+  on_hold
+  cancelled
+}
+
+model Project {
+  id                 String        @id @default(cuid())
+  code               String        @unique
+  requestId          String        @unique
+  workspaceId        String
+  agencyDepartmentId String?
+  pmUserId           String?
+  name               String
+  description        String?
+  status             ProjectStatus @default(active)
+  startDate          DateTime?
+  targetDeliveryDate DateTime?
+  actualDeliveryDate DateTime?
+  csatScore          Int?
+  csatComment        String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  request    Request     @relation(fields: [requestId], references: [id])
+  workspace  Workspace   @relation(fields: [workspaceId], references: [id])
+  department Department? @relation(fields: [agencyDepartmentId], references: [id])
+  tasks      Task[]
+  milestones Milestone[]
+  proposals  Proposal[]
+  invoices   Invoice[]
+  sponsorships Sponsorship[]
+
+  @@index([workspaceId])
+  @@index([agencyDepartmentId])
+  @@index([status])
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  blocked
+  in_review
+  done
+  cancelled
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+model Task {
+  id                 String       @id @default(cuid())
+  code               String       @unique
+  projectId          String
+  subUnitId          String?
+  assigneeUserId     String?
+  title              String
+  description        String?
+  status             TaskStatus   @default(todo)
+  priority           TaskPriority @default(medium)
+  estimatedHours     Decimal?     @db.Decimal(6, 2)
+  loggedHours        Decimal      @default(0) @db.Decimal(8, 2)
+  dueDate            DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  reopenedCount      Int          @default(0)
+  completionSummary  String?
+  completionEvidence String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  subUnit         SubUnit?         @relation(fields: [subUnitId], references: [id])
+  comments        TaskComment[]    @relation("TaskComments")
+  attachments     Attachment[]     @relation("TaskAttachments")
+  timeLogs        TimeLog[]        @relation("TaskTimeLogs")
+  integrationLink IntegrationLink?
+  dependencies    TaskDependency[] @relation("TaskDeps")
+  dependents      TaskDependency[] @relation("TaskDependents")
+
+  @@index([projectId])
+  @@index([subUnitId])
+  @@index([assigneeUserId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model TaskDependency {
+  id              String   @id @default(cuid())
+  taskId          String
+  dependsOnTaskId String
+  createdAt       DateTime @default(now())
+
+  task          Task @relation("TaskDeps", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOnTask Task @relation("TaskDependents", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnTaskId])
+}
+
+model TaskComment {
+  id         String   @id @default(cuid())
+  taskId     String?
+  requestId  String?
+  authorId   String
+  body       String
+  mentions   String[]
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  task    Task?    @relation("TaskComments", fields: [taskId], references: [id], onDelete: Cascade)
+  request Request? @relation("RequestComments", fields: [requestId], references: [id], onDelete: Cascade)
+  author  User     @relation(fields: [authorId], references: [id])
+
+  @@index([taskId])
+  @@index([requestId])
+}
+
+model TimeLog {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  hours     Decimal  @db.Decimal(5, 2)
+  note      String?
+  date      DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task Task @relation("TaskTimeLogs", fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation("UserTimeLogs", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId])
+}
+
+// ============================================================
+// PROPOSALS, MILESTONES, INVOICES
+// ============================================================
+
+enum ProposalStatus {
+  draft
+  sent
+  accepted
+  rejected
+  expired
+}
+
+model Proposal {
+  id           String         @id @default(cuid())
+  projectId    String?
+  requestId    String?
+  title        String
+  summary      String?
+  version      Int            @default(1)
+  status       ProposalStatus @default(draft)
+  currency     String         @default("NGN")
+  total        Decimal        @db.Decimal(14, 2)
+  lineItems    Json
+  terms        String?
+  validUntil   DateTime?
+  sentAt       DateTime?
+  acceptedAt   DateTime?
+  acceptedById String?
+  pdfUrl       String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  project      Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  request      Request?       @relation("RequestProposals", fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([requestId])
+}
+
+model Milestone {
+  id          String    @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  dueDate     DateTime?
+  completedAt DateTime?
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  paid
+  overdue
+  void
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  code        String        @unique
+  projectId   String?
+  workspaceId String
+  status      InvoiceStatus @default(draft)
+  currency    String        @default("NGN")
+  amount      Decimal       @db.Decimal(14, 2)
+  lineItems   Json
+  issuedAt    DateTime?
+  dueAt       DateTime?
+  paidAt      DateTime?
+  paymentRef  String?
+  pdfUrl      String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  project   Project?   @relation(fields: [projectId], references: [id])
+  workspace Workspace  @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+  @@index([status])
+}
+
+// ============================================================
+// INTEGRATIONS
+// ============================================================
+
+enum IntegrationProvider {
+  plane
+  trello
+  asana
+  jira
+  linear
+  clickup
+  notion
+  monday
+  github
+}
+
+enum IntegrationStatus {
+  active
+  degraded
+  disconnected
+  error
+}
+
+model Integration {
+  id               String              @id @default(cuid())
+  provider         IntegrationProvider
+  status           IntegrationStatus   @default(active)
+  departmentId     String?
+  subUnitId        String?
+  name             String
+  baseUrl          String?
+  config           Json
+  encryptedSecrets String
+  lastSyncedAt     DateTime?
+  lastError        String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  department Department? @relation(fields: [departmentId], references: [id])
+  subUnit    SubUnit?    @relation(fields: [subUnitId], references: [id])
+  links      IntegrationLink[]
+
+  @@index([departmentId])
+}
+
+model IntegrationLink {
+  id             String    @id @default(cuid())
+  integrationId  String
+  taskId         String    @unique
+  externalId     String
+  externalUrl    String?
+  lastSyncedAt   DateTime?
+  lastSyncedHash String?
+  pendingSync    Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+}
+
+// ============================================================
+// TEMPLATES (P2)
+// ============================================================
+
+model ProjectTemplate {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  projectType String
+  tasks       Json
+  createdById String
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ============================================================
+// REPORTS, KPIs
+// ============================================================
+
+enum ReportLevel {
+  member
+  subunit
+  department
+  agency
+}
+
+enum ReportPeriod {
+  weekly
+  monthly
+}
+
+model Report {
+  id           String       @id @default(cuid())
+  level        ReportLevel
+  period       ReportPeriod
+  scopeId      String
+  periodStart  DateTime
+  periodEnd    DateTime
+  metrics      Json
+  highlights   String?
+  pdfUrl       String?
+  authoredById String?
+  createdAt    DateTime     @default(now())
+
+  authoredBy User? @relation("ReportAuthoredBy", fields: [authoredById], references: [id])
+
+  @@unique([level, period, scopeId, periodStart])
+  @@index([level, periodStart])
+}
+
+model ScorecardConfig {
+  id          String      @id @default(cuid())
+  workspaceId String
+  level       ReportLevel
+  scopeId     String      // departmentId or workspaceId
+  name        String
+  items       Json        // array of ScorecardItem objects
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([level, scopeId])
+}
+
+model KpiSnapshot {
+  id          String       @id @default(cuid())
+  level       ReportLevel
+  scopeId     String
+  period      ReportPeriod
+  periodStart DateTime
+  periodEnd   DateTime
+  scorecard   Json
+  totalScore  Decimal      @db.Decimal(5, 2)
+  rating      String?
+  createdAt   DateTime     @default(now())
+
+  @@unique([level, period, scopeId, periodStart])
+}
+
+// ============================================================
+// ATTACHMENTS, NOTIFICATIONS, AUDIT
+// ============================================================
+
+model Attachment {
+  id           String    @id @default(cuid())
+  taskId       String?
+  requestId    String?
+  commentId    String?
+  proposalId   String?
+  fileName     String
+  mimeType     String
+  size         Int
+  storageKey   String
+  publicUrl    String?
+  uploadedById String
+  createdAt    DateTime  @default(now())
+
+  task    Task?    @relation("TaskAttachments", fields: [taskId], references: [id], onDelete: Cascade)
+  request Request? @relation("RequestAttachments", fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+enum NotificationKind {
+  request_submitted
+  request_assigned
+  request_state_changed
+  task_assigned
+  task_due_soon
+  task_overdue
+  task_completed
+  mention
+  proposal_sent
+  proposal_accepted
+  report_ready
+  approval_requested
+  integration_degraded
+  csat_received
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String
+  kind       NotificationKind
+  title      String
+  body       String?
+  link       String?
+  entityType String?
+  entityId   String?
+  readAt     DateTime?
+  emailedAt  DateTime?
+  pushedAt   DateTime?
+  whatsappAt DateTime?
+  createdAt  DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  workspaceId String?
+  action      String
+  entityType  String
+  entityId    String
+  before      Json?
+  after       Json?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation("ActorAuditLogs", fields: [actorId], references: [id])
+
+  @@index([workspaceId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model NotificationPreference {
+  id        String           @id @default(cuid())
+  userId    String
+  kind      NotificationKind
+  email     Boolean          @default(true)
+  push      Boolean          @default(true)
+  whatsapp  Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind])
+  @@index([userId])
+}
+
+// ============================================================
+// CMS
+// ============================================================
+
+model MarketingContent {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  content   String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+// ============================================================
+// PHASE 3: SPONSORSHIPS & GRANTS
+// ============================================================
+
+enum SponsorshipStatus {
+  prospect
+  applied
+  approved
+  funded
+  rejected
+}
+
+model Sponsorship {
+  id            String            @id @default(cuid())
+  sponsorName   String
+  amount        Decimal?          @db.Decimal(14, 2)
+  currency      String            @default("USD")
+  status        SponsorshipStatus @default(prospect)
+  projectId     String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  project       Project?          @relation(fields: [projectId], references: [id])
+}
+
+// ============================================================
+// PHASE 3: AUDIT LOG ARCHIVAL
+// ============================================================
+
+model ArchivedAuditLog {
+  id           String   @id
+  workspaceId  String?
+  actorId      String?
+  action       String
+  entityType   String
+  entityId     String
+  changes      Json     @default("{}")
+  createdAt    DateTime
+  archivedAt   DateTime @default(now())
+}
+
+
+
