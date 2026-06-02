@@ -31,60 +31,7 @@ jobs:
       - name: Deploy application
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" 'bash -se' <<'REMOTE'
-          set -euo pipefail
-
-          APP_DIR="${APP_DIR:-}"
-
-          if [ -z "$APP_DIR" ]; then
-            for candidate in \
-              /var/www/Ethree10_OMS \
-              /var/www/ethree10_oms \
-              /var/www/ethree10 \
-              /opt/Ethree10_OMS \
-              /opt/ethree10_oms \
-              /root/Ethree10_OMS \
-              /home/*/Ethree10_OMS
-            do
-              if [ -d "$candidate/.git" ] && [ -f "$candidate/ethree10/package.json" ]; then
-                APP_DIR="$candidate"
-                break
-              fi
-            done
-          fi
-
-          if [ -z "$APP_DIR" ]; then
-            echo "Could not find Ethree10_OMS repo on VPS. Set APP_DIR in the deploy script or place the repo under /var/www, /opt, /root, or /home/*."
-            exit 1
-          fi
-
-          echo "Deploying from $APP_DIR"
-          cd "$APP_DIR"
-          git pull origin main
-
-          cd ethree10
-          if command -v corepack >/dev/null 2>&1; then
-            corepack enable
-          fi
-
-          pnpm install --frozen-lockfile
-          pnpm db:generate
-          pnpm build
-
-          if command -v pm2 >/dev/null 2>&1; then
-            pm2 restart ethree10 || pm2 start pnpm --name ethree10 -- start
-            pm2 restart ethree10-worker || pm2 start pnpm --name ethree10-worker -- worker
-            pm2 save
-          elif command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q '^ethree10'; then
-            systemctl restart ethree10
-            if systemctl list-unit-files | grep -q '^ethree10-worker'; then
-              systemctl restart ethree10-worker
-            fi
-          else
-            echo "No PM2 process or ethree10 systemd service found. Build completed, but restart could not be performed."
-            exit 1
-          fi
-          REMOTE
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" "bash /srv/ethree10/deploy.sh"
 
       - name: Send failure email
         if: failure()
@@ -95,7 +42,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d @- <<'JSON'
           {
-            "from": "Ethree10 Deploy <noreply@ethree10.r4c.global>",
+            "from": "Ethree10 Deploy <noreply@theincubatorhub.org>",
             "to": ["softdevs@theincubatorhub.org"],
             "subject": "Ethree10 VPS deploy failed",
             "html": "<p>The Ethree10 OMS GitHub Actions deployment failed. Check the latest workflow run in GitHub Actions.</p>"
