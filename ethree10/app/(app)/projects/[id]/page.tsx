@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Plus, Truck } from "lucide-react";
+import { Plus, Star, Truck } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/components/providers/workspace-provider";
 import { formatDate } from "@/lib/format";
 import { Textarea } from "@/components/ui/textarea";
-import { Star } from "lucide-react";
+
 
 export default function ProjectDetailPage() {
   const params = useParams();

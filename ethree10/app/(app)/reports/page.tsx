@@ -1,89 +1,162 @@
 "use client";
 
+import Link from "next/link";
+import { format } from "date-fns";
+import { BarChart3, CalendarRange, FileText, Play, RefreshCw } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { FileText, Play } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/components/providers/workspace-provider";
+import { PageHeader } from "@/components/ui-ext/page-header";
+import { StatCard } from "@/components/ui-ext/stat-card";
+import { AnimatedPage, AnimatedSection } from "@/components/ui-ext/animated";
 
 export default function ReportsPage() {
   const { activeWorkspace: currentWorkspace } = useWorkspace();
+  const { toast } = useToast();
   const { data: reports, isLoading, refetch } = trpc.reports.list.useQuery();
 
   const generateWeekly = trpc.reports.generateWeekly.useMutation({
     onSuccess: () => {
-      alert("Weekly reports generation triggered.");
-      refetch();
+      toast({
+        title: "Weekly reports queued",
+        description: "Fresh rollups are being generated for the current reporting cycle.",
+      });
+      void refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: "Could not generate reports",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
-  return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-          <p className="text-muted-foreground mt-1">
-            Weekly and monthly rollups across the agency.
-          </p>
-        </div>
-        <div className="flex space-x-2">
-          {currentWorkspace?.type === "agency" && (
-            <Button onClick={() => generateWeekly.mutate()} disabled={generateWeekly.isPending}>
-              <Play className="mr-2 h-4 w-4" />
-              Force Generate Weekly
-            </Button>
-          )}
-        </div>
-      </div>
+  const reportList = reports ?? [];
+  const latestReport = reportList[0] ?? null;
+  const withPdfCount = reportList.filter((report) => Boolean(report.pdfUrl)).length;
 
-      {isLoading ? (
-        <div>Loading reports...</div>
-      ) : (
-        <div className="bg-white border rounded-lg overflow-hidden">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 font-medium">Level</th>
-                <th className="px-4 py-3 font-medium">Period</th>
-                <th className="px-4 py-3 font-medium">Date Range</th>
-                <th className="px-4 py-3 font-medium">Generated At</th>
-                <th className="px-4 py-3 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reports?.map((report) => (
-                <tr key={report.id} className="border-t hover:bg-muted/50">
-                  <td className="px-4 py-3 capitalize">{report.level}</td>
-                  <td className="px-4 py-3 capitalize">{report.period}</td>
-                  <td className="px-4 py-3">
-                    {format(new Date(report.periodStart), "MMM d, yyyy")} - {format(new Date(report.periodEnd), "MMM d, yyyy")}
-                  </td>
-                  <td className="px-4 py-3">
-                    {format(new Date(report.createdAt), "MMM d, yyyy HH:mm")}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {report.pdfUrl && (
-                      <Button variant="ghost" size="sm" asChild>
-                        <a href={report.pdfUrl} target="_blank" rel="noreferrer">
-                          <FileText className="mr-2 h-4 w-4" />
-                          View PDF
-                        </a>
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {reports?.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                    No reports found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+  return (
+    <AnimatedPage className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+      <AnimatedSection delay={40}>
+        <PageHeader
+          title="Reports"
+          description="Weekly and monthly rollups across the agency."
+          actions={
+            currentWorkspace?.type === "agency" ? (
+              <Button onClick={() => generateWeekly.mutate()} disabled={generateWeekly.isPending}>
+                {generateWeekly.isPending ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                Force Generate Weekly
+              </Button>
+            ) : undefined
+          }
+        />
+      </AnimatedSection>
+
+      <AnimatedSection delay={100} className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StatCard
+          label="Reports generated"
+          value={reportList.length}
+          icon={BarChart3}
+          hint="All available report snapshots"
+          className="surface-hover"
+        />
+        <StatCard
+          label="PDF exports ready"
+          value={withPdfCount}
+          icon={FileText}
+          hint="Reports with downloadable PDFs"
+          className="surface-hover"
+        />
+        <StatCard
+          label="Latest cycle"
+          value={latestReport ? format(new Date(latestReport.periodStart), "MMM d") : "—"}
+          icon={CalendarRange}
+          hint={
+            latestReport
+              ? `${format(new Date(latestReport.periodStart), "MMM d, yyyy")} - ${format(new Date(latestReport.periodEnd), "MMM d, yyyy")}`
+              : "No reports generated yet"
+          }
+          className="surface-hover"
+        />
+      </AnimatedSection>
+
+      <AnimatedSection delay={160}>
+        <Card className="surface-hover border-border/60 shadow-sm">
+          <CardHeader>
+            <CardTitle>Report archive</CardTitle>
+            <CardDescription>
+              Review recent reporting periods, confirm the scope, and open exported PDFs.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="grid gap-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />
+                ))}
+              </div>
+            ) : reportList.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-10 text-center">
+                <p className="text-sm font-medium">No reports found yet.</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Generate the first weekly rollup to populate this archive.
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Level</TableHead>
+                    <TableHead>Period</TableHead>
+                    <TableHead>Date Range</TableHead>
+                    <TableHead>Generated At</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reportList.map((report) => (
+                    <TableRow key={report.id}>
+                      <TableCell>
+                        <Badge variant="secondary" className="capitalize">
+                          {report.level}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="capitalize">{report.period}</TableCell>
+                      <TableCell>
+                        {format(new Date(report.periodStart), "MMM d, yyyy")} - {format(new Date(report.periodEnd), "MMM d, yyyy")}
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(report.createdAt), "MMM d, yyyy HH:mm")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {report.pdfUrl ? (
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={report.pdfUrl} target="_blank" rel="noreferrer">
+                              <FileText className="h-4 w-4" />
+                              View PDF
+                            </Link>
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Pending export</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </AnimatedSection>
+    </AnimatedPage>
   );
 }

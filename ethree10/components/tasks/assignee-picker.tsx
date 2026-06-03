@@ -58,10 +58,11 @@ export function AssigneePicker({
           <ul className="max-h-72 overflow-y-auto">
             {candidates.map((c) => (
               <li key={c.id}>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => onChange(c.id)}
-                  className="flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-accent"
+                  className="h-auto w-full justify-start gap-3 rounded-md p-2 text-left hover:bg-accent"
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>{initials(c.name)}</AvatarFallback>
@@ -76,7 +77,7 @@ export function AssigneePicker({
                       {c.skills.length > 0 ? ` · ${c.skills.slice(0, 3).join(", ")}` : ""}
                     </span>
                   </span>
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

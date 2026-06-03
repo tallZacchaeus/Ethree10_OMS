@@ -16,8 +16,9 @@ Error: expect(locator).toBeVisible() failed
 
 Locator: locator('text=Request submitted successfully')
 Expected: visible
-Timeout: 10000ms
-Error: element(s) not found
+Error: strict mode violation: locator('text=Request submitted successfully') resolved to 2 elements:
+    1) <div class="text-sm font-semibold">Request submitted successfully</div> aka getByText('Request submitted successfully', { exact: true })
+    2) <span role="status" aria-live="assertive">Notification Request submitted successfullyWe wil…</span> aka getByText('Notification Request')
 
 Call log:
   - Expect "toBeVisible" with timeout 10000ms
@@ -25,55 +26,83 @@ Call log:
 
 ```
 
+# Page snapshot
+
 ```yaml
-- banner:
-  - link "Ethree10":
-    - /url: /
-  - navigation:
-    - link "Services":
-      - /url: /services
-    - link "About":
-      - /url: /about
-    - link "Contact":
-      - /url: /contact
-    - link "Sign in":
-      - /url: /login
-- text: Start a Project Tell us about your organization and what you're looking to build. Our team will review your request and get in touch. Full Name *
-- textbox "Full Name *":
-  - /placeholder: Jane Doe
-  - text: John Doe Test
-- text: Email *
-- textbox "Email *":
-  - /placeholder: jane@example.com
-  - text: john@example.com
-- text: Organization
-- textbox "Organization":
-  - /placeholder: Your Ministry or NGO
-  - text: Test Organization
-- text: Phone Number
-- textbox "Phone Number":
-  - /placeholder: "+1234567890"
-  - text: "+1234567890"
-- text: Project Description *
-- textbox "Project Description *":
-  - /placeholder: Please describe your project, timeline, and any specific requirements...
-  - text: This is a test project request from Playwright automation.
-- button "Submit Request"
-- contentinfo:
-  - paragraph: Ethree10
-  - paragraph: A Reach4Christ Global initiative. Excellence through People, Process, Product.
-  - navigation:
-    - link "Services":
-      - /url: /services
-    - link "About":
-      - /url: /about
-    - link "Start a project":
-      - /url: /request
-    - link "Sign in":
-      - /url: /login
-- region "Notifications (F8)":
-  - list
-- alert
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "Ethree10" [ref=e5] [cursor=pointer]:
+          - /url: /
+        - navigation [ref=e6]:
+          - link "Services" [ref=e7] [cursor=pointer]:
+            - /url: /services
+          - link "About" [ref=e8] [cursor=pointer]:
+            - /url: /about
+          - link "Contact" [ref=e9] [cursor=pointer]:
+            - /url: /contact
+          - button [ref=e10] [cursor=pointer]:
+            - img
+          - link "Login" [ref=e11] [cursor=pointer]:
+            - /url: /login
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]: Start a Project
+        - generic [ref=e17]: Tell us about your organization and what you're looking to build. Our team will review your request and get in touch.
+      - generic [ref=e19]:
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - text: Full Name *
+            - textbox "Full Name *" [ref=e22]:
+              - /placeholder: Jane Doe
+              - text: John Doe Test
+          - generic [ref=e23]:
+            - text: Email *
+            - textbox "Email *" [ref=e24]:
+              - /placeholder: jane@example.com
+              - text: john@example.com
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - text: Organization
+            - textbox "Organization" [ref=e27]:
+              - /placeholder: Your Ministry or NGO
+              - text: Test Organization
+          - generic [ref=e28]:
+            - text: Phone Number
+            - textbox "Phone Number" [ref=e29]:
+              - /placeholder: "+1234567890"
+              - text: "+1234567890"
+        - generic [ref=e30]:
+          - text: Project Description *
+          - textbox "Project Description *" [ref=e31]:
+            - /placeholder: Please describe your project, timeline, and any specific requirements...
+            - text: This is a test project request from Playwright automation.
+        - button "Submit Request" [ref=e32] [cursor=pointer]
+    - contentinfo [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - paragraph [ref=e36]: Ethree10
+          - paragraph [ref=e37]: A Reach4Christ Global initiative. Excellence through People, Process, Product.
+        - navigation [ref=e38]:
+          - link "Services" [ref=e39] [cursor=pointer]:
+            - /url: /services
+          - link "About" [ref=e40] [cursor=pointer]:
+            - /url: /about
+          - link "Start a project" [ref=e41] [cursor=pointer]:
+            - /url: /request
+          - link "Sign in" [ref=e42] [cursor=pointer]:
+            - /url: /login
+  - region "Notifications (F8)":
+    - list [ref=e44]:
+      - listitem [ref=e45]:
+        - generic [ref=e46]:
+          - generic [ref=e47]: Request submitted successfully
+          - generic [ref=e48]: We will get back to you shortly.
+        - button [ref=e49] [cursor=pointer]:
+          - img [ref=e50]
+  - alert [ref=e54]
+  - status [ref=e55]: Notification Request submitted successfullyWe will get back to you shortly.
 ```
 
 # Test source

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { ReportService } from "@/server/services/report";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     await ReportService.generateWeekly({ actorId: "system" });

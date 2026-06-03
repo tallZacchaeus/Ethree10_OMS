@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, ShieldAlert } from "lucide-react";
-import QRCode from "qrcode";
+import { toDataURL } from "qrcode";
 import { useRouter } from "next/navigation";
 
 export function MfaEnforceSetup() {
@@ -20,7 +20,7 @@ export function MfaEnforceSetup() {
   
   const generateSecret = trpc.auth.generateMfaSecret.useMutation({
     onSuccess: async (data) => {
-      const url = await QRCode.toDataURL(data.uri);
+      const url = await toDataURL(data.uri);
       setQrUrl(url);
     }
   });

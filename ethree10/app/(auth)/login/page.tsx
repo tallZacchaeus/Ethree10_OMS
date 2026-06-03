@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import { ShieldCheck } from "lucide-react";
 import { LoginForm } from "./login-form";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { AnimatedPage, AnimatedSection } from "@/components/ui-ext/animated";
 
 export const metadata: Metadata = {
   title: "Sign In",
@@ -7,21 +11,33 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <div className="w-full max-w-sm space-y-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-brand-500">E10</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Ethree10 Operations Management System
-        </p>
-      </div>
+    <AnimatedPage className="w-full max-w-md">
+      <div className="space-y-6">
+        <AnimatedSection className="text-center" delay={40}>
+          <Badge variant="secondary" className="mb-3 inline-flex gap-1 px-3 py-1 text-xs">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Secure workspace access
+          </Badge>
+          <h1 className="text-3xl font-bold text-brand-500">E10</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Ethree10 Operations Management System
+          </p>
+        </AnimatedSection>
 
-      <div className="rounded-lg border bg-card p-8 shadow-sm">
-        <h2 className="mb-1 text-xl font-semibold">Sign in</h2>
-        <p className="mb-6 text-sm text-muted-foreground">
-          Enter your email to receive a magic link, or continue with Google.
-        </p>
-        <LoginForm />
+        <AnimatedSection delay={120}>
+          <Card className="surface-hover border-border/60 shadow-sm">
+            <CardHeader className="space-y-2">
+              <CardTitle className="text-2xl">Sign in</CardTitle>
+              <CardDescription>
+                Enter your email to receive a magic link, or continue with Google.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LoginForm />
+            </CardContent>
+          </Card>
+        </AnimatedSection>
       </div>
-    </div>
+    </AnimatedPage>
   );
 }

@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { ProposalService } from "@/server/services/proposal";
-import { renderToStream } from "@react-pdf/renderer";
+import { Document, Page, renderToStream, StyleSheet, Text, View } from "@react-pdf/renderer";
 import React from "react";
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 
 // Basic PDF styles
 const styles = StyleSheet.create({

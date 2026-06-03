@@ -39,13 +39,15 @@ export function NotificationBell() {
         <div className="flex items-center justify-between border-b px-4 py-2">
           <span className="text-sm font-semibold">Notifications</span>
           {unread > 0 && (
-            <button
+            <Button
               type="button"
-              className="text-xs text-brand-600 hover:underline"
+              variant="ghost"
+              size="sm"
+              className="h-auto px-0 text-xs text-brand-600 hover:bg-transparent hover:text-brand-700"
               onClick={() => markAllRead.mutate()}
             >
               Mark all read
-            </button>
+            </Button>
           )}
         </div>
         <ScrollArea className="max-h-80">

@@ -2,8 +2,8 @@ import { vi } from "vitest";
 
 vi.mock("@/lib/env", () => ({
   env: {
-    DATABASE_URL: "postgresql://test:test@localhost:5432/test",
-    DIRECT_URL: "postgresql://test:test@localhost:5432/test",
+    DATABASE_URL: "postgresql://test:password@localhost:5432/test",
+    DIRECT_URL: "postgresql://test:password@localhost:5432/test",
     AUTH_SECRET: "test-secret-32-chars-long-enough!!",
     AUTH_URL: "http://localhost:3000",
     AUTH_GOOGLE_ID: "test-google-client-id",
@@ -12,9 +12,18 @@ vi.mock("@/lib/env", () => ({
     EMAIL_FROM: "test@test.com",
     REDIS_URL: "redis://localhost:6379",
     INTEGRATION_SECRET_KEY: "a".repeat(64),
-    NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
-    SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
+    STORAGE_ENDPOINT: "http://127.0.0.1:9000",
+    STORAGE_ACCESS_KEY: "minioadmin",
+    STORAGE_SECRET_KEY: "minioadmin",
+    STORAGE_BUCKET: "ethree10-test",
+    STORAGE_PUBLIC_URL: "http://localhost:3000/files",
+    NEXT_PUBLIC_APP_URL: "http://localhost:3000",
+    NEXT_PUBLIC_STORAGE_URL: "http://localhost:3000/files",
     NODE_ENV: "test",
+  },
+  clientEnv: {
+    NEXT_PUBLIC_APP_URL: "http://localhost:3000",
+    NEXT_PUBLIC_STORAGE_URL: "http://localhost:3000/files",
+    NEXT_PUBLIC_SENTRY_DSN: "",
   },
 }));
