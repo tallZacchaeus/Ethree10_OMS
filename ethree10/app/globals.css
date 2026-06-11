@@ -2,68 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+/* E310 brand tokens — navy #031629 · teal #05b1a4 · lime #ccec63 · grey #e7e7e7
+   Declared outside @layer base so Tailwind's content purge never strips the
+   runtime-only `.dark` selector (dark mode would silently break otherwise). */
+:root {
+    --background: 210 24% 98%;
+    --foreground: 209 87% 9%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 209 87% 9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 239 84% 67%;
+    --popover-foreground: 209 87% 9%;
+    --primary: 176 95% 28%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 239 84% 67%;
-    --radius: 0.5rem;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 239 84% 67%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 239 84% 67%;
+    --secondary: 210 22% 94%;
+    --secondary-foreground: 209 45% 15%;
+    --muted: 210 22% 95%;
+    --muted-foreground: 210 12% 42%;
+    --accent: 210 22% 94%;
+    --accent-foreground: 209 45% 15%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 210 22% 90%;
+    --input: 210 22% 90%;
+    --ring: 176 94% 32%;
+    --radius: 0.75rem;
+    /* Brand signature accents (lime) for the rare highlight moment */
+    --brand-accent: 74 78% 66%;
+    --brand-accent-foreground: 209 87% 9%;
+    /* Sidebar is always the deep navy brand surface */
+    --sidebar-background: 209 87% 9%;
+    --sidebar-foreground: 210 16% 76%;
+    --sidebar-primary: 176 84% 44%;
+    --sidebar-primary-foreground: 209 87% 9%;
+    --sidebar-accent: 209 56% 14%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 209 48% 15%;
+    --sidebar-ring: 176 84% 44%;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 239 84% 67%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 239 84% 67%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 239 84% 67%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 239 84% 67%;
+    --background: 209 58% 7%;
+    --foreground: 210 16% 92%;
+    --card: 209 45% 11%;
+    --card-foreground: 210 16% 92%;
+    --popover: 209 45% 11%;
+    --popover-foreground: 210 16% 92%;
+    --primary: 175 84% 44%;
+    --primary-foreground: 209 87% 9%;
+    --secondary: 209 35% 16%;
+    --secondary-foreground: 210 16% 92%;
+    --muted: 209 35% 15%;
+    --muted-foreground: 210 14% 64%;
+    --accent: 209 35% 18%;
+    --accent-foreground: 210 16% 92%;
+    --destructive: 0 62% 47%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 209 34% 18%;
+    --input: 209 34% 20%;
+    --ring: 175 84% 44%;
+    --brand-accent: 74 78% 66%;
+    --brand-accent-foreground: 209 87% 9%;
+    --sidebar-background: 209 80% 6%;
+    --sidebar-foreground: 210 16% 76%;
+    --sidebar-primary: 176 84% 44%;
+    --sidebar-primary-foreground: 209 87% 9%;
+    --sidebar-accent: 209 50% 13%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 209 44% 14%;
+    --sidebar-ring: 176 84% 44%;
   }
-}
 
 @layer base {
   * {
@@ -161,7 +168,50 @@
   }
 
   .surface-hover {
-    @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md;
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-pop;
+  }
+
+  /* Deep navy brand band used behind dashboard greetings/heroes (solid). */
+  .brand-hero {
+    background-color: hsl(209 87% 9%);
+  }
+
+  /* Subtle lime spark for the single signature accent per view */
+  .text-brand-accent {
+    color: hsl(var(--brand-accent));
+  }
+  .bg-brand-accent {
+    background-color: hsl(var(--brand-accent));
+    color: hsl(var(--brand-accent-foreground));
+  }
+}
+
+@layer base {
+  body {
+    font-feature-settings: "cv11", "ss01";
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: hsl(176 90% 36% / 0.22);
+  }
+  /* Refined, brand-tinted scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+    background-clip: content-box;
   }
 }
 

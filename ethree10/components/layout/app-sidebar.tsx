@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import type { Role } from "@prisma/client";
 import { useWorkspace } from "@/components/providers/workspace-provider";
+import { E310Logo } from "@/components/brand/e310-logo";
 import { cn } from "@/lib/utils/cn";
 
 interface NavItem {
@@ -28,6 +29,11 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   allow: Role[] | "all";
+}
+
+interface NavSection {
+  title: string;
+  items: NavItem[];
 }
 
 const AGENCY_EXEC: Role[] = [
@@ -41,68 +47,112 @@ const AGENCY_EXEC: Role[] = [
 const AGENCY_LEADS: Role[] = ["agency_admin", "agency_lead", "department_lead"];
 const TRIAGE: Role[] = ["agency_admin", "agency_lead", "department_lead", "project_manager"];
 
-const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, allow: "all" },
-  { href: "/workspaces", label: "Workspaces", icon: Layers, allow: "all" },
-  { href: "/agency/dashboard", label: "Agency Dashboard", icon: Briefcase, allow: ["agency_admin", "agency_lead"] },
-  { href: "/agency/skills", label: "Skills Marketplace", icon: Users, allow: ["agency_admin", "agency_lead"] },
-  { href: "/inbox", label: "Inbox", icon: Inbox, allow: TRIAGE },
-  { href: "/requests", label: "Requests", icon: FileText, allow: "all" },
-  { href: "/projects", label: "Projects", icon: FolderKanban, allow: "all" },
-  { href: "/tasks", label: "My Tasks", icon: CheckSquare, allow: AGENCY_EXEC },
-  { href: "/members", label: "Members", icon: Users, allow: AGENCY_EXEC },
-  { href: "/departments", label: "Departments", icon: Building2, allow: AGENCY_LEADS },
-  { href: "/leads", label: "Leads", icon: Sparkles, allow: ["agency_admin", "agency_lead"] },
-  { href: "/integrations", label: "Integrations", icon: Plug, allow: AGENCY_LEADS },
-  { href: "/reports", label: "Reports", icon: BarChart3, allow: AGENCY_EXEC },
-  { href: "/audit", label: "Audit log", icon: ScrollText, allow: AGENCY_LEADS },
-  { href: "/settings", label: "Settings", icon: Settings, allow: "all" },
+const NAV_SECTIONS: NavSection[] = [
+  {
+    title: "Overview",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, allow: "all" },
+      { href: "/workspaces", label: "Workspaces", icon: Layers, allow: "all" },
+    ],
+  },
+  {
+    title: "Operations",
+    items: [
+      { href: "/agency/dashboard", label: "Agency", icon: Briefcase, allow: ["agency_admin", "agency_lead"] },
+      { href: "/inbox", label: "Inbox", icon: Inbox, allow: TRIAGE },
+      { href: "/requests", label: "Requests", icon: FileText, allow: "all" },
+      { href: "/projects", label: "Projects", icon: FolderKanban, allow: "all" },
+      { href: "/tasks", label: "My Tasks", icon: CheckSquare, allow: AGENCY_EXEC },
+    ],
+  },
+  {
+    title: "Organization",
+    items: [
+      { href: "/members", label: "Members", icon: Users, allow: AGENCY_EXEC },
+      { href: "/agency/skills", label: "Skills", icon: Sparkles, allow: ["agency_admin", "agency_lead"] },
+      { href: "/departments", label: "Departments", icon: Building2, allow: AGENCY_LEADS },
+      { href: "/leads", label: "Leads", icon: Sparkles, allow: ["agency_admin", "agency_lead"] },
+    ],
+  },
+  {
+    title: "Insights",
+    items: [
+      { href: "/reports", label: "Reports", icon: BarChart3, allow: AGENCY_EXEC },
+      { href: "/integrations", label: "Integrations", icon: Plug, allow: AGENCY_LEADS },
+      { href: "/audit", label: "Audit log", icon: ScrollText, allow: AGENCY_LEADS },
+      { href: "/settings", label: "Settings", icon: Settings, allow: "all" },
+    ],
+  },
 ];
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { roles, isSuperAdmin } = useWorkspace();
 
-  const visible = NAV_ITEMS.filter((item) => {
-    if (item.allow === "all" || isSuperAdmin) return true;
-    return item.allow.some((r) => roles.includes(r));
-  });
+  const canSee = (item: NavItem) =>
+    item.allow === "all" || isSuperAdmin || item.allow.some((r) => roles.includes(r));
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r bg-sidebar text-sidebar-foreground">
-      <div className="flex h-16 items-center border-b border-sidebar-border px-6">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <span className="text-xl font-bold text-sidebar-primary">E10</span>
-          <span className="text-sm font-medium text-sidebar-foreground/80">OMS</span>
+    <aside className="flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+      <div className="flex h-16 items-center border-b border-sidebar-border/70 px-6">
+        <Link href="/dashboard" className="flex items-center gap-2.5 transition-opacity hover:opacity-80">
+          <E310Logo className="h-6 w-auto text-white" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/75">
+            OPS
+          </span>
         </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="space-y-1">
-          {visible.map(({ href, icon: Icon, label }) => {
-            const active = pathname === href || pathname.startsWith(`${href}/`);
-            return (
-              <li key={href}>
-                <Link
-                  href={href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    active
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+      <nav className="flex-1 overflow-y-auto px-3 py-5">
+        {NAV_SECTIONS.map((section) => {
+          const items = section.items.filter(canSee);
+          if (items.length === 0) return null;
+          return (
+            <div key={section.title} className="mb-6 last:mb-0">
+              <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/65">
+                {section.title}
+              </p>
+              <ul className="space-y-0.5">
+                {items.map(({ href, icon: Icon, label }) => {
+                  const active = pathname === href || pathname.startsWith(`${href}/`);
+                  return (
+                    <li key={href}>
+                      <Link
+                        href={href}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                          "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                          active
+                            ? "bg-white/[0.06] text-white"
+                            : "text-sidebar-foreground/70 hover:bg-white/[0.04] hover:text-white",
+                        )}
+                      >
+                        {active && (
+                          <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-sidebar-primary" />
+                        )}
+                        <Icon
+                          className={cn(
+                            "h-[18px] w-[18px] shrink-0 transition-colors",
+                            active ? "text-sidebar-primary" : "text-sidebar-foreground/55 group-hover:text-white",
+                          )}
+                          strokeWidth={1.75}
+                        />
+                        {label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
       </nav>
 
-      <div className="border-t border-sidebar-border p-3">
-        <p className="px-3 text-xs text-sidebar-foreground/40">Ethree10 OMS v0.1</p>
+      <div className="border-t border-sidebar-border/70 px-6 py-4">
+        <p className="text-[11px] font-medium text-sidebar-foreground/70">
+          E310 · Operating Platform
+        </p>
+        <p className="text-[10px] text-sidebar-foreground/55">v0.1 — beta</p>
       </div>
     </aside>
   );

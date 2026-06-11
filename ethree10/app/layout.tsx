@@ -1,27 +1,33 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { TRPCProvider } from "@/components/providers/trpc-provider";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { Toaster } from "@/components/ui/toaster";
 import "@/app/globals.css";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
+// Self-hosted so boot is fast and offline-safe (no Google fetch at build time).
+const jakarta = localFont({
+  src: "./fonts/PlusJakartaSans.woff2",
+  variable: "--font-jakarta",
+  display: "swap",
+  weight: "400 700",
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "Ethree10 OMS",
-    template: "%s | Ethree10 OMS",
+    default: "E310 — Operating Platform",
+    template: "%s · E310",
   },
   description:
-    "Ethree10 Operations Management System — manage projects, track delivery, and report performance across the agency.",
+    "E310 — the all-in-one operating platform. Manage requests, track delivery, and report performance across your teams.",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#4338ca",
+  themeColor: "#031629",
 };
 
 export default function RootLayout({
@@ -31,7 +37,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${jakarta.variable} font-sans antialiased`}>
         <PostHogProvider>
           <TRPCProvider>{children}</TRPCProvider>
         </PostHogProvider>

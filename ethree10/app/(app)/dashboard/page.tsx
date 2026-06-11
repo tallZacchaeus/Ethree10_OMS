@@ -23,7 +23,6 @@ import {
   getDashboardExperience,
   summarizeThroughput,
 } from "@/lib/dashboard";
-import { PageHeader } from "@/components/ui-ext/page-header";
 import { StatCard } from "@/components/ui-ext/stat-card";
 import { StatusPill } from "@/components/ui-ext/status-pill";
 import { UrgencyTag } from "@/components/ui-ext/urgency-tag";
@@ -76,9 +75,9 @@ export default function DashboardPage() {
   return (
     <AnimatedPage className="space-y-8">
       <AnimatedSection delay={40}>
-        <PageHeader
-          title="Dashboard"
-          description={activeWorkspace ? `${activeWorkspace.name} overview` : "Your overview"}
+        <DashboardHero
+          workspaceName={activeWorkspace?.name ?? null}
+          showRequestCta={experience.isRequester}
         />
       </AnimatedSection>
 
@@ -95,7 +94,7 @@ export default function DashboardPage() {
               value={requesterData.metrics.openRequestsCount}
               icon={Inbox}
               hint="Requests still moving through the pipeline"
-              className="surface-hover"
+              tone="signature"
             />
             <StatCard
               label="Active projects"
@@ -180,7 +179,7 @@ export default function DashboardPage() {
               label="My open tasks"
               value={myOpenTasksCount}
               icon={CheckSquare}
-              className="surface-hover"
+              tone="signature"
             />
             <StatCard
               label="Overdue tasks"
@@ -254,7 +253,7 @@ export default function DashboardPage() {
               label="Review queue"
               value={subUnitData.reviewQueue.length}
               icon={ClipboardList}
-              className="surface-hover"
+              tone="signature"
             />
             <StatCard
               label="Active tasks"
@@ -325,7 +324,7 @@ export default function DashboardPage() {
               label="Incoming requests"
               value={deptData.incomingRequests.length}
               icon={Inbox}
-              className="surface-hover"
+              tone="signature"
             />
             <StatCard
               label="Active projects"
@@ -397,7 +396,7 @@ export default function DashboardPage() {
               value={throughput}
               icon={CheckCircle2}
               hint="Closed requests + delivered projects + completed tasks"
-              className="surface-hover"
+              tone="signature"
             />
             <StatCard
               label="Pending approvals"
@@ -529,6 +528,40 @@ export default function DashboardPage() {
         </AnimatedSection>
       )}
     </AnimatedPage>
+  );
+}
+
+function DashboardHero({
+  workspaceName,
+  showRequestCta,
+}: {
+  workspaceName: string | null;
+  showRequestCta: boolean;
+}) {
+  return (
+    <div className="brand-hero relative overflow-hidden rounded-2xl px-6 py-7 text-white shadow-pop sm:px-8 sm:py-8">
+      <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-white/55">
+            {workspaceName ?? "Your workspace"}
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            Welcome back
+          </h1>
+          <p className="max-w-xl text-sm text-white/70">
+            Here&apos;s what&apos;s moving across your operation today — requests, delivery, and the work that needs you.
+          </p>
+        </div>
+        {showRequestCta && (
+          <Button asChild variant="accent" className="shrink-0">
+            <Link href="/requests/new">
+              Submit a request
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 
