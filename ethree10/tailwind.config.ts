@@ -98,8 +98,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-jakarta)", "var(--font-inter)", ...fontFamily.sans],
-        display: ["var(--font-jakarta)", ...fontFamily.sans],
+        sans: ["var(--font-poppins)", ...fontFamily.sans],
+        display: ["var(--font-poppins)", ...fontFamily.sans],
         mono: ["var(--font-jetbrains-mono)", ...fontFamily.mono],
       },
       borderRadius: {

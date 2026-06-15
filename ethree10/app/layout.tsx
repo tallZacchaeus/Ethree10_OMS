@@ -5,12 +5,17 @@ import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { Toaster } from "@/components/ui/toaster";
 import "@/app/globals.css";
 
-// Self-hosted so boot is fast and offline-safe (no Google fetch at build time).
-const jakarta = localFont({
-  src: "./fonts/PlusJakartaSans.woff2",
-  variable: "--font-jakarta",
+// Poppins — rounded, geometric, modern. Self-hosted so boot is fast and
+// offline-safe (no Google fetch at build time, which stalls dev here).
+const poppins = localFont({
+  src: [
+    { path: "./fonts/Poppins-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/Poppins-500.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/Poppins-600.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/Poppins-700.woff2", weight: "700", style: "normal" },
+  ],
+  variable: "--font-poppins",
   display: "swap",
-  weight: "400 700",
 });
 
 export const metadata: Metadata = {
@@ -37,7 +42,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${jakarta.variable} font-sans antialiased`}>
+      <body className={`${poppins.variable} font-sans antialiased`}>
         <PostHogProvider>
           <TRPCProvider>{children}</TRPCProvider>
         </PostHogProvider>
