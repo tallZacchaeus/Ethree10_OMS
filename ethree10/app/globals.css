@@ -137,6 +137,15 @@
   }
 }
 
+@keyframes slide-in-from-left {
+  from {
+    transform: translate3d(-100%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 @layer utilities {
   .animate-enter {
     animation: enter 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -165,6 +174,10 @@
 
   .slide-in-from-bottom-full {
     animation-name: slide-in-from-bottom;
+  }
+
+  .slide-in-from-left-full {
+    animation-name: slide-in-from-left;
   }
 
   .surface-hover {

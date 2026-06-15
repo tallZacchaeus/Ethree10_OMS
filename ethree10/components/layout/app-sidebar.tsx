@@ -85,7 +85,8 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-export function AppSidebar() {
+/** Shared sidebar inner content — used by the desktop rail and the mobile drawer. */
+export function SidebarContent() {
   const pathname = usePathname();
   const { roles, isSuperAdmin } = useWorkspace();
 
@@ -93,7 +94,7 @@ export function AppSidebar() {
     item.allow === "all" || isSuperAdmin || item.allow.some((r) => roles.includes(r));
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+    <div className="flex h-full flex-col">
       <div className="flex h-16 items-center border-b border-sidebar-border/70 px-6">
         <Link href="/dashboard" className="flex items-center gap-2.5 transition-opacity hover:opacity-80">
           <E310Logo variant="white" className="h-6 w-auto" />
@@ -154,6 +155,15 @@ export function AppSidebar() {
         </p>
         <p className="text-[10px] text-sidebar-foreground/55">v0.1 — beta</p>
       </div>
+    </div>
+  );
+}
+
+/** Desktop sidebar rail — hidden below `lg`, where the mobile drawer takes over. */
+export function AppSidebar() {
+  return (
+    <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
+      <SidebarContent />
     </aside>
   );
 }

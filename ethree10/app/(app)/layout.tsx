@@ -52,7 +52,7 @@ export default async function AppLayout({
         <AppSidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <AppTopbar user={session.user} />
-          <main className="flex-1 overflow-y-auto bg-background p-6">
+          <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
             <div className="mx-auto max-w-[1440px]">{children}</div>
           </main>
         </div>
