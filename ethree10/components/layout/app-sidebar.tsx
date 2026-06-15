@@ -96,7 +96,7 @@ export function AppSidebar() {
     <aside className="flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center border-b border-sidebar-border/70 px-6">
         <Link href="/dashboard" className="flex items-center gap-2.5 transition-opacity hover:opacity-80">
-          <E310Logo className="h-6 w-auto text-white" />
+          <E310Logo variant="white" className="h-6 w-auto" />
           <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/75">
             OPS
           </span>

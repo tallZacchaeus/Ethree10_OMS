@@ -19,7 +19,7 @@ export default function LoginPage() {
             <ShieldCheck className="h-3.5 w-3.5" />
             Secure workspace access
           </Badge>
-          <E310Logo className="mx-auto h-8 w-auto text-foreground" />
+          <E310Logo variant="dark" className="mx-auto h-8 w-auto" />
           <p className="mt-2 text-sm text-muted-foreground">
             The all-in-one operating platform
           </p>

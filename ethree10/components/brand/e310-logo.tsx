@@ -1,46 +1,37 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 
+const LOGO = {
+  white: "/e310-white.png", // for navy / dark surfaces
+  dark: "/e310-black.png", // for light surfaces
+} as const;
+
 /**
- * E310 wordmark — geometric recreation of the brand mark.
- * "E" = three bars (Workforce / Workflows / Structure) with a forward arrow
- * (operational movement); "O" = the power-ring of a continuous operating system.
- * Uses currentColor, so set the color via `text-*` (white on navy, ink on light).
+ * E310 wordmark (official brand asset).
+ * Pick `variant="white"` on dark/navy surfaces and `variant="dark"` on light
+ * surfaces so the mark always has proper contrast. Size with a height class
+ * (e.g. `h-6 w-auto`); the intrinsic aspect ratio (3848×876) is preserved.
  */
-export function E310Logo({ className }: { className?: string }) {
+export function E310Logo({
+  className,
+  variant = "dark",
+}: {
+  className?: string;
+  variant?: "white" | "dark";
+}) {
   return (
-    <svg
-      viewBox="0 0 172 64"
-      fill="none"
-      role="img"
-      aria-label="E310"
-      className={cn("h-7 w-auto text-foreground", className)}
-    >
-      <g
-        stroke="currentColor"
-        strokeWidth={8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        {/* E — three bars */}
-        <path d="M8 16H38" />
-        <path d="M8 32H31" />
-        <path d="M8 48H38" />
-        {/* 3 — squared */}
-        <path d="M55 18H73C81 18 82 31 71 32C82 33 81 48 73 48H55" />
-        {/* 1 — flagged stem */}
-        <path d="M104 16V48" />
-        <path d="M97 23L104 16" />
-        {/* O — power ring with top notch */}
-        <path d="M148 17A17 17 0 1 1 134 17" />
-        <path d="M141 13V27" />
-      </g>
-      {/* Forward arrowhead on the middle bar */}
-      <path d="M30 25L43 32L30 39Z" fill="currentColor" />
-    </svg>
+    <Image
+      src={LOGO[variant]}
+      alt="E310"
+      width={3848}
+      height={876}
+      priority
+      className={cn("h-7 w-auto", className)}
+    />
   );
 }
 
-/** Compact square mark (E-arrow + ring) for collapsed rails and avatars. */
+/** Compact square mark (E-arrow + ring) for collapsed rails, avatars, favicon. */
 export function E310Mark({ className }: { className?: string }) {
   return (
     <svg
