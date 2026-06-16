@@ -125,9 +125,9 @@ export default function DashboardPage() {
                 requesterData.recentRequests.map((request, index) => (
                   <AnimatedItem key={request.id} delay={index * 50}>
                     <LinkCard href={`/requests/${request.id}`}>
-                      <div className="min-w-0 space-y-1">
+                      <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="truncate font-medium">{request.title}</span>
+                          <span className="block min-w-0 truncate font-medium">{request.title}</span>
                           <UrgencyTag value={request.urgency} />
                         </div>
                         <p className="text-xs text-muted-foreground">
@@ -151,8 +151,8 @@ export default function DashboardPage() {
                 requesterData.awaitingFeedback.map((project, index) => (
                   <AnimatedItem key={project.id} delay={index * 50}>
                     <LinkCard href={`/projects/${project.id}`}>
-                      <div className="min-w-0 space-y-1">
-                        <span className="truncate font-medium">{project.name}</span>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <span className="block min-w-0 truncate font-medium">{project.name}</span>
                         <p className="text-xs text-muted-foreground">
                           {project.workspace.name} · Delivered {formatDate(project.updatedAt)}
                         </p>
@@ -215,8 +215,8 @@ export default function DashboardPage() {
                 myTaskList.slice(0, 5).map((task, index) => (
                   <AnimatedItem key={task.id} delay={index * 50}>
                     <LinkCard href={`/tasks/${task.id}`}>
-                      <div className="min-w-0 space-y-1">
-                        <span className="truncate font-medium">{task.title}</span>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <span className="block min-w-0 truncate font-medium">{task.title}</span>
                         <p className="text-xs text-muted-foreground">
                           {task.project?.name ?? "Project"}
                           {task.dueDate ? ` · Due ${formatDate(task.dueDate)}` : " · No due date"}
@@ -277,8 +277,8 @@ export default function DashboardPage() {
                 subUnitData.reviewQueue.map((task, index) => (
                   <AnimatedItem key={task.id} delay={index * 50}>
                     <LinkCard href={`/tasks/${task.id}`}>
-                      <div className="min-w-0 space-y-1">
-                        <span className="truncate font-medium">{task.title}</span>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <span className="block min-w-0 truncate font-medium">{task.title}</span>
                         <p className="text-xs text-muted-foreground">{task.project?.name}</p>
                       </div>
                       <StatusPill kind="task" value="in_review" />
@@ -295,8 +295,8 @@ export default function DashboardPage() {
                 subUnitData.activeTasks.slice(0, 5).map((task, index) => (
                   <AnimatedItem key={task.id} delay={index * 50}>
                     <LinkCard href={`/tasks/${task.id}`}>
-                      <div className="min-w-0 space-y-1">
-                        <span className="truncate font-medium">{task.title}</span>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <span className="block min-w-0 truncate font-medium">{task.title}</span>
                         <p className="text-xs text-muted-foreground">
                           {task.project?.name}
                           {task.dueDate ? ` · Due ${formatDate(task.dueDate)}` : ""}
@@ -354,9 +354,9 @@ export default function DashboardPage() {
                 deptData.incomingRequests.map((request, index) => (
                   <AnimatedItem key={request.id} delay={index * 50}>
                     <LinkCard href={`/requests/${request.id}`}>
-                      <div className="min-w-0 space-y-1">
+                      <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="truncate font-medium">{request.title}</span>
+                          <span className="block min-w-0 truncate font-medium">{request.title}</span>
                           <UrgencyTag value={request.urgency} />
                         </div>
                         <p className="text-xs text-muted-foreground">
@@ -426,9 +426,9 @@ export default function DashboardPage() {
                 agencyData.crossAgencyInbox.map((request, index) => (
                   <AnimatedItem key={request.id} delay={index * 50}>
                     <LinkCard href={`/requests/${request.id}`}>
-                      <div className="min-w-0 space-y-1">
+                      <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="truncate font-medium">{request.title}</span>
+                          <span className="block min-w-0 truncate font-medium">{request.title}</span>
                           {request.urgency === "critical" && (
                             <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
                           )}
@@ -506,7 +506,7 @@ export default function DashboardPage() {
                     >
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-3">
-                          <span className="truncate font-medium">{project.name}</span>
+                          <span className="block min-w-0 truncate font-medium">{project.name}</span>
                           <StatusPill kind="project" value={project.status} />
                         </div>
                         <p className="text-xs text-muted-foreground">

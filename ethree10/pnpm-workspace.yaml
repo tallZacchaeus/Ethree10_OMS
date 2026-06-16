@@ -1,0 +1,13 @@
+# Build-script approvals for pnpm 10+/11 (decisions recorded so `pnpm install`
+# stops erroring with ERR_PNPM_IGNORED_BUILDS). Prisma builds (needed for the DB
+# query engine); the rest aren't required to run the Next dev server.
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true
+  esbuild: true
+  '@sentry/cli': false
+  core-js: false
+  msgpackr-extract: false
+  protobufjs: false
+  unrs-resolver: false
