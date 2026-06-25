@@ -55,14 +55,14 @@ export default function InvoicesPage() {
               invoices.map((inv) => (
                 <TableRow key={inv.id}>
                   <TableCell className="font-medium">
-                    <Link href={`/invoice/${inv.code}`} className="hover:underline" target="_blank">
+                    <Link href={`/invoices/${inv.id}`} className="hover:underline">
                       {inv.code}
                     </Link>
                   </TableCell>
                   <TableCell>{inv.workspace.name}</TableCell>
                   <TableCell>{formatMoney(Number(inv.amount), inv.currency)}</TableCell>
                   <TableCell>
-                    <StatusPill kind="task" value={inv.status} /> {/* Using task for now just to render a pill */}
+                    <StatusPill kind="invoice" value={inv.status} />
                   </TableCell>
                   <TableCell>
                     {new Date(inv.createdAt).toLocaleDateString()}

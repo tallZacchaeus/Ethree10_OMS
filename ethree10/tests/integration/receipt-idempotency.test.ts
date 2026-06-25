@@ -85,3 +85,45 @@ describe("ReceiptService.issueForInvoice — idempotent auto-issue", () => {
     expect(count).toBe(1);
   });
 });
+
+describe("ReceiptService.issueForInvoice — offline payment methods", () => {
+  let workspaceId: string;
+
+  beforeAll(async () => {
+    await ensureBucket();
+    const ws = await db.workspace.create({
+      data: { type: "agency", name: "Offline Pay WS", slug: `offline-pay-${Date.now()}`, defaultCurrency: "NGN" },
+    });
+    workspaceId = ws.id;
+  });
+
+  afterAll(async () => {
+    await db.receipt.deleteMany({ where: { workspaceId } });
+    await db.invoice.deleteMany({ where: { workspaceId } });
+    await db.workspace.delete({ where: { id: workspaceId } }).catch(() => {});
+  });
+
+  // The headline of this feature: cheque/bank-transfer/cash are first-class
+  // alongside Paystack and persist their method + reference on the receipt.
+  it.each(["cheque", "bank_transfer", "cash", "other"] as const)(
+    "issues a %s receipt with its method and reference",
+    async (paymentMethod) => {
+      const invoice = await db.invoice.create({
+        data: {
+          code: `INV-${paymentMethod}-${Date.now()}`,
+          workspaceId,
+          status: "paid",
+          currency: "NGN",
+          amount: "90000.00",
+          lineItems: [{ description: "Retainer", quantity: 1, unitPrice: 90000 }],
+          paidAt: new Date(),
+        },
+      });
+      const ref = `${paymentMethod.toUpperCase()}-REF`;
+      const receipt = await ReceiptService.issueForInvoice(invoice.id, { paymentMethod, paymentRef: ref });
+      expect(receipt.paymentMethod).toBe(paymentMethod);
+      expect(receipt.paymentRef).toBe(ref);
+      expect(receipt.code).toMatch(/^RCPT-/);
+    },
+  );
+});

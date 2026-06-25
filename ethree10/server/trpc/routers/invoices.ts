@@ -37,7 +37,7 @@ export const invoicesRouter = router({
     .query(async ({ ctx, input }) => {
       const invoice = await db.invoice.findUnique({
         where: { id: input.id },
-        include: { workspace: true, project: true },
+        include: { workspace: true, project: true, receipt: true },
       });
       if (!invoice) throw new TRPCError({ code: "NOT_FOUND" });
       return invoice;
