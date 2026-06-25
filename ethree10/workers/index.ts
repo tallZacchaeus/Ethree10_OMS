@@ -1,6 +1,7 @@
 import { Worker } from "bullmq";
 import { redisConnection, queues } from "./queues";
 import { ReportService } from "../server/services/report";
+import { InvoiceService } from "../server/services/invoice";
 import pino from "pino";
 
 const logger = pino({ name: "worker" });
@@ -22,6 +23,10 @@ const reportsWorker = new Worker(
     if (job.name === "weekly-report") {
       // The generateWeekly service should ideally handle idempotency or not run if already generated.
       await ReportService.generateWeekly({ actorId: "system" });
+    }
+    if (job.name === "mark-overdue-invoices") {
+      const count = await InvoiceService.markOverdue();
+      logger.info({ count }, "Marked overdue invoices");
     }
   },
   { connection: redisConnection },
@@ -51,6 +56,14 @@ queues.reports.add("weekly-report", {}, {
     tz: "Africa/Lagos",
   }
 }).catch(err => logger.error({ err }, "Failed to schedule weekly report job"));
+
+// Flip overdue invoices daily at 06:00 Africa/Lagos
+queues.reports.add("mark-overdue-invoices", {}, {
+  repeat: {
+    pattern: "0 6 * * *",
+    tz: "Africa/Lagos",
+  }
+}).catch(err => logger.error({ err }, "Failed to schedule overdue-invoice job"));
 
 process.on("SIGTERM", async () => {
   await Promise.all([

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { PaystackService } from "@/server/services/paystack";
+import { ReceiptService } from "@/server/services/receipt";
 import { db } from "@/server/db/client";
 
 export async function POST(req: NextRequest) {
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
       const invoiceCode = data.reference;
 
       // Update invoice status
-      await db.invoice.update({
+      const invoice = await db.invoice.update({
         where: { code: invoiceCode },
         data: {
           status: "paid",
@@ -26,6 +27,17 @@ export async function POST(req: NextRequest) {
           paymentRef: String(data.id),
         },
       });
+
+      // Auto-issue a receipt (idempotent on retries). A receipt/PDF failure must
+      // not block the webhook ack, or Paystack will keep retrying.
+      try {
+        await ReceiptService.issueForInvoice(invoice.id, {
+          paymentMethod: "paystack",
+          paymentRef: String(data.id),
+        });
+      } catch (receiptError) {
+        console.error("Failed to auto-issue receipt for invoice", invoice.code, receiptError);
+      }
     }
 
     return NextResponse.json({ received: true });
