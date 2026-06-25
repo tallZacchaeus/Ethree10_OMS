@@ -17,6 +17,8 @@ import {
   Settings,
   Briefcase,
   Layers,
+  FileSpreadsheet,
+  ReceiptText,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@prisma/client";
@@ -72,6 +74,13 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/agency/skills", label: "Skills", icon: Sparkles, allow: ["agency_admin", "agency_lead"] },
       { href: "/departments", label: "Departments", icon: Building2, allow: AGENCY_LEADS },
       { href: "/leads", label: "Leads", icon: Sparkles, allow: ["agency_admin", "agency_lead"] },
+    ],
+  },
+  {
+    title: "Billing",
+    items: [
+      { href: "/invoices", label: "Invoices", icon: FileSpreadsheet, allow: ["agency_admin", "agency_lead"] },
+      { href: "/receipts", label: "Receipts", icon: ReceiptText, allow: ["agency_admin", "agency_lead"] },
     ],
   },
   {

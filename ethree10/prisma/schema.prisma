@@ -105,6 +105,7 @@ model Workspace {
   projects         Project[]
   leads            Lead[]
   invoices         Invoice[]
+  receipts         Receipt[]
   approvalRules    ApprovalRule[]
   scorecardConfigs ScorecardConfig[]
 
@@ -567,9 +568,37 @@ model Invoice {
 
   project   Project?   @relation(fields: [projectId], references: [id])
   workspace Workspace  @relation(fields: [workspaceId], references: [id])
+  receipt   Receipt?
 
   @@index([workspaceId])
   @@index([status])
+}
+
+enum PaymentMethod {
+  paystack
+  bank_transfer
+  cash
+  other
+}
+
+model Receipt {
+  id            String        @id @default(cuid())
+  code          String        @unique
+  invoiceId     String?       @unique
+  workspaceId   String
+  amount        Decimal       @db.Decimal(14, 2)
+  currency      String        @default("NGN")
+  paymentMethod PaymentMethod @default(paystack)
+  paymentRef    String?
+  issuedAt      DateTime      @default(now())
+  pdfUrl        String?
+  createdAt     DateTime      @default(now())
+
+  invoice   Invoice?  @relation(fields: [invoiceId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+  @@index([paymentRef])
 }
 
 // ============================================================

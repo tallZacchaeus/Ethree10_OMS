@@ -4,6 +4,7 @@ import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { db } from "@/server/db/client";
 import { requireAgencyAction } from "@/server/services/agency";
+import { computeBottlenecks } from "@/server/services/analytics";
 import { subMonths, startOfMonth, format } from "date-fns";
 
 export const analyticsRouter = router({
@@ -31,16 +32,14 @@ export const analyticsRouter = router({
       };
     });
 
-    // 2. Bottleneck Detection (Time spent in Request Stages)
-    // For a real app, you'd calculate the average duration between audit log events.
-    // We'll mock this with realistic numbers based on current active requests.
-    const bottleneckData = [
-      { stage: "Submitted -> Review", avgDays: 1.2 },
-      { stage: "Under Review -> Scoping", avgDays: 3.5 },
-      { stage: "Scoping -> Approved", avgDays: 5.1 }, // Potential bottleneck
-      { stage: "Approved -> In Progress", avgDays: 2.0 },
-      { stage: "In Progress -> Delivered", avgDays: 14.5 },
-    ];
+    // 2. Bottleneck Detection (avg days spent in each request stage).
+    // Derived from real RequestStageEvent transitions: the gap between two
+    // consecutive events is the dwell time in the earlier stage.
+    const stageEvents = await db.requestStageEvent.findMany({
+      select: { requestId: true, toStage: true, createdAt: true },
+      orderBy: [{ requestId: "asc" }, { createdAt: "asc" }],
+    });
+    const bottleneckData = computeBottlenecks(stageEvents);
 
     return {
       throughput: throughputData,

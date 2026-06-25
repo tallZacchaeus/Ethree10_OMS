@@ -22,6 +22,7 @@ import { whatsappRouter } from "./whatsapp";
 import { preferencesRouter } from "./preferences";
 import { cmsRouter } from "./cms";
 import { invoicesRouter } from "./invoices";
+import { receiptsRouter } from "./receipts";
 import { analyticsRouter } from "./analytics";
 import { sponsorshipsRouter } from "./sponsorships";
 
@@ -49,6 +50,7 @@ export const appRouter = router({
   preferences: preferencesRouter,
   cms: cmsRouter,
   invoices: invoicesRouter,
+  receipts: receiptsRouter,
   analytics: analyticsRouter,
   sponsorships: sponsorshipsRouter,
 });

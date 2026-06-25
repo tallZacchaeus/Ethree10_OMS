@@ -1,19 +1,29 @@
 import { notFound } from "next/navigation";
+import { toDataURL } from "qrcode";
 import { db } from "@/server/db/client";
 import { formatMoney } from "@/lib/format";
+import { invoicePublicUrl } from "@/server/services/invoice";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building2, CheckCircle2 } from "lucide-react";
+import { Building2, CheckCircle2, Download, ReceiptText } from "lucide-react";
 
 interface Props {
   params: { code: string };
+  searchParams: { error?: string };
 }
 
-export default async function PublicInvoicePage({ params }: Props) {
+const PAY_ERRORS: Record<string, string> = {
+  "email-required": "Please enter your email to pay.",
+  "currency-unsupported": "Online payment is only available for NGN invoices.",
+  "payment-init-failed": "We couldn't start the payment. Please try again.",
+};
+
+export default async function PublicInvoicePage({ params, searchParams }: Props) {
   const invoice = await db.invoice.findUnique({
     where: { code: params.code },
-    include: { workspace: true, project: true },
+    include: { workspace: true, project: true, receipt: true },
   });
 
   if (!invoice) notFound();
@@ -25,6 +35,8 @@ export default async function PublicInvoicePage({ params }: Props) {
   }>;
 
   const isPaid = invoice.status === "paid";
+  const qrDataUrl = await toDataURL(invoicePublicUrl(invoice.code), { margin: 1, width: 160 });
+  const payError = searchParams.error ? PAY_ERRORS[searchParams.error] : undefined;
 
   return (
     <div className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
@@ -36,7 +48,7 @@ export default async function PublicInvoicePage({ params }: Props) {
             </div>
             <div>
               <CardTitle className="text-2xl">Invoice {invoice.code}</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">Ethree10 Global</p>
+              <p className="text-sm text-muted-foreground mt-1">Ethree10</p>
             </div>
           </div>
           <div className="text-right">
@@ -82,17 +94,46 @@ export default async function PublicInvoicePage({ params }: Props) {
             </table>
           </div>
 
-          <div className="border-t pt-8 flex justify-end">
-            {!isPaid ? (
-              <Button size="lg" className="w-full sm:w-auto text-lg px-8 py-6">
-                Pay Now
-              </Button>
-            ) : (
-              <div className="flex items-center text-success-600 font-medium text-lg">
-                <CheckCircle2 className="mr-2 h-6 w-6" />
-                Paid on {invoice.paidAt?.toLocaleDateString()}
+          <div className="border-t pt-8 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex items-center gap-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrDataUrl} alt={`QR code for invoice ${invoice.code}`} className="h-24 w-24" />
+              <div className="flex flex-col gap-2 text-sm">
+                {invoice.pdfUrl ? (
+                  <a href={invoice.pdfUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-brand-700 hover:underline">
+                    <Download className="mr-1.5 h-4 w-4" /> Download invoice PDF
+                  </a>
+                ) : null}
+                {isPaid && invoice.receipt?.pdfUrl ? (
+                  <a href={invoice.receipt.pdfUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-brand-700 hover:underline">
+                    <ReceiptText className="mr-1.5 h-4 w-4" /> Download receipt {invoice.receipt.code}
+                  </a>
+                ) : null}
               </div>
-            )}
+            </div>
+
+            <div className="sm:text-right">
+              {!isPaid ? (
+                <form method="get" action={`/api/invoices/${invoice.code}/pay`} className="flex flex-col gap-2 sm:items-end">
+                  {payError ? <p className="text-sm text-destructive">{payError}</p> : null}
+                  <Input
+                    type="email"
+                    name="email"
+                    required
+                    placeholder="you@example.com"
+                    className="w-full sm:w-64"
+                  />
+                  <Button size="lg" type="submit" className="w-full sm:w-auto">
+                    Pay with Paystack
+                  </Button>
+                </form>
+              ) : (
+                <div className="flex items-center text-success-600 font-medium text-lg">
+                  <CheckCircle2 className="mr-2 h-6 w-6" />
+                  Paid on {invoice.paidAt?.toLocaleDateString()}
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

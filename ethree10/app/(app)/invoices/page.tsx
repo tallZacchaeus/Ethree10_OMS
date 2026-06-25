@@ -55,7 +55,7 @@ export default function InvoicesPage() {
               invoices.map((inv) => (
                 <TableRow key={inv.id}>
                   <TableCell className="font-medium">
-                    <Link href={`/public/invoice/${inv.code}`} className="hover:underline" target="_blank">
+                    <Link href={`/invoice/${inv.code}`} className="hover:underline" target="_blank">
                       {inv.code}
                     </Link>
                   </TableCell>
