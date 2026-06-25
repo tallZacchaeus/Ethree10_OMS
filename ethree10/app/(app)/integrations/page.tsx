@@ -134,6 +134,99 @@ function ConnectPlaneDialog({ open, onOpenChange }: { open: boolean; onOpenChang
   );
 }
 
+function ConnectTrelloDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const { toast } = useToast();
+  const utils = trpc.useUtils();
+  const { data: departments } = trpc.requests.agencyDepartments.useQuery(undefined, { enabled: open });
+
+  const [name, setName] = useState("Trello — Product & Tech");
+  const [departmentId, setDepartmentId] = useState<string | null>(null);
+  const [listId, setListId] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [apiToken, setApiToken] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
+
+  const connect = trpc.integrations.connect.useMutation({
+    onSuccess: (res) => {
+      toast({
+        title: res.status === "active" ? "Trello connected" : "Saved with warnings",
+        description: res.lastError ?? "Connection verified.",
+        variant: res.status === "active" ? "default" : "destructive",
+      });
+      void utils.integrations.list.invalidate();
+      onOpenChange(false);
+    },
+    onError: (e) => toast({ title: "Couldn't connect", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Connect Trello</DialogTitle>
+          <DialogDescription>
+            Mirror this department&apos;s tasks into a Trello list as cards.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[60vh] space-y-4 overflow-y-auto">
+          <Field label="Display name">
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label="Department">
+            <Select value={departmentId ?? undefined} onValueChange={setDepartmentId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select department" />
+              </SelectTrigger>
+              <SelectContent>
+                {(departments ?? []).map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="List ID (cards are created here)">
+            <Input value={listId} onChange={(e) => setListId(e.target.value)} />
+          </Field>
+          <Field label="API key">
+            <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+          </Field>
+          <Field label="API token">
+            <Input type="password" value={apiToken} onChange={(e) => setApiToken(e.target.value)} />
+          </Field>
+          <Field label="Webhook secret (optional)">
+            <Input
+              type="password"
+              value={webhookSecret}
+              onChange={(e) => setWebhookSecret(e.target.value)}
+            />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            disabled={connect.isPending || !departmentId || !listId || !apiKey || !apiToken}
+            onClick={() =>
+              connect.mutate({
+                provider: "trello",
+                name,
+                departmentId: departmentId ?? undefined,
+                config: { listId },
+                secrets: { apiKey, apiToken, webhookSecret },
+              })
+            }
+          >
+            {connect.isPending ? "Connecting…" : "Connect"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
@@ -147,6 +240,7 @@ export default function IntegrationsPage() {
   const { toast } = useToast();
   const utils = trpc.useUtils();
   const [connecting, setConnecting] = useState(false);
+  const [connectingTrello, setConnectingTrello] = useState(false);
   const { data: integrations, isLoading } = trpc.integrations.list.useQuery();
 
   const test = trpc.integrations.test.useMutation({
@@ -170,12 +264,16 @@ export default function IntegrationsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Integrations"
-        description="Connect external project tools. Plane is the day-one adapter."
+        description="Connect external project tools. Plane and Trello are available today."
         actions={
           <div className="flex gap-2">
             <Button onClick={() => setConnecting(true)}>
               <Plug className="mr-2 h-4 w-4" />
               Connect Plane
+            </Button>
+            <Button variant="outline" onClick={() => setConnectingTrello(true)}>
+              <Plug className="mr-2 h-4 w-4" />
+              Connect Trello
             </Button>
           </div>
         }
@@ -266,6 +364,7 @@ export default function IntegrationsPage() {
       </div>
 
       <ConnectPlaneDialog open={connecting} onOpenChange={setConnecting} />
+      <ConnectTrelloDialog open={connectingTrello} onOpenChange={setConnectingTrello} />
     </div>
   );
 }
