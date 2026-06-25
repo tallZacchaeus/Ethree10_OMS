@@ -181,12 +181,12 @@ export default function MembersPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label htmlFor="inv-dept">Department (optional)</Label>
-                      <Select value={departmentId} onValueChange={v => { setDeptId(v); setSubUnitId(""); }}>
+                      <Select value={departmentId || "__none__"} onValueChange={v => { setDeptId(v === "__none__" ? "" : v); setSubUnitId(""); }}>
                         <SelectTrigger id="inv-dept">
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
                           {departments.map(d => (
                             <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                           ))}
@@ -196,12 +196,12 @@ export default function MembersPage() {
                     {selectedDept && selectedDept.subUnits.length > 0 && (
                       <div className="space-y-1">
                         <Label htmlFor="inv-sub">Sub-unit (optional)</Label>
-                        <Select value={subUnitId} onValueChange={setSubUnitId}>
+                        <Select value={subUnitId || "__none__"} onValueChange={v => setSubUnitId(v === "__none__" ? "" : v)}>
                           <SelectTrigger id="inv-sub">
                             <SelectValue placeholder="None" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">None</SelectItem>
+                            <SelectItem value="__none__">None</SelectItem>
                             {selectedDept.subUnits.map(s => (
                               <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                             ))}
