@@ -103,6 +103,20 @@ File: `/srv/ethree10/ethree10/.env`
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | ⏳ Add when Google OAuth is ready |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | ⏳ Add when Sentry is ready |
 
+### External-service secrets matrix (Stage 2)
+
+These are read directly by their services. Behaviour without them is intentional: dev degrades gracefully, **production fails loudly** instead of silently using a mock.
+
+| Variable(s) | Service | Required in prod? | Behaviour if missing |
+|---|---|---|---|
+| `PAYSTACK_SECRET_KEY` | Paystack payments + webhook verify | ✅ Yes | `getPaystackSecretKey()` **throws in prod**; dev uses `sk_test_mock` |
+| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Paystack inline checkout (client) | ✅ Yes | Pay button cannot initialise |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | WhatsApp delivery | ✅ Yes | prod returns `false` (no send); dev logs to console |
+| `TWILIO_WHATSAPP_NUMBER` | WhatsApp sender | Optional | Falls back to Twilio sandbox number |
+| `NEXT_PUBLIC_POSTHOG_KEY` / `_HOST` | Product analytics | Recommended | No-op capture; prod logs an error |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe (DISABLED v1.0) | ❌ No | Service methods throw "Stripe is disabled for v1.0" |
+| `PLANE_*` (per-integration, encrypted at rest) | Plane PM sync | Per workspace | Integration shows disconnected |
+
 ---
 
 ## File storage (MinIO)

@@ -5,8 +5,11 @@ import { PostHogProvider as Provider } from "posthog-js/react";
 import { useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-if (typeof window !== "undefined") {
-  posthogClient.init(process.env.NEXT_PUBLIC_POSTHOG_KEY || "phc_mock_key_for_dev", {
+// Only initialise PostHog when a real key is configured — never ship a mock key
+// to the browser. With no key, analytics is a no-op and capture() calls are safe.
+const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+if (typeof window !== "undefined" && posthogKey) {
+  posthogClient.init(posthogKey, {
     api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://app.posthog.com",
     loaded: (client) => {
       if (process.env.NODE_ENV === "development") client.debug();

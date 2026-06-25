@@ -1,6 +1,19 @@
 import crypto from "crypto";
 
-const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || "sk_test_mock";
+/**
+ * Resolve the Paystack secret key at call time. In production a real key is
+ * mandatory — we throw rather than silently fall back to a mock key (which would
+ * make every live payment/webhook fail in confusing ways). In dev/test a clearly
+ * fake placeholder keeps local boot working without real credentials.
+ */
+function getPaystackSecretKey(): string {
+  const key = process.env.PAYSTACK_SECRET_KEY;
+  if (key) return key;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("PAYSTACK_SECRET_KEY is required in production");
+  }
+  return "sk_test_mock";
+}
 
 export class PaystackService {
   static async initializePayment(params: {
@@ -12,7 +25,7 @@ export class PaystackService {
     const response = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        Authorization: `Bearer ${getPaystackSecretKey()}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(params),
@@ -28,7 +41,7 @@ export class PaystackService {
   }
 
   static verifyWebhookSignature(signature: string, payload: string) {
-    const hash = crypto.createHmac("sha512", PAYSTACK_SECRET_KEY).update(payload).digest("hex");
+    const hash = crypto.createHmac("sha512", getPaystackSecretKey()).update(payload).digest("hex");
     return hash === signature;
   }
 }

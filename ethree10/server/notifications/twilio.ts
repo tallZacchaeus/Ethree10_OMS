@@ -5,6 +5,13 @@ export class TwilioService {
     const fromPhone = process.env.TWILIO_WHATSAPP_NUMBER || "whatsapp:+14155238886"; // Twilio sandbox number
 
     if (!accountSid || !authToken) {
+      // In production we must not pretend a message was sent — fail honestly so
+      // callers and monitoring see the misconfiguration. The console mock is a
+      // local-dev convenience only.
+      if (process.env.NODE_ENV === "production") {
+        console.error("Twilio credentials missing in production; cannot send WhatsApp to", toPhone);
+        return false;
+      }
       console.warn("Twilio credentials missing. Mocking WhatsApp message to", toPhone);
       console.log(`[WHATSAPP TO ${toPhone}]: ${body}`);
       return true;
