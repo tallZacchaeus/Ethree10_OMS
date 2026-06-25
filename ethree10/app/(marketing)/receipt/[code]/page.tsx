@@ -12,6 +12,7 @@ interface Props {
 const METHOD_LABELS: Record<string, string> = {
   paystack: "Paystack",
   bank_transfer: "Bank Transfer",
+  cheque: "Cheque",
   cash: "Cash",
   other: "Other",
 };

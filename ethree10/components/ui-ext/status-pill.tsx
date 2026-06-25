@@ -42,11 +42,20 @@ const LEAD_STATUS: Record<string, { label: string; variant: Variant }> = {
   rejected: { label: "Rejected", variant: "destructive" },
 };
 
+const INVOICE_STATUS: Record<string, { label: string; variant: Variant }> = {
+  draft: { label: "Draft", variant: "neutral" },
+  sent: { label: "Sent", variant: "info" },
+  paid: { label: "Paid", variant: "success" },
+  overdue: { label: "Overdue", variant: "destructive" },
+  void: { label: "Void", variant: "secondary" },
+};
+
 const MAPS = {
   request: REQUEST_STAGE,
   task: TASK_STATUS,
   project: PROJECT_STATUS,
   lead: LEAD_STATUS,
+  invoice: INVOICE_STATUS,
 } as const;
 
 export function StatusPill({

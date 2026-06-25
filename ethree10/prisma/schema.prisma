@@ -577,6 +577,7 @@ model Invoice {
 enum PaymentMethod {
   paystack
   bank_transfer
+  cheque
   cash
   other
 }
