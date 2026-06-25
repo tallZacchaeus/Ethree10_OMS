@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { PaystackService } from "@/server/services/paystack";
 import { ReceiptService } from "@/server/services/receipt";
+import { AuditService } from "@/server/services/audit";
 import { db } from "@/server/db/client";
 
 export async function POST(req: NextRequest) {
@@ -27,6 +28,16 @@ export async function POST(req: NextRequest) {
           paymentRef: String(data.id),
         },
       });
+
+      // Audit the payment state transition (no user actor — Paystack drove it).
+      await AuditService.log({
+        actorId: null,
+        workspaceId: invoice.workspaceId,
+        action: "invoice.paid",
+        entityType: "Invoice",
+        entityId: invoice.id,
+        after: { via: "paystack", paymentRef: String(data.id) },
+      }).catch((auditError) => console.error("Audit log failed for invoice.paid", auditError));
 
       // Auto-issue a receipt (idempotent on retries). A receipt/PDF failure must
       // not block the webhook ack, or Paystack will keep retrying.

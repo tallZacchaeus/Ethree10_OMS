@@ -4,8 +4,24 @@ import { db } from "@/server/db/client";
 import { AuditService } from "@/server/services/audit";
 import { NotificationService } from "@/server/services/notification";
 import { ProjectService } from "@/server/services/project";
+import { AuthorizationService } from "@/server/services/authorization";
 
 export class ProposalService {
+  /**
+   * A proposal may only be responded to (accepted/rejected) by someone who
+   * belongs to the proposal's workspace, or a super admin. Without this, any
+   * signed-in user could accept/reject another workspace's proposal by id.
+   */
+  private static async assertCanRespond(actorId: string, workspaceId: string | undefined) {
+    if (!workspaceId) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Proposal is not linked to a workspace." });
+    }
+    const ctx = await AuthorizationService.resolve(actorId, workspaceId);
+    if (!ctx.isSuperAdmin && ctx.membershipIds.length === 0) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "You do not have access to this proposal." });
+    }
+  }
+
   static async getById(id: string) {
     const proposal = await db.proposal.findUnique({
       where: { id },
@@ -172,6 +188,10 @@ export class ProposalService {
 
   static async accept(args: { actorId: string; proposalId: string }) {
     const before = await ProposalService.getById(args.proposalId);
+    await ProposalService.assertCanRespond(
+      args.actorId,
+      before.request?.workspaceId || before.project?.workspaceId,
+    );
     if (before.status !== "sent") {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Only sent proposals can be accepted." });
     }
@@ -228,6 +248,10 @@ export class ProposalService {
 
   static async reject(args: { actorId: string; proposalId: string; reason: string }) {
     const before = await ProposalService.getById(args.proposalId);
+    await ProposalService.assertCanRespond(
+      args.actorId,
+      before.request?.workspaceId || before.project?.workspaceId,
+    );
     const updated = await db.proposal.update({
       where: { id: args.proposalId },
       data: { status: "rejected" },
