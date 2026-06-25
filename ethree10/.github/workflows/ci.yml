@@ -131,7 +131,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm db:generate
-      - run: pnpm db:migrate
+      # This project uses `prisma db push` (no migrations folder).
+      - run: pnpm db:push
       - run: pnpm build
         env:
           CI: true

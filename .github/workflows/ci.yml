@@ -110,10 +110,13 @@ jobs:
       EMAIL_FROM: noreply@test.com
       REDIS_URL: redis://localhost:6379
       INTEGRATION_SECRET_KEY: ${{ secrets.INTEGRATION_SECRET_KEY || 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }}
-      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
-      SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key
+      STORAGE_ENDPOINT: http://127.0.0.1:9000
+      STORAGE_ACCESS_KEY: test-access-key
+      STORAGE_SECRET_KEY: test-secret-key
+      STORAGE_BUCKET: test-bucket
+      STORAGE_PUBLIC_URL: http://localhost:3000/files
       NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_STORAGE_URL: http://localhost:3000/files
       PLAYWRIGHT_BASE_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
@@ -128,7 +131,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm db:generate
-      - run: pnpm db:migrate
+      # This project uses `prisma db push` (no migrations folder); `migrate dev`
+      # would hang/fail in CI. db:push creates the schema incl. the Receipt table.
+      - run: pnpm db:push
       - run: pnpm build
         env:
           CI: true
@@ -157,10 +162,13 @@ jobs:
       EMAIL_FROM: noreply@test.com
       REDIS_URL: redis://localhost:6379
       INTEGRATION_SECRET_KEY: ${{ secrets.INTEGRATION_SECRET_KEY || 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }}
-      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
-      SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key
+      STORAGE_ENDPOINT: http://127.0.0.1:9000
+      STORAGE_ACCESS_KEY: test-access-key
+      STORAGE_SECRET_KEY: test-secret-key
+      STORAGE_BUCKET: test-bucket
+      STORAGE_PUBLIC_URL: http://localhost:3000/files
       NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_STORAGE_URL: http://localhost:3000/files
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
