@@ -1,5 +1,17 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// Locally, load .env so specs that talk to Postgres directly (e.g. the
+// invoice/receipt money-path spec) get DATABASE_URL. In CI the env is provided
+// by the workflow, so we only load when DATABASE_URL isn't already set.
+if (!process.env["DATABASE_URL"]) {
+  const proc = process as NodeJS.Process & { loadEnvFile?: (path?: string) => void };
+  try {
+    proc.loadEnvFile?.(".env");
+  } catch {
+    /* no .env present — rely on the ambient environment */
+  }
+}
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
