@@ -70,6 +70,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: ethree10/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/oms
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/oms
       - run: pnpm test
 
   test-e2e:
