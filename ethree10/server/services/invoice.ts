@@ -30,7 +30,7 @@ export class InvoiceService {
   static async generateInvoicePdf(invoiceId: string): Promise<string> {
     const invoice = await db.invoice.findUnique({
       where: { id: invoiceId },
-      include: { workspace: true },
+      include: { organization: true },
     });
     if (!invoice) throw new Error(`Invoice ${invoiceId} not found`);
 
@@ -42,7 +42,7 @@ export class InvoiceService {
         code: invoice.code,
         currency: invoice.currency,
         status: invoice.status,
-        billedTo: invoice.workspace.name,
+        billedTo: invoice.organization.name,
         issuedAt: invoice.issuedAt,
         dueAt: invoice.dueAt,
         lineItems: parseLineItems(invoice.lineItems),

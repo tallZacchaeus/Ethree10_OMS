@@ -2,7 +2,10 @@ import { db } from "@/server/db/client";
 
 export interface AuditEntry {
   actorId: string | null;
+  // Audit is agency-global now; any org/workspace hint passed by callers is accepted but
+  // ignored (kept optional so existing call sites compile without churn).
   workspaceId?: string | null;
+  organizationId?: string | null;
   action: string;
   entityType: string;
   entityId: string;
@@ -17,7 +20,6 @@ export class AuditService {
     await db.auditLog.create({
       data: {
         actorId: entry.actorId,
-        workspaceId: entry.workspaceId ?? null,
         action: entry.action,
         entityType: entry.entityType,
         entityId: entry.entityId,
@@ -30,14 +32,12 @@ export class AuditService {
   }
 
   static async list(opts: {
-    workspaceId?: string;
     entityType?: string;
     entityId?: string;
     limit?: number;
   }) {
     return db.auditLog.findMany({
       where: {
-        workspaceId: opts.workspaceId,
         entityType: opts.entityType,
         entityId: opts.entityId,
       },

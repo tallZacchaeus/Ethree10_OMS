@@ -17,7 +17,7 @@ export function receiptPublicUrl(code: string): string {
 }
 
 export interface IssueManualReceiptInput {
-  workspaceId: string;
+  organizationId: string;
   invoiceId?: string | null;
   amount: number;
   currency: string;
@@ -53,7 +53,7 @@ export class ReceiptService {
         data: {
           code: generateCode(),
           invoiceId,
-          workspaceId: invoice.workspaceId,
+          organizationId: invoice.organizationId,
           amount: invoice.amount,
           currency: invoice.currency,
           paymentMethod: opts.paymentMethod,
@@ -85,7 +85,7 @@ export class ReceiptService {
     const receipt = await db.receipt.create({
       data: {
         code: generateCode(),
-        workspaceId: input.workspaceId,
+        organizationId: input.organizationId,
         amount: new Prisma.Decimal(input.amount),
         currency: input.currency,
         paymentMethod: input.paymentMethod,
@@ -100,7 +100,7 @@ export class ReceiptService {
   static async generateReceiptPdf(receiptId: string): Promise<string> {
     const receipt = await db.receipt.findUnique({
       where: { id: receiptId },
-      include: { workspace: true, invoice: true },
+      include: { organization: true, invoice: true },
     });
     if (!receipt) throw new Error(`Receipt ${receiptId} not found`);
 
@@ -112,7 +112,7 @@ export class ReceiptService {
         code: receipt.code,
         currency: receipt.currency,
         amount: Number(receipt.amount),
-        paidBy: receipt.workspace.name,
+        paidBy: receipt.organization.name,
         paymentMethod: receipt.paymentMethod,
         paymentRef: receipt.paymentRef,
         issuedAt: receipt.issuedAt,
