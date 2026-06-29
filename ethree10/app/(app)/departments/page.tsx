@@ -112,7 +112,7 @@ export default function DepartmentsPage() {
   });
 
   const canManage =
-    isSuperAdmin || roles.some((r) => ["agency_admin", "agency_lead"].includes(r));
+    isSuperAdmin || roles.some((r) => ["admin"].includes(r));
 
   return (
     <div className="space-y-6">

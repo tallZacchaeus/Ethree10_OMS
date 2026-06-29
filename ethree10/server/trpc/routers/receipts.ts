@@ -11,11 +11,7 @@ import { AuditService } from "@/server/services/audit";
 
 async function requireAgencyView(userId: string) {
   const authCtx = await getAgencyAuthContext(userId);
-  if (
-    !authCtx.isSuperAdmin &&
-    !authCtx.roles.includes("agency_admin") &&
-    !authCtx.roles.includes("agency_lead")
-  ) {
+  if (!authCtx.isSuperAdmin && !authCtx.roles.includes("admin")) {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
 }

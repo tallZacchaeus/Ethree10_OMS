@@ -4,55 +4,11 @@ import { db } from "@/server/db/client";
 import { getAgencyAuthContext } from "@/server/services/agency";
 import { can } from "@/server/auth/permissions";
 
-const REQUESTER_ROLES = ["requester_admin", "requester_member", "requester_observer"] as const;
+const REQUESTER_ROLES = ["client", "client_viewer"] as const;
 
 export const dashboardRouter = router({
-  subUnitLead: protectedProcedure.query(async ({ ctx }) => {
-    const agencyCtx = await getAgencyAuthContext(ctx.userId);
-    if (!can(agencyCtx, "task.review")) return null;
-
-    const mySubUnits = await db.subUnit.findMany({
-      where: { leadId: ctx.userId },
-      select: { id: true, name: true },
-    });
-
-    if (mySubUnits.length === 0) return null;
-    const subUnitIds = mySubUnits.map((subUnit) => subUnit.id);
-    const now = new Date();
-
-    const reviewQueue = await db.task.findMany({
-      where: {
-        subUnitId: { in: subUnitIds },
-        status: "in_review",
-      },
-      include: {
-        project: { select: { id: true, name: true, code: true } },
-      },
-      orderBy: { updatedAt: "desc" },
-    });
-
-    const activeTasks = await db.task.findMany({
-      where: {
-        subUnitId: { in: subUnitIds },
-        status: { notIn: ["done", "cancelled"] },
-      },
-      include: {
-        project: { select: { id: true, name: true, code: true } },
-      },
-      orderBy: [{ dueDate: "asc" }, { updatedAt: "desc" }],
-    });
-
-    const overdueTasksCount = activeTasks.filter(
-      (task) => task.dueDate && task.dueDate < now && task.status !== "in_review",
-    ).length;
-
-    return {
-      reviewQueue,
-      activeTasks,
-      overdueTasksCount,
-      subUnits: mySubUnits,
-    };
-  }),
+  // Sub-unit-lead rollup retired in the role simplification: the subunit_lead role was folded
+  // into department_lead, so sub-unit work now rolls up through the department surfaces below.
 
   departmentLead: protectedProcedure.query(async ({ ctx }) => {
     const agencyCtx = await getAgencyAuthContext(ctx.userId);

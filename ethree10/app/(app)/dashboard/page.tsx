@@ -7,7 +7,6 @@ import {
   Briefcase,
   CheckCircle2,
   CheckSquare,
-  ClipboardList,
   FileClock,
   FolderKanban,
   Inbox,
@@ -31,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useWorkspace } from "@/components/providers/workspace-provider";
 import { KpiWidget } from "@/components/dashboard/kpi-widget";
+import { FirstRunChecklist } from "@/components/dashboard/first-run-checklist";
 import { AnimatedItem, AnimatedPage, AnimatedSection } from "@/components/ui-ext/animated";
 
 export default function DashboardPage() {
@@ -42,9 +42,6 @@ export default function DashboardPage() {
   });
   const { data: myWeek } = trpc.reports.myCurrentWeek.useQuery(undefined, {
     enabled: experience.isMember,
-  });
-  const { data: subUnitData } = trpc.dashboard.subUnitLead.useQuery(undefined, {
-    enabled: experience.isSubUnitLead,
   });
   const { data: deptData } = trpc.dashboard.departmentLead.useQuery(undefined, {
     enabled: experience.isDeptLead,
@@ -80,6 +77,13 @@ export default function DashboardPage() {
           showRequestCta={experience.isRequester}
         />
       </AnimatedSection>
+
+      {/* Admin-only "ready to use" setup checklist (isAgencyLead && isMember == admin/super_admin). */}
+      {experience.isAgencyLead && experience.isMember && (
+        <AnimatedSection delay={60}>
+          <FirstRunChecklist enabled />
+        </AnimatedSection>
+      )}
 
       {experience.isRequester && requesterData && (
         <AnimatedSection className="space-y-4" delay={80}>
@@ -241,77 +245,6 @@ export default function DashboardPage() {
         </AnimatedSection>
       )}
 
-      {experience.isSubUnitLead && subUnitData && subUnitData.subUnits.length > 0 && (
-        <AnimatedSection className="space-y-4 border-t pt-6" delay={160}>
-          <SectionHeader
-            title="Sub-unit operations"
-            description="Review work waiting on sign-off and spot execution risks early."
-          />
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <StatCard
-              label="Review queue"
-              value={subUnitData.reviewQueue.length}
-              icon={ClipboardList}
-              tone="signature"
-            />
-            <StatCard
-              label="Active tasks"
-              value={subUnitData.activeTasks.length}
-              icon={FolderKanban}
-              className="surface-hover"
-            />
-            <StatCard
-              label="Overdue active tasks"
-              value={subUnitData.overdueTasksCount}
-              icon={AlertTriangle}
-              className="surface-hover"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <SurfaceCard title="Completion review queue" description="Tasks waiting for your validation.">
-              {subUnitData.reviewQueue.length === 0 ? (
-                <EmptyState message="No tasks awaiting review." />
-              ) : (
-                subUnitData.reviewQueue.map((task, index) => (
-                  <AnimatedItem key={task.id} delay={index * 50}>
-                    <LinkCard href={`/tasks/${task.id}`}>
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <span className="block min-w-0 truncate font-medium">{task.title}</span>
-                        <p className="text-xs text-muted-foreground">{task.project?.name}</p>
-                      </div>
-                      <StatusPill kind="task" value="in_review" />
-                    </LinkCard>
-                  </AnimatedItem>
-                ))
-              )}
-            </SurfaceCard>
-
-            <SurfaceCard title="Sub-unit active tasks" description="The most time-sensitive work across your team.">
-              {subUnitData.activeTasks.length === 0 ? (
-                <EmptyState message="No active tasks in your sub-units." />
-              ) : (
-                subUnitData.activeTasks.slice(0, 5).map((task, index) => (
-                  <AnimatedItem key={task.id} delay={index * 50}>
-                    <LinkCard href={`/tasks/${task.id}`}>
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <span className="block min-w-0 truncate font-medium">{task.title}</span>
-                        <p className="text-xs text-muted-foreground">
-                          {task.project?.name}
-                          {task.dueDate ? ` · Due ${formatDate(task.dueDate)}` : ""}
-                        </p>
-                      </div>
-                      <StatusPill kind="task" value={task.status} />
-                    </LinkCard>
-                  </AnimatedItem>
-                ))
-              )}
-            </SurfaceCard>
-          </div>
-        </AnimatedSection>
-      )}
-
       {experience.isDeptLead && deptData && deptData.departments.length > 0 && (
         <AnimatedSection className="space-y-4 border-t pt-6" delay={220}>
           <SectionHeader
@@ -386,8 +319,12 @@ export default function DashboardPage() {
       {experience.isAgencyLead && agencyData && (
         <AnimatedSection className="space-y-4 border-t pt-6" delay={280}>
           <SectionHeader
-            title="Agency overview"
-            description="A real leadership surface for queue health, throughput, and delivery pressure."
+            title={experience.isExecutive && !experience.isMember ? "Executive overview" : "Agency overview"}
+            description={
+              experience.isExecutive && !experience.isMember
+                ? "A read-only pulse of the whole agency — queue health, throughput, and delivery pressure across both departments."
+                : "A real leadership surface for queue health, throughput, and delivery pressure."
+            }
           />
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">

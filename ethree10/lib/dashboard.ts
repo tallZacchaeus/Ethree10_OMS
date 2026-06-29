@@ -1,28 +1,28 @@
 import type { Role } from "@prisma/client";
 import type { BadgeProps } from "@/components/ui/badge";
 
-const REQUESTER_ROLES: Role[] = [
-  "requester_admin",
-  "requester_member",
-  "requester_observer",
-];
+const REQUESTER_ROLES: Role[] = ["client", "client_viewer"];
 
 type CapacityVariant = NonNullable<BadgeProps["variant"]>;
 
 export function getDashboardExperience(roles: Role[], isSuperAdmin: boolean) {
-  const isAgencyLead =
-    isSuperAdmin || roles.includes("agency_admin") || roles.includes("agency_lead");
-  const isDeptLead = isAgencyLead || roles.includes("department_lead");
-  const isSubUnitLead = isDeptLead || roles.includes("subunit_lead");
-  const isMember = isSubUnitLead || roles.includes("member") || roles.includes("project_manager");
+  const isAdmin = isSuperAdmin || roles.includes("admin");
+  const isExecutive = roles.includes("executive");
+  // Agency-wide overview surface — admins plus the executive oversight role.
+  const isAgencyLead = isAdmin || isExecutive;
+  // Operational tiers. The executive is read-only oversight, so it is deliberately excluded
+  // from the personal "My work" and department-execution surfaces — it only gets the
+  // agency-wide overview above. (Sub-unit lead role was removed; dept leads cover sub-units.)
+  const isDeptLead = isAdmin || roles.includes("department_lead");
+  const isMember = isDeptLead || roles.includes("member");
   const isRequester = roles.some((role) => REQUESTER_ROLES.includes(role));
 
   return {
     isAgencyLead,
     isDeptLead,
-    isSubUnitLead,
     isMember,
     isRequester,
+    isExecutive,
   };
 }
 

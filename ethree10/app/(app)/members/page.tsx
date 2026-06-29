@@ -40,15 +40,12 @@ import { humanize } from "@/lib/constants";
 import type { Role } from "@prisma/client";
 
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
-  { value: "agency_admin",       label: "Agency Admin" },
-  { value: "agency_lead",        label: "Agency Lead" },
-  { value: "department_lead",    label: "Department Lead" },
-  { value: "subunit_lead",       label: "Sub-unit Lead" },
-  { value: "project_manager",    label: "Project Manager" },
-  { value: "member",             label: "Member" },
-  { value: "requester_admin",    label: "Requester Admin (client)" },
-  { value: "requester_member",   label: "Requester Member (client)" },
-  { value: "requester_observer", label: "Requester Observer (client)" },
+  { value: "admin",           label: "Admin" },
+  { value: "executive",       label: "Executive Overview" },
+  { value: "department_lead", label: "Department Lead" },
+  { value: "member",          label: "Member" },
+  { value: "client",          label: "Client" },
+  { value: "client_viewer",   label: "Client Viewer (read-only)" },
 ];
 
 export default function MembersPage() {
@@ -65,7 +62,7 @@ export default function MembersPage() {
   const [subUnitId, setSubUnitId] = useState<string>("");
 
   const canInvite = isSuperAdmin || roles.some(r =>
-    ["agency_admin", "agency_lead"].includes(r)
+    ["admin"].includes(r)
   );
 
   const { data, isLoading, refetch } = trpc.members.list.useQuery(undefined, {

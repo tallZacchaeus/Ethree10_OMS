@@ -7,6 +7,7 @@ import { getAgencyWorkspaceId } from "@/server/services/agency";
 import { ProjectService } from "@/server/services/project";
 import { ApprovalService } from "@/server/services/approval";
 import { generateCode } from "@/lib/utils/codes";
+import { departmentSlugForTaskType } from "@/lib/request-types";
 
 export const ALLOWED_TRANSITIONS: Record<RequestStage, RequestStage[]> = {
   submitted: ["under_review", "rejected", "cancelled", "pending_approval"],
@@ -52,13 +53,30 @@ async function agencyLeadUserIds(): Promise<string[]> {
   const leads = await db.membership.findMany({
     where: {
       workspaceId: agencyId,
-      role: { in: ["agency_lead", "agency_admin"] },
+      role: { in: ["admin"] },
       removedAt: null,
       acceptedAt: { not: null },
     },
     select: { userId: true },
   });
   return leads.map((m) => m.userId);
+}
+
+/**
+ * Resolve the agency department a request should route to, based on its task type.
+ * Returns null when the type isn't in the catalog or the matching department doesn't exist
+ * (e.g. legacy free-text types) — the request then stays unrouted for manual triage.
+ */
+async function resolveRoutedDepartmentId(projectType: string): Promise<string | null> {
+  const slug = departmentSlugForTaskType(projectType);
+  if (!slug) return null;
+  const agencyId = await getAgencyWorkspaceId();
+  if (!agencyId) return null;
+  const dept = await db.department.findFirst({
+    where: { workspaceId: agencyId, slug, archivedAt: null },
+    select: { id: true },
+  });
+  return dept?.id ?? null;
 }
 
 export class RequestService {
@@ -138,6 +156,11 @@ export class RequestService {
   }) {
     const seq = await nextRequestSeq(args.workspaceId);
     const code = generateCode("request", seq);
+
+    // Self-routing: derive the target department from the chosen task type so the request
+    // lands with the right team (Creative vs Product Development) without manual triage.
+    const routedDepartmentId = await resolveRoutedDepartmentId(args.input.projectType);
+
     const created = await db.request.create({
       data: {
         code,
@@ -146,6 +169,7 @@ export class RequestService {
         title: args.input.title,
         description: args.input.description,
         projectType: args.input.projectType,
+        routedDepartmentId,
         urgency: args.input.urgency,
         deadline: args.input.deadline ?? null,
         primaryContact: args.input.primaryContact ?? null,

@@ -18,7 +18,7 @@ export default function RequestsPage() {
   const isAgencyStaff =
     isSuperAdmin ||
     roles.some((r) =>
-      ["agency_admin", "agency_lead", "department_lead", "subunit_lead", "project_manager", "member"].includes(r),
+      ["admin", "executive", "department_lead", "member"].includes(r),
     );
 
   

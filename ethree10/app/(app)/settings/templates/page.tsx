@@ -12,7 +12,7 @@ export default function TemplatesPage() {
   const { roles, isSuperAdmin } = useWorkspace();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  const isAgencyAdmin = isSuperAdmin || roles.includes("agency_admin") || roles.includes("agency_lead");
+  const isAgencyAdmin = isSuperAdmin || roles.includes("admin");
 
   const { data: templates, isLoading, refetch } = trpc.templates.list.useQuery();
 

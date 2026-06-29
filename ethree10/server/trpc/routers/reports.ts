@@ -16,7 +16,7 @@ export const reportsRouter = router({
     .input(
       z
         .object({
-          level: z.enum(["member", "subunit", "department", "agency"]).optional(),
+          level: z.enum(["member", "department", "agency"]).optional(),
           scopeId: z.string().optional(),
         })
         .optional(),
