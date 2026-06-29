@@ -2,7 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { RequestStage, Urgency } from "@prisma/client";
 import { router, publicProcedure } from "../trpc";
-import { protectedProcedure, workspaceProcedure } from "../procedures";
+import { protectedProcedure, orgProcedure } from "../procedures";
 import { db } from "@/server/db/client";
 import { can } from "@/server/auth/permissions";
 import { RequestService } from "@/server/services/request";
@@ -10,7 +10,6 @@ import { LeadService } from "@/server/services/lead";
 import { posthogServer } from "@/lib/posthog";
 import {
   getAgencyAuthContext,
-  getAgencyWorkspaceId,
   requireAgencyAction,
 } from "@/server/services/agency";
 
@@ -42,7 +41,7 @@ async function assertCanReadRequest(userId: string, requestId: string) {
   const membership = await db.membership.findFirst({
     where: {
       userId,
-      workspaceId: request.workspaceId,
+      organizationId: request.organizationId,
       removedAt: null,
       acceptedAt: { not: null },
     },
@@ -70,7 +69,7 @@ export const requestsRouter = router({
       return { ok: true };
     }),
 
-  list: workspaceProcedure
+  list: orgProcedure
     .input(
       z
         .object({
@@ -82,7 +81,7 @@ export const requestsRouter = router({
     )
     .query(async ({ ctx, input }) => {
       await ctx.authorize("request.read");
-      return RequestService.listForWorkspace(ctx.workspaceId, {
+      return RequestService.listForWorkspace(ctx.organizationId, {
         stage: input?.stage,
         routedDepartmentId: input?.routedDepartmentId,
         limit: input?.limit,
@@ -113,10 +112,8 @@ export const requestsRouter = router({
   /** Agency departments available as routing targets. */
   agencyDepartments: protectedProcedure.query(async ({ ctx }) => {
     await requireAgencyAction(ctx.userId, "request.read");
-    const agencyId = await getAgencyWorkspaceId();
-    if (!agencyId) return [];
     return db.department.findMany({
-      where: { workspaceId: agencyId, archivedAt: null },
+      where: { archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, slug: true, color: true },
     });
@@ -136,18 +133,18 @@ export const requestsRouter = router({
       return request;
     }),
 
-  create: workspaceProcedure.input(createInput).mutation(async ({ ctx, input }) => {
+  create: orgProcedure.input(createInput).mutation(async ({ ctx, input }) => {
     await ctx.authorize("request.create");
     const request = await RequestService.create({
       actorId: ctx.userId,
-      workspaceId: ctx.workspaceId,
+      organizationId: ctx.organizationId,
       input,
     });
-    
+
     posthogServer.capture({
       distinctId: ctx.userId,
       event: "request_submitted",
-      properties: { requestId: request.id, workspaceId: ctx.workspaceId },
+      properties: { requestId: request.id, organizationId: ctx.organizationId },
     });
     
     return request;
