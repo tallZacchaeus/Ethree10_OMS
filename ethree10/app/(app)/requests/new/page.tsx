@@ -7,13 +7,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { TASK_TYPE_GROUPS, isOtherTaskType } from "@/lib/request-types";
 
 export default function NewRequestPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [projectType, setProjectType] = useState("");
+  const [otherDetail, setOtherDetail] = useState("");
+  const needsOtherDetail = isOtherTaskType(projectType);
   
   const createRequest = trpc.requests.create.useMutation({
     onSuccess: (data) => {
@@ -35,21 +47,38 @@ export default function NewRequestPage() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (!projectType) {
+      toast({ title: "Pick a task type", description: "Tell us what you need done.", variant: "destructive" });
+      return;
+    }
+    if (needsOtherDetail && !otherDetail.trim()) {
+      toast({ title: "Describe your request", description: "Add a short note for the “Other” task type.", variant: "destructive" });
+      return;
+    }
+
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
-    
+
     // Parse deadline
     const deadlineStr = formData.get("deadline") as string;
     const deadline = deadlineStr ? new Date(deadlineStr) : undefined;
-    
+
     // Parse budget
     const budgetStr = formData.get("budgetEstimate") as string;
     const budgetEstimate = budgetStr ? parseFloat(budgetStr) : undefined;
 
+    // For "Other", capture the free-text detail at the top of the description so the team
+    // sees exactly what was requested (the task type itself still drives routing).
+    const baseDescription = formData.get("description") as string;
+    const description = needsOtherDetail
+      ? `Requested (other): ${otherDetail.trim()}\n\n${baseDescription}`
+      : baseDescription;
+
     createRequest.mutate({
       title: formData.get("title") as string,
-      description: formData.get("description") as string,
-      projectType: formData.get("projectType") as string,
+      description,
+      projectType,
       urgency: formData.get("urgency") as "low" | "medium" | "high" | "critical",
       primaryContact: formData.get("primaryContact") as string,
       deadline,
@@ -88,17 +117,22 @@ export default function NewRequestPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="projectType">Project Type *</Label>
-              <Select name="projectType" defaultValue="web_app">
+              <Label htmlFor="projectType">What do you need? *</Label>
+              <Select value={projectType} onValueChange={setProjectType}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue placeholder="Select a task type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="web_app">Web Application</SelectItem>
-                  <SelectItem value="marketing_site">Marketing Site</SelectItem>
-                  <SelectItem value="mobile_app">Mobile App</SelectItem>
-                  <SelectItem value="design">Design / Creative</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  {TASK_TYPE_GROUPS.map((group) => (
+                    <SelectGroup key={group.departmentSlug}>
+                      <SelectLabel>{group.department}</SelectLabel>
+                      {group.options.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -118,6 +152,18 @@ export default function NewRequestPage() {
               </Select>
             </div>
           </div>
+
+          {needsOtherDetail && (
+            <div className="space-y-2">
+              <Label htmlFor="otherDetail">Describe what you need *</Label>
+              <Input
+                id="otherDetail"
+                value={otherDetail}
+                onChange={(e) => setOtherDetail(e.target.value)}
+                placeholder="e.g. A printed event programme booklet"
+              />
+            </div>
+          )}
         </div>
 
         <div className="space-y-4 bg-card p-6 rounded-lg border">

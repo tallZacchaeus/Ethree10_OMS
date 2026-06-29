@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { WorkspaceType, Role } from "@prisma/client";
 import { router } from "../trpc";
 import { protectedProcedure, workspaceProcedure, superAdminProcedure } from "../procedures";
+import { DEFAULT_DEPARTMENTS } from "@/lib/request-types";
 
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -92,6 +93,19 @@ export const workspacesRouter = router({
             isPrimary: false,
             acceptedAt: new Date(),
           },
+        });
+      }
+      // Ready-to-use: an agency workspace ships with its two fixed departments.
+      if (input.type === WorkspaceType.agency) {
+        await ctx.db.department.createMany({
+          data: DEFAULT_DEPARTMENTS.map((d) => ({
+            workspaceId: workspace.id,
+            name: d.name,
+            slug: d.slug,
+            description: d.description,
+            color: d.color,
+          })),
+          skipDuplicates: true,
         });
       }
       return workspace;

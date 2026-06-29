@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { labelForTaskType } from "@/lib/request-types";
 import { StatusPill } from "@/components/ui-ext/status-pill";
 import { UrgencyTag } from "@/components/ui-ext/urgency-tag";
 import { useWorkspace } from "@/components/providers/workspace-provider";
@@ -216,7 +217,7 @@ export default function RequestDetailPage() {
               <CardTitle>Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <Detail label="Project type" value={request.projectType} />
+              <Detail label="Task type" value={labelForTaskType(request.projectType)} />
               <Separator />
               <Detail label="Department" value={request.routedDepartment?.name ?? "Unassigned"} />
               <Separator />

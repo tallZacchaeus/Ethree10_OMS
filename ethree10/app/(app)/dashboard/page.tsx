@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useWorkspace } from "@/components/providers/workspace-provider";
 import { KpiWidget } from "@/components/dashboard/kpi-widget";
+import { FirstRunChecklist } from "@/components/dashboard/first-run-checklist";
 import { AnimatedItem, AnimatedPage, AnimatedSection } from "@/components/ui-ext/animated";
 
 export default function DashboardPage() {
@@ -80,6 +81,13 @@ export default function DashboardPage() {
           showRequestCta={experience.isRequester}
         />
       </AnimatedSection>
+
+      {/* Admin-only "ready to use" setup checklist (isAgencyLead && isMember == admin/super_admin). */}
+      {experience.isAgencyLead && experience.isMember && (
+        <AnimatedSection delay={60}>
+          <FirstRunChecklist enabled />
+        </AnimatedSection>
+      )}
 
       {experience.isRequester && requesterData && (
         <AnimatedSection className="space-y-4" delay={80}>

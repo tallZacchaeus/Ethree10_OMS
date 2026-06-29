@@ -1,4 +1,5 @@
 import { PrismaClient, Role, WorkspaceType, RequestStage, Urgency, TaskStatus, TaskPriority } from "@prisma/client";
+import { DEFAULT_DEPARTMENTS, DEPARTMENT_SLUGS } from "../lib/request-types";
 
 const prisma = new PrismaClient();
 
@@ -94,20 +95,27 @@ async function main() {
     });
   }
 
-  // ── Product & Tech Department ──────────────────────────────────────────
-  const productTech = await prisma.department.upsert({
-    where: { workspaceId_slug: { workspaceId: ethree10.id, slug: "product-tech" } },
-    update: {},
-    create: {
-      workspaceId: ethree10.id,
-      name: "Product & Tech",
-      slug: "product-tech",
-      description: "Engineering, design, and product management.",
-      color: "#6366F1",
-      leadId: superAdmin.id,
-    },
-  });
+  // ── Departments (the two fixed agency departments) ─────────────────────
+  const departmentsBySlug: Record<string, { id: string }> = {};
+  for (const dept of DEFAULT_DEPARTMENTS) {
+    departmentsBySlug[dept.slug] = await prisma.department.upsert({
+      where: { workspaceId_slug: { workspaceId: ethree10.id, slug: dept.slug } },
+      update: { name: dept.name, description: dept.description, color: dept.color },
+      create: {
+        workspaceId: ethree10.id,
+        name: dept.name,
+        slug: dept.slug,
+        description: dept.description,
+        color: dept.color,
+        leadId: superAdmin.id,
+      },
+    });
+  }
+  // Product Development is the lead's own team; used for the demo project/request below.
+  const productTech = departmentsBySlug[DEPARTMENT_SLUGS.productDevelopment];
+  if (!productTech) throw new Error("Seed failed: Product Development department missing.");
 
+  // Sub-units are kept in the model but hidden in the UI; seed a couple under Product Dev.
   const backend = await prisma.subUnit.upsert({
     where: { departmentId_slug: { departmentId: productTech.id, slug: "backend" } },
     update: {},
@@ -161,7 +169,7 @@ async function main() {
       submittedById: superAdmin.id,
       title: "Lightbearers Hub site refresh",
       description: "Redesign and rebuild the Lightbearers Hub website with a fresh brand identity and improved mobile experience.",
-      projectType: "Website",
+      projectType: "website",
       urgency: Urgency.medium,
       stage: RequestStage.submitted,
     },
@@ -177,7 +185,7 @@ async function main() {
       submittedById: superAdmin.id,
       title: "R4C global event booking platform",
       description: "Build an event management and booking platform for Reach4Christ's annual summit.",
-      projectType: "Internal Tool",
+      projectType: "software_automation",
       urgency: Urgency.high,
       stage: RequestStage.in_progress,
       routedDepartmentId: productTech.id,
