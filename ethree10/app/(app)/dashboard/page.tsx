@@ -386,8 +386,12 @@ export default function DashboardPage() {
       {experience.isAgencyLead && agencyData && (
         <AnimatedSection className="space-y-4 border-t pt-6" delay={280}>
           <SectionHeader
-            title="Agency overview"
-            description="A real leadership surface for queue health, throughput, and delivery pressure."
+            title={experience.isExecutive && !experience.isMember ? "Executive overview" : "Agency overview"}
+            description={
+              experience.isExecutive && !experience.isMember
+                ? "A read-only pulse of the whole agency — queue health, throughput, and delivery pressure across both departments."
+                : "A real leadership surface for queue health, throughput, and delivery pressure."
+            }
           />
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">

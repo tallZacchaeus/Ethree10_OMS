@@ -87,10 +87,38 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
+/**
+ * Focused portal nav for client-only users (no internal/staff role). Keeps the surface to the
+ * essentials — submit & track work, see deliveries, manage the account — with no org structure.
+ */
+const CLIENT_NAV: NavSection[] = [
+  {
+    title: "Portal",
+    items: [
+      { href: "/dashboard", label: "Home", icon: LayoutDashboard, allow: "all" },
+      { href: "/requests", label: "My Requests", icon: FileText, allow: "all" },
+      { href: "/projects", label: "My Projects", icon: FolderKanban, allow: "all" },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      { href: "/settings", label: "Settings", icon: Settings, allow: "all" },
+    ],
+  },
+];
+
+const CLIENT_ROLES: Role[] = ["client", "client_viewer"];
+
 /** Shared sidebar inner content — used by the desktop rail and the mobile drawer. */
 export function SidebarContent() {
   const pathname = usePathname();
   const { roles, isSuperAdmin } = useWorkspace();
+
+  // A client-only user (no staff role, not super admin) gets the trimmed portal nav.
+  const isClientOnly =
+    !isSuperAdmin && roles.length > 0 && roles.every((r) => CLIENT_ROLES.includes(r));
+  const sections = isClientOnly ? CLIENT_NAV : NAV_SECTIONS;
 
   const canSee = (item: NavItem) =>
     item.allow === "all" || isSuperAdmin || item.allow.some((r) => roles.includes(r));
@@ -107,7 +135,7 @@ export function SidebarContent() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-5">
-        {NAV_SECTIONS.map((section) => {
+        {sections.map((section) => {
           const items = section.items.filter(canSee);
           if (items.length === 0) return null;
           return (

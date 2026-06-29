@@ -24,12 +24,15 @@ describe("dashboard helpers", () => {
     expect(experience.isMember).toBe(true);
   });
 
-  it("gives the executive the agency-wide overview", () => {
+  it("gives the executive a focused agency-wide overview only", () => {
     const experience = getDashboardExperience(["executive"], false);
 
+    // Agency-wide read surface...
     expect(experience.isAgencyLead).toBe(true);
-    expect(experience.isDeptLead).toBe(true);
-    expect(experience.isMember).toBe(true);
+    expect(experience.isExecutive).toBe(true);
+    // ...but not the operational/personal surfaces (read-only oversight).
+    expect(experience.isDeptLead).toBe(false);
+    expect(experience.isMember).toBe(false);
     expect(experience.isRequester).toBe(false);
   });
 
