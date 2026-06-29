@@ -7,7 +7,6 @@ import {
   Briefcase,
   CheckCircle2,
   CheckSquare,
-  ClipboardList,
   FileClock,
   FolderKanban,
   Inbox,
@@ -43,9 +42,6 @@ export default function DashboardPage() {
   });
   const { data: myWeek } = trpc.reports.myCurrentWeek.useQuery(undefined, {
     enabled: experience.isMember,
-  });
-  const { data: subUnitData } = trpc.dashboard.subUnitLead.useQuery(undefined, {
-    enabled: experience.isSubUnitLead,
   });
   const { data: deptData } = trpc.dashboard.departmentLead.useQuery(undefined, {
     enabled: experience.isDeptLead,
@@ -244,77 +240,6 @@ export default function DashboardPage() {
               <MetricRow label="Tasks completed" value={`${myWeek?.metrics?.tasksCompleted ?? 0}`} />
               <MetricRow label="On-time rate" value={formatPercentage(myWeek?.metrics?.onTimeRate)} />
               <MetricRow label="Hours logged" value={`${myWeek?.metrics?.hoursLogged ?? 0}`} />
-            </SurfaceCard>
-          </div>
-        </AnimatedSection>
-      )}
-
-      {experience.isSubUnitLead && subUnitData && subUnitData.subUnits.length > 0 && (
-        <AnimatedSection className="space-y-4 border-t pt-6" delay={160}>
-          <SectionHeader
-            title="Sub-unit operations"
-            description="Review work waiting on sign-off and spot execution risks early."
-          />
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <StatCard
-              label="Review queue"
-              value={subUnitData.reviewQueue.length}
-              icon={ClipboardList}
-              tone="signature"
-            />
-            <StatCard
-              label="Active tasks"
-              value={subUnitData.activeTasks.length}
-              icon={FolderKanban}
-              className="surface-hover"
-            />
-            <StatCard
-              label="Overdue active tasks"
-              value={subUnitData.overdueTasksCount}
-              icon={AlertTriangle}
-              className="surface-hover"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <SurfaceCard title="Completion review queue" description="Tasks waiting for your validation.">
-              {subUnitData.reviewQueue.length === 0 ? (
-                <EmptyState message="No tasks awaiting review." />
-              ) : (
-                subUnitData.reviewQueue.map((task, index) => (
-                  <AnimatedItem key={task.id} delay={index * 50}>
-                    <LinkCard href={`/tasks/${task.id}`}>
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <span className="block min-w-0 truncate font-medium">{task.title}</span>
-                        <p className="text-xs text-muted-foreground">{task.project?.name}</p>
-                      </div>
-                      <StatusPill kind="task" value="in_review" />
-                    </LinkCard>
-                  </AnimatedItem>
-                ))
-              )}
-            </SurfaceCard>
-
-            <SurfaceCard title="Sub-unit active tasks" description="The most time-sensitive work across your team.">
-              {subUnitData.activeTasks.length === 0 ? (
-                <EmptyState message="No active tasks in your sub-units." />
-              ) : (
-                subUnitData.activeTasks.slice(0, 5).map((task, index) => (
-                  <AnimatedItem key={task.id} delay={index * 50}>
-                    <LinkCard href={`/tasks/${task.id}`}>
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <span className="block min-w-0 truncate font-medium">{task.title}</span>
-                        <p className="text-xs text-muted-foreground">
-                          {task.project?.name}
-                          {task.dueDate ? ` · Due ${formatDate(task.dueDate)}` : ""}
-                        </p>
-                      </div>
-                      <StatusPill kind="task" value={task.status} />
-                    </LinkCard>
-                  </AnimatedItem>
-                ))
-              )}
             </SurfaceCard>
           </div>
         </AnimatedSection>

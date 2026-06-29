@@ -14,14 +14,12 @@ export function getDashboardExperience(roles: Role[], isSuperAdmin: boolean) {
   // from the personal "My work" and department-execution surfaces — it only gets the
   // agency-wide overview above. (Sub-unit lead role was removed; dept leads cover sub-units.)
   const isDeptLead = isAdmin || roles.includes("department_lead");
-  const isSubUnitLead = isDeptLead;
   const isMember = isDeptLead || roles.includes("member");
   const isRequester = roles.some((role) => REQUESTER_ROLES.includes(role));
 
   return {
     isAgencyLead,
     isDeptLead,
-    isSubUnitLead,
     isMember,
     isRequester,
     isExecutive,

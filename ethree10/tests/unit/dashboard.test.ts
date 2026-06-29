@@ -20,7 +20,6 @@ describe("dashboard helpers", () => {
 
     expect(experience.isAgencyLead).toBe(true);
     expect(experience.isDeptLead).toBe(true);
-    expect(experience.isSubUnitLead).toBe(true);
     expect(experience.isMember).toBe(true);
   });
 

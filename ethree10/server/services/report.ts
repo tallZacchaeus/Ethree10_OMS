@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { db } from "@/server/db/client";
-import { type ReportLevel, type ReportPeriod, type Report } from "@prisma/client";
+import { type ReportPeriod } from "@prisma/client";
 import { KpiService } from "@/server/services/kpi";
 import { NotificationService } from "@/server/services/notification";
 
@@ -36,7 +36,7 @@ export interface SubUnitMetrics {
 }
 
 export class ReportService {
-  static async list(filters: { level?: "member" | "subunit" | "department" | "agency"; scopeId?: string } = {}) {
+  static async list(filters: { level?: "member" | "department" | "agency"; scopeId?: string } = {}) {
     return db.report.findMany({
       where: filters,
       orderBy: { createdAt: "desc" },
