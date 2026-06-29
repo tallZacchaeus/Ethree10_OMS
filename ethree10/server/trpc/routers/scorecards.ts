@@ -7,10 +7,10 @@ import { ReportLevel } from "@prisma/client";
 
 export const scorecardsRouter = router({
   list: protectedProcedure
-    .input(z.object({ workspaceId: z.string() }))
+    .input(z.object({ level: z.nativeEnum(ReportLevel).optional() }).optional())
     .query(async ({ input }) => {
       return db.scorecardConfig.findMany({
-        where: { workspaceId: input.workspaceId },
+        where: input?.level ? { level: input.level } : undefined,
       });
     }),
 
@@ -25,7 +25,6 @@ export const scorecardsRouter = router({
   create: protectedProcedure
     .input(
       z.object({
-        workspaceId: z.string(),
         level: z.nativeEnum(ReportLevel),
         scopeId: z.string(),
         name: z.string(),
@@ -45,7 +44,6 @@ export const scorecardsRouter = router({
       await requireAgencyAction(ctx.userId, "department.update");
       return db.scorecardConfig.create({
         data: {
-          workspaceId: input.workspaceId,
           level: input.level,
           scopeId: input.scopeId,
           name: input.name,

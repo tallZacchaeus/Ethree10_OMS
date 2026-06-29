@@ -3,16 +3,13 @@ import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { db } from "@/server/db/client";
 import { can } from "@/server/auth/permissions";
-import { getAgencyAuthContext, getAgencyWorkspaceId } from "@/server/services/agency";
+import { getAgencyAuthContext } from "@/server/services/agency";
 import { TRPCError } from "@trpc/server";
 import { Role } from "@prisma/client";
 
 export const approvalRulesRouter = router({
-  list: protectedProcedure.query(async ({ ctx }) => {
-    const agencyId = await getAgencyWorkspaceId();
-    if (!agencyId) return [];
+  list: protectedProcedure.query(async () => {
     return db.approvalRule.findMany({
-      where: { workspaceId: agencyId },
       orderBy: { createdAt: "desc" },
     });
   }),
@@ -31,12 +28,8 @@ export const approvalRulesRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Only agency admins can manage approval rules." });
       }
 
-      const agencyId = await getAgencyWorkspaceId();
-      if (!agencyId) throw new TRPCError({ code: "NOT_FOUND", message: "Agency workspace not found" });
-
       return db.approvalRule.create({
         data: {
-          workspaceId: agencyId,
           name: input.name,
           triggerCondition: input.triggerCondition,
           requiredRole: input.requiredRole,
