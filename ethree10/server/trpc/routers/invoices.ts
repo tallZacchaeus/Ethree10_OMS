@@ -27,7 +27,7 @@ export const invoicesRouter = router({
 
       return db.invoice.findMany({
         where: input?.status ? { status: input.status } : undefined,
-        include: { workspace: true, project: true },
+        include: { organization: true, project: true },
         orderBy: { createdAt: "desc" },
       });
     }),
@@ -37,7 +37,7 @@ export const invoicesRouter = router({
     .query(async ({ ctx, input }) => {
       const invoice = await db.invoice.findUnique({
         where: { id: input.id },
-        include: { workspace: true, project: true, receipt: true },
+        include: { organization: true, project: true, receipt: true },
       });
       if (!invoice) throw new TRPCError({ code: "NOT_FOUND" });
       return invoice;
@@ -48,7 +48,7 @@ export const invoicesRouter = router({
     .query(async ({ input }) => {
       const invoice = await db.invoice.findUnique({
         where: { code: input.code },
-        include: { workspace: true, project: true },
+        include: { organization: true, project: true },
       });
       if (!invoice) throw new TRPCError({ code: "NOT_FOUND" });
       return invoice;
@@ -57,7 +57,7 @@ export const invoicesRouter = router({
   create: protectedProcedure
     .input(
       z.object({
-        workspaceId: z.string(),
+        organizationId: z.string(),
         projectId: z.string().optional(),
         currency: z.enum(["NGN", "USD"]),
         dueAt: z.string().optional(),
@@ -81,7 +81,7 @@ export const invoicesRouter = router({
       const invoice = await db.invoice.create({
         data: {
           code: `INV-${generateCode()}`,
-          workspaceId: input.workspaceId,
+          organizationId: input.organizationId,
           projectId: input.projectId,
           currency: input.currency,
           amount: totalAmount,
@@ -139,7 +139,7 @@ export const invoicesRouter = router({
       });
       await AuditService.log({
         actorId: ctx.userId,
-        workspaceId: invoice.workspaceId,
+        organizationId: invoice.organizationId,
         action: "invoice.send",
         entityType: "Invoice",
         entityId: invoice.id,
@@ -169,7 +169,7 @@ export const invoicesRouter = router({
       });
       await AuditService.log({
         actorId: ctx.userId,
-        workspaceId: invoice.workspaceId,
+        organizationId: invoice.organizationId,
         action: "invoice.markPaid",
         entityType: "Invoice",
         entityId: invoice.id,
@@ -188,7 +188,7 @@ export const invoicesRouter = router({
       });
       await AuditService.log({
         actorId: ctx.userId,
-        workspaceId: invoice.workspaceId,
+        organizationId: invoice.organizationId,
         action: "invoice.void",
         entityType: "Invoice",
         entityId: invoice.id,

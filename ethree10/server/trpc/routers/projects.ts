@@ -97,7 +97,7 @@ export const projectsRouter = router({
         },
         include: {
           department: true,
-          workspace: true,
+          organization: true,
           tasks: {
             where: { status: "done" },
             select: { id: true, title: true, status: true },

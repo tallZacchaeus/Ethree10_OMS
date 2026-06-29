@@ -3,7 +3,6 @@ import { Prisma, type RequestStage, type Urgency } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { AuditService } from "@/server/services/audit";
 import { NotificationService } from "@/server/services/notification";
-import { getAgencyWorkspaceId } from "@/server/services/agency";
 import { ProjectService } from "@/server/services/project";
 import { ApprovalService } from "@/server/services/approval";
 import { generateCode } from "@/lib/utils/codes";
@@ -36,23 +35,22 @@ export interface CreateRequestInput {
   currency?: string;
 }
 
-async function nextRequestSeq(workspaceId: string): Promise<number> {
+async function nextRequestSeq(organizationId: string): Promise<number> {
   const year = new Date().getUTCFullYear();
   const count = await db.request.count({
     where: {
-      workspaceId,
+      organizationId,
       createdAt: { gte: new Date(Date.UTC(year, 0, 1)) },
     },
   });
   return count + 1;
 }
 
+// Agency admins = staff (org-null) memberships with the admin role.
 async function agencyLeadUserIds(): Promise<string[]> {
-  const agencyId = await getAgencyWorkspaceId();
-  if (!agencyId) return [];
   const leads = await db.membership.findMany({
     where: {
-      workspaceId: agencyId,
+      organizationId: null,
       role: { in: ["admin"] },
       removedAt: null,
       acceptedAt: { not: null },
@@ -70,10 +68,8 @@ async function agencyLeadUserIds(): Promise<string[]> {
 async function resolveRoutedDepartmentId(projectType: string): Promise<string | null> {
   const slug = departmentSlugForTaskType(projectType);
   if (!slug) return null;
-  const agencyId = await getAgencyWorkspaceId();
-  if (!agencyId) return null;
   const dept = await db.department.findFirst({
-    where: { workspaceId: agencyId, slug, archivedAt: null },
+    where: { slug, archivedAt: null },
     select: { id: true },
   });
   return dept?.id ?? null;
@@ -82,7 +78,7 @@ async function resolveRoutedDepartmentId(projectType: string): Promise<string | 
 export class RequestService {
   static requestInclude = {
     routedDepartment: { select: { id: true, name: true, slug: true } },
-    workspace: { select: { id: true, name: true, type: true, slug: true } },
+    organization: { select: { id: true, name: true, isExternal: true, slug: true } },
     project: { select: { id: true, code: true, status: true } },
     stageEvents: {
       orderBy: { createdAt: "asc" } as const,
@@ -110,12 +106,12 @@ export class RequestService {
   }
 
   static async listForWorkspace(
-    workspaceId: string,
+    organizationId: string,
     filters: { stage?: RequestStage; routedDepartmentId?: string; limit?: number } = {},
   ) {
     return db.request.findMany({
       where: {
-        workspaceId,
+        organizationId,
         stage: filters.stage,
         routedDepartmentId: filters.routedDepartmentId,
       },
@@ -125,12 +121,10 @@ export class RequestService {
     });
   }
 
-  /** Agency-wide triage queue: requests across all client workspaces. */
+  /** Agency-wide triage queue: requests across all client organizations. */
   static async inbox(filters: { stage?: RequestStage; routedDepartmentId?: string } = {}) {
-    const agencyId = await getAgencyWorkspaceId();
     return db.request.findMany({
       where: {
-        workspaceId: agencyId ? { not: agencyId } : undefined,
         stage: filters.stage ?? { in: ["submitted", "under_review", "scoping"] },
         routedDepartmentId: filters.routedDepartmentId,
       },
@@ -151,10 +145,10 @@ export class RequestService {
 
   static async create(args: {
     actorId: string;
-    workspaceId: string;
+    organizationId: string;
     input: CreateRequestInput;
   }) {
-    const seq = await nextRequestSeq(args.workspaceId);
+    const seq = await nextRequestSeq(args.organizationId);
     const code = generateCode("request", seq);
 
     // Self-routing: derive the target department from the chosen task type so the request
@@ -164,7 +158,7 @@ export class RequestService {
     const created = await db.request.create({
       data: {
         code,
-        workspaceId: args.workspaceId,
+        organizationId: args.organizationId,
         submittedById: args.actorId,
         title: args.input.title,
         description: args.input.description,
@@ -186,7 +180,7 @@ export class RequestService {
     });
     await AuditService.log({
       actorId: args.actorId,
-      workspaceId: args.workspaceId,
+      organizationId: args.organizationId,
       action: "request.create",
       entityType: "Request",
       entityId: created.id,
@@ -222,9 +216,9 @@ export class RequestService {
     let targetStage = advanceToReview ? "under_review" : before.stage;
 
     if (advanceToReview) {
-      const workspace = await db.workspace.findUnique({ where: { id: before.workspaceId } });
-      if (workspace) {
-        const rule = await ApprovalService.checkRules(before as any, workspace);
+      const organization = await db.organization.findUnique({ where: { id: before.organizationId } });
+      if (organization) {
+        const rule = await ApprovalService.checkRules(before as any, organization);
         if (rule) {
           targetStage = "pending_approval";
           await ApprovalService.notifyApprovers(rule, before as any);
@@ -252,7 +246,7 @@ export class RequestService {
     }
     await AuditService.log({
       actorId: args.actorId,
-      workspaceId: before.workspaceId,
+      organizationId: before.organizationId,
       action: "request.route",
       entityType: "Request",
       entityId: args.requestId,
@@ -305,7 +299,7 @@ export class RequestService {
     });
     await AuditService.log({
       actorId: args.actorId,
-      workspaceId: before.workspaceId,
+      organizationId: before.organizationId,
       action: "request.transition",
       entityType: "Request",
       entityId: args.requestId,
@@ -345,7 +339,7 @@ export class RequestService {
     });
     await AuditService.log({
       actorId: args.actorId,
-      workspaceId: before.workspaceId,
+      organizationId: before.organizationId,
       action: "request.approve",
       entityType: "Request",
       entityId: args.requestId,
@@ -383,7 +377,7 @@ export class RequestService {
     });
     await AuditService.log({
       actorId: args.actorId,
-      workspaceId: before.workspaceId,
+      organizationId: before.organizationId,
       action: "request.reject",
       entityType: "Request",
       entityId: args.requestId,
@@ -420,7 +414,7 @@ export class RequestService {
     });
     await AuditService.log({
       actorId: args.actorId,
-      workspaceId: before.workspaceId,
+      organizationId: before.organizationId,
       action: "request.update",
       entityType: "Request",
       entityId: args.requestId,

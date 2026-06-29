@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import type { LeadStatus, WorkspaceType } from "@prisma/client";
+import type { LeadStatus } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { AuditService } from "@/server/services/audit";
 
@@ -8,10 +8,10 @@ function slugify(s: string): string {
 }
 
 async function uniqueSlug(base: string): Promise<string> {
-  const root = slugify(base) || "workspace";
+  const root = slugify(base) || "client";
   let slug = root;
   let n = 1;
-  while (await db.workspace.findUnique({ where: { slug }, select: { id: true } })) {
+  while (await db.organization.findUnique({ where: { slug }, select: { id: true } })) {
     slug = `${root}-${n++}`;
   }
   return slug;
@@ -33,14 +33,14 @@ export class LeadService {
     return db.lead.findMany({
       where: status ? { status } : undefined,
       orderBy: { createdAt: "desc" },
-      include: { workspace: { select: { id: true, name: true, slug: true } } },
+      include: { org: { select: { id: true, name: true, slug: true } } },
     });
   }
 
   static async get(id: string) {
     const lead = await db.lead.findUnique({
       where: { id },
-      include: { workspace: { select: { id: true, name: true, slug: true } } },
+      include: { org: { select: { id: true, name: true, slug: true } } },
     });
     if (!lead) throw new TRPCError({ code: "NOT_FOUND" });
     return lead;
@@ -59,16 +59,16 @@ export class LeadService {
   }
 
   /**
-   * Convert a marketing lead into a client workspace and invite the requester
-   * as that workspace's admin. Returns the new workspace + pending membership.
+   * Convert a marketing lead into a client Organization and invite the requester as that
+   * org's client admin. Returns the new organization + pending membership.
    */
-  static async convertToWorkspace(args: {
+  static async convertToOrganization(args: {
     actorId: string;
     leadId: string;
-    workspaceName: string;
+    organizationName: string;
     requesterEmail: string;
     requesterName: string;
-    type?: Extract<WorkspaceType, "external_client" | "internal_client">;
+    isExternal?: boolean;
   }) {
     const lead = await db.lead.findUnique({ where: { id: args.leadId } });
     if (!lead) throw new TRPCError({ code: "NOT_FOUND" });
@@ -76,12 +76,12 @@ export class LeadService {
       throw new TRPCError({ code: "CONFLICT", message: "Lead already converted." });
     }
 
-    const slug = await uniqueSlug(args.workspaceName);
-    const workspace = await db.workspace.create({
+    const slug = await uniqueSlug(args.organizationName);
+    const organization = await db.organization.create({
       data: {
-        name: args.workspaceName,
+        name: args.organizationName,
         slug,
-        type: args.type ?? "external_client",
+        isExternal: args.isExternal ?? true,
         description: lead.organization ?? null,
       },
     });
@@ -95,7 +95,7 @@ export class LeadService {
     const membership = await db.membership.create({
       data: {
         userId: user.id,
-        workspaceId: workspace.id,
+        organizationId: organization.id,
         role: "client",
         isPrimary: true,
         invitedAt: new Date(),
@@ -104,18 +104,17 @@ export class LeadService {
 
     await db.lead.update({
       where: { id: args.leadId },
-      data: { status: "converted", workspaceId: workspace.id },
+      data: { status: "converted", organizationId: organization.id },
     });
 
     await AuditService.log({
       actorId: args.actorId,
-      workspaceId: workspace.id,
       action: "lead.converted",
       entityType: "Lead",
       entityId: args.leadId,
-      after: { workspaceId: workspace.id, requester: args.requesterEmail },
+      after: { organizationId: organization.id, requester: args.requesterEmail },
     });
 
-    return { workspace, membership };
+    return { organization, membership };
   }
 }
