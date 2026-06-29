@@ -4,38 +4,25 @@ import { db } from "@/server/db/client";
 import { can, type Action, type AuthContext } from "@/server/auth/permissions";
 
 /**
- * The single agency workspace. Requests submitted by client workspaces are
- * triaged by agency staff whose roles live in this workspace, so triage
- * authorization resolves against agency membership rather than the active
- * (client) workspace.
+ * The agency is implicit — agency staff are the users whose memberships have no organization
+ * (organizationId null). Triage/management authorization resolves against these staff roles.
  */
-export async function getAgencyWorkspaceId(): Promise<string | null> {
-  const ws = await db.workspace.findFirst({
-    where: { type: "agency" },
-    select: { id: true },
-  });
-  return ws?.id ?? null;
-}
-
 export async function getAgencyAuthContext(userId: string): Promise<AuthContext> {
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { isSuperAdmin: true },
   });
-  const agencyId = await getAgencyWorkspaceId();
-  const roles: Role[] = agencyId
-    ? (
-        await db.membership.findMany({
-          where: {
-            userId,
-            workspaceId: agencyId,
-            removedAt: null,
-            acceptedAt: { not: null },
-          },
-          select: { role: true },
-        })
-      ).map((m) => m.role)
-    : [];
+  const roles: Role[] = (
+    await db.membership.findMany({
+      where: {
+        userId,
+        organizationId: null,
+        removedAt: null,
+        acceptedAt: { not: null },
+      },
+      select: { role: true, canManageProjects: true },
+    })
+  ).map((m) => m.role);
   return { isSuperAdmin: user?.isSuperAdmin ?? false, roles };
 }
 

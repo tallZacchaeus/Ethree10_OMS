@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import { trpc } from "@/lib/trpc/client";
-import { getActiveWorkspaceId } from "@/lib/workspace";
 
 function getBaseUrl() {
   if (typeof window !== "undefined") return "";
@@ -31,10 +30,6 @@ export function TRPCProvider({ children }: { children: ReactNode }) {
         httpBatchLink({
           url: `${getBaseUrl()}/api/trpc`,
           transformer: superjson,
-          headers() {
-            const id = getActiveWorkspaceId();
-            return id ? { "x-workspace-id": id } : {};
-          },
         }),
       ],
     }),
