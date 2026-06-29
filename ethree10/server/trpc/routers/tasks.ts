@@ -218,6 +218,11 @@ export const tasksRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await loadTaskForRead(ctx.userId, input.taskId);
+      // Task comments are internal — require comment.create (granted to staff + executive).
+      const agencyCtx = await getAgencyAuthContext(ctx.userId);
+      if (!can(agencyCtx, "comment.create")) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Missing permission: comment.create" });
+      }
       return TaskService.addComment({
         actorId: ctx.userId,
         taskId: input.taskId,

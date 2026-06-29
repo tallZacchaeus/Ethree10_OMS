@@ -9,7 +9,7 @@ import { subMonths, startOfMonth, format } from "date-fns";
 
 export const analyticsRouter = router({
   getAdvancedMetrics: protectedProcedure.query(async ({ ctx }) => {
-    // Requires agency_admin or super_admin
+    // Requires an agency role with workspace.read (admin/executive/leads) or super_admin
     await requireAgencyAction(ctx.userId, "workspace.read");
 
     // 1. 6-Month Throughput (Tasks Completed per month)

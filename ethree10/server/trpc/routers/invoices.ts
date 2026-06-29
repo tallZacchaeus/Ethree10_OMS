@@ -21,7 +21,7 @@ export const invoicesRouter = router({
       // In a real system we'd limit this to the agency admin or the specific client workspace.
       // For now, if you are an agency admin, you see all.
       const authCtx = await getAgencyAuthContext(ctx.userId);
-      if (!authCtx.isSuperAdmin && !authCtx.roles.includes("agency_admin") && !authCtx.roles.includes("agency_lead")) {
+      if (!authCtx.isSuperAdmin && !authCtx.roles.includes("admin")) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 

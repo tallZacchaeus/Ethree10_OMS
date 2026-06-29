@@ -1,20 +1,18 @@
 import type { Role } from "@prisma/client";
 import type { BadgeProps } from "@/components/ui/badge";
 
-const REQUESTER_ROLES: Role[] = [
-  "requester_admin",
-  "requester_member",
-  "requester_observer",
-];
+const REQUESTER_ROLES: Role[] = ["client", "client_viewer"];
 
 type CapacityVariant = NonNullable<BadgeProps["variant"]>;
 
 export function getDashboardExperience(roles: Role[], isSuperAdmin: boolean) {
+  // `executive` is agency-wide oversight (read-first), so it shares the agency-lead view.
   const isAgencyLead =
-    isSuperAdmin || roles.includes("agency_admin") || roles.includes("agency_lead");
+    isSuperAdmin || roles.includes("admin") || roles.includes("executive");
   const isDeptLead = isAgencyLead || roles.includes("department_lead");
-  const isSubUnitLead = isDeptLead || roles.includes("subunit_lead");
-  const isMember = isSubUnitLead || roles.includes("member") || roles.includes("project_manager");
+  // Sub-unit lead role was removed; department leads cover sub-units. Kept for return shape.
+  const isSubUnitLead = isDeptLead;
+  const isMember = isSubUnitLead || roles.includes("member");
   const isRequester = roles.some((role) => REQUESTER_ROLES.includes(role));
 
   return {

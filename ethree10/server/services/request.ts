@@ -52,7 +52,7 @@ async function agencyLeadUserIds(): Promise<string[]> {
   const leads = await db.membership.findMany({
     where: {
       workspaceId: agencyId,
-      role: { in: ["agency_lead", "agency_admin"] },
+      role: { in: ["admin"] },
       removedAt: null,
       acceptedAt: { not: null },
     },

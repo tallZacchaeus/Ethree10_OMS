@@ -35,6 +35,7 @@ export class AuthorizationService {
             role: true,
             departmentId: true,
             subUnitId: true,
+            canManageProjects: true,
           },
         })
       : [];
@@ -49,6 +50,9 @@ export class AuthorizationService {
       subUnitId: memberships[0]?.subUnitId ?? null,
       membershipIds: memberships.map((m) => m.id),
       roles,
+      capabilities: {
+        canManageProjects: memberships.some((m) => m.canManageProjects),
+      },
     };
   }
 

@@ -90,7 +90,7 @@ export default function TaskDetailPage() {
   const isLead =
     isSuperAdmin ||
     roles.some((r) =>
-      ["agency_admin", "agency_lead", "department_lead", "subunit_lead", "project_manager"].includes(r),
+      ["admin", "department_lead"].includes(r),
     );
 
   return (

@@ -7,21 +7,30 @@ import {
 } from "@/lib/dashboard";
 
 describe("dashboard helpers", () => {
-  it("treats requester roles as requester-facing without agency controls", () => {
-    const experience = getDashboardExperience(["requester_admin"], false);
+  it("treats client roles as requester-facing without agency controls", () => {
+    const experience = getDashboardExperience(["client"], false);
 
     expect(experience.isRequester).toBe(true);
     expect(experience.isAgencyLead).toBe(false);
     expect(experience.isMember).toBe(false);
   });
 
-  it("gives agency admins the full leadership dashboard", () => {
-    const experience = getDashboardExperience(["agency_admin"], false);
+  it("gives admins the full leadership dashboard", () => {
+    const experience = getDashboardExperience(["admin"], false);
 
     expect(experience.isAgencyLead).toBe(true);
     expect(experience.isDeptLead).toBe(true);
     expect(experience.isSubUnitLead).toBe(true);
     expect(experience.isMember).toBe(true);
+  });
+
+  it("gives the executive the agency-wide overview", () => {
+    const experience = getDashboardExperience(["executive"], false);
+
+    expect(experience.isAgencyLead).toBe(true);
+    expect(experience.isDeptLead).toBe(true);
+    expect(experience.isMember).toBe(true);
+    expect(experience.isRequester).toBe(false);
   });
 
   it("summarizes throughput from real completed work signals", () => {

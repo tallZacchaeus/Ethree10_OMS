@@ -107,7 +107,7 @@ export class TaskService {
   /** Candidate assignees for a sub-unit, ranked by current load (best fit first). */
   static async candidates(subUnitId: string) {
     const memberships = await db.membership.findMany({
-      where: { subUnitId, removedAt: null, role: { in: ["member", "subunit_lead"] } },
+      where: { subUnitId, removedAt: null, role: { in: ["member", "department_lead"] } },
       select: {
         user: {
           select: {

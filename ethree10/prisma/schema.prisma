@@ -114,15 +114,12 @@ model Workspace {
 
 enum Role {
   super_admin
-  agency_admin
-  agency_lead
+  executive
+  admin
   department_lead
-  subunit_lead
   member
-  project_manager
-  requester_admin
-  requester_member
-  requester_observer
+  client
+  client_viewer
 }
 
 model Membership {
@@ -134,6 +131,9 @@ model Membership {
   subUnitId   String?
   title       String?
   isPrimary   Boolean   @default(false)
+  // Capability toggle: lets a `member` manage projects (create/update projects, create/assign
+  // tasks) without granting a separate lead role. Ignored for non-member roles.
+  canManageProjects Boolean @default(false)
   invitedAt   DateTime?
   acceptedAt  DateTime?
   removedAt   DateTime?

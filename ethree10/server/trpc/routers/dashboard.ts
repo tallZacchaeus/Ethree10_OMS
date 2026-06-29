@@ -4,7 +4,7 @@ import { db } from "@/server/db/client";
 import { getAgencyAuthContext } from "@/server/services/agency";
 import { can } from "@/server/auth/permissions";
 
-const REQUESTER_ROLES = ["requester_admin", "requester_member", "requester_observer"] as const;
+const REQUESTER_ROLES = ["client", "client_viewer"] as const;
 
 export const dashboardRouter = router({
   subUnitLead: protectedProcedure.query(async ({ ctx }) => {

@@ -38,16 +38,9 @@ interface NavSection {
   items: NavItem[];
 }
 
-const AGENCY_EXEC: Role[] = [
-  "agency_admin",
-  "agency_lead",
-  "department_lead",
-  "subunit_lead",
-  "member",
-  "project_manager",
-];
-const AGENCY_LEADS: Role[] = ["agency_admin", "agency_lead", "department_lead"];
-const TRIAGE: Role[] = ["agency_admin", "agency_lead", "department_lead", "project_manager"];
+const AGENCY_EXEC: Role[] = ["admin", "executive", "department_lead", "member"];
+const AGENCY_LEADS: Role[] = ["admin", "executive", "department_lead"];
+const TRIAGE: Role[] = ["admin", "department_lead"];
 
 const NAV_SECTIONS: NavSection[] = [
   {
@@ -60,7 +53,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Operations",
     items: [
-      { href: "/agency/dashboard", label: "Agency", icon: Briefcase, allow: ["agency_admin", "agency_lead"] },
+      { href: "/agency/dashboard", label: "Agency", icon: Briefcase, allow: ["admin", "executive"] },
       { href: "/inbox", label: "Inbox", icon: Inbox, allow: TRIAGE },
       { href: "/requests", label: "Requests", icon: FileText, allow: "all" },
       { href: "/projects", label: "Projects", icon: FolderKanban, allow: "all" },
@@ -71,16 +64,16 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Organization",
     items: [
       { href: "/members", label: "Members", icon: Users, allow: AGENCY_EXEC },
-      { href: "/agency/skills", label: "Skills", icon: Sparkles, allow: ["agency_admin", "agency_lead"] },
+      { href: "/agency/skills", label: "Skills", icon: Sparkles, allow: ["admin"] },
       { href: "/departments", label: "Departments", icon: Building2, allow: AGENCY_LEADS },
-      { href: "/leads", label: "Leads", icon: Sparkles, allow: ["agency_admin", "agency_lead"] },
+      { href: "/leads", label: "Leads", icon: Sparkles, allow: ["admin", "executive"] },
     ],
   },
   {
     title: "Billing",
     items: [
-      { href: "/invoices", label: "Invoices", icon: FileSpreadsheet, allow: ["agency_admin", "agency_lead"] },
-      { href: "/receipts", label: "Receipts", icon: ReceiptText, allow: ["agency_admin", "agency_lead"] },
+      { href: "/invoices", label: "Invoices", icon: FileSpreadsheet, allow: ["admin"] },
+      { href: "/receipts", label: "Receipts", icon: ReceiptText, allow: ["admin"] },
     ],
   },
   {

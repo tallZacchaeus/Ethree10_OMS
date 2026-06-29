@@ -80,7 +80,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {workspaces.some((w) => w.type === "agency" && w.roles.some(r => ["agency_admin", "agency_lead", "super_admin"].includes(r))) && (
+      {workspaces.some((w) => w.type === "agency" && w.roles.some(r => ["admin", "super_admin"].includes(r))) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Agency Configuration</CardTitle>

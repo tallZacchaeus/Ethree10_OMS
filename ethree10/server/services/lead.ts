@@ -96,7 +96,7 @@ export class LeadService {
       data: {
         userId: user.id,
         workspaceId: workspace.id,
-        role: "requester_admin",
+        role: "client",
         isPrimary: true,
         invitedAt: new Date(),
       },
