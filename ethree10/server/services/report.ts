@@ -111,7 +111,6 @@ export class ReportService {
   static async generateDepartmentReport(departmentId: string, period: ReportPeriod, start: Date, end: Date) {
     const department = await db.department.findUnique({
       where: { id: departmentId },
-      include: { workspace: true },
     });
     if (!department) throw new TRPCError({ code: "NOT_FOUND" });
 

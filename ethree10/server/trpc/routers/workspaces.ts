@@ -1,147 +1,83 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { WorkspaceType, Role } from "@prisma/client";
+import { Role } from "@prisma/client";
 import { router } from "../trpc";
-import { protectedProcedure, workspaceProcedure, superAdminProcedure } from "../procedures";
-import { DEFAULT_DEPARTMENTS } from "@/lib/request-types";
+import { protectedProcedure } from "../procedures";
 
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
+/**
+ * Membership + client-organization management. (Workspaces were removed; the agency is
+ * implicit and clients are grouped into Organizations.)
+ */
 export const workspacesRouter = router({
+  // The caller's memberships, with their org (null = agency staff). Used by the session provider.
   list: protectedProcedure.query(async ({ ctx }) => {
-    // Super admins see all workspaces; regular users see only their memberships.
-    const user = await ctx.db.user.findUnique({
-      where: { id: ctx.userId },
-      select: { isSuperAdmin: true },
-    });
-
-    if (user?.isSuperAdmin) {
-      const workspaces = await ctx.db.workspace.findMany({
-        where: { archivedAt: null },
-        select: { id: true, name: true, slug: true, type: true, logoUrl: true, archivedAt: true },
-        orderBy: { name: "asc" },
-      });
-      return workspaces.map((ws) => ({
-        membershipId: null,
-        role: "super_admin" as Role,
-        isPrimary: false,
-        workspace: ws,
-      }));
-    }
-
     const memberships = await ctx.db.membership.findMany({
       where: { userId: ctx.userId, removedAt: null, acceptedAt: { not: null } },
       select: {
         id: true,
         role: true,
         isPrimary: true,
-        workspace: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            type: true,
-            logoUrl: true,
-            archivedAt: true,
-          },
-        },
+        organization: { select: { id: true, name: true, slug: true, logoUrl: true } },
       },
     });
     return memberships.map((m) => ({
       membershipId: m.id,
       role: m.role,
       isPrimary: m.isPrimary,
-      workspace: m.workspace,
+      organization: m.organization,
     }));
   }),
 
-  get: workspaceProcedure.query(async ({ ctx }) => {
-    const ws = await ctx.db.workspace.findUnique({
-      where: { id: ctx.workspaceId },
+  // List all client organizations (staff view).
+  listOrganizations: protectedProcedure.query(async ({ ctx }) => {
+    await ctx.authorize("workspace.read");
+    return ctx.db.organization.findMany({
+      where: { archivedAt: null },
+      orderBy: { name: "asc" },
     });
-    if (!ws) throw new TRPCError({ code: "NOT_FOUND" });
-    return ws;
   }),
 
-  create: superAdminProcedure
+  createOrganization: protectedProcedure
     .input(
       z.object({
         name: z.string().min(2),
-        type: z.nativeEnum(WorkspaceType),
+        isExternal: z.boolean().default(false),
         description: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const slug = slugify(input.name);
-      const workspace = await ctx.db.workspace.create({
+      await ctx.authorize("workspace.create");
+      return ctx.db.organization.create({
         data: {
           name: input.name,
-          slug,
-          type: input.type,
+          slug: slugify(input.name),
+          isExternal: input.isExternal,
           description: input.description,
         },
       });
-      // Auto-enrol the creating super admin so they appear as a member.
-      const creatorId = (ctx as { userId?: string }).userId;
-      if (creatorId) {
-        await ctx.db.membership.create({
-          data: {
-            userId: creatorId,
-            workspaceId: workspace.id,
-            role: Role.super_admin,
-            isPrimary: false,
-            acceptedAt: new Date(),
-          },
-        });
-      }
-      // Ready-to-use: an agency workspace ships with its two fixed departments.
-      if (input.type === WorkspaceType.agency) {
-        await ctx.db.department.createMany({
-          data: DEFAULT_DEPARTMENTS.map((d) => ({
-            workspaceId: workspace.id,
-            name: d.name,
-            slug: d.slug,
-            description: d.description,
-            color: d.color,
-          })),
-          skipDuplicates: true,
-        });
-      }
-      return workspace;
     }),
 
-  update: workspaceProcedure
-    .input(
-      z.object({
-        name: z.string().min(2).optional(),
-        description: z.string().optional(),
-        brandColor: z.string().optional(),
-        logoUrl: z.string().url().optional(),
-      }),
-    )
+  archiveOrganization: protectedProcedure
+    .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.authorize("workspace.update");
-      return ctx.db.workspace.update({
-        where: { id: ctx.workspaceId },
-        data: input,
+      await ctx.authorize("workspace.archive");
+      return ctx.db.organization.update({
+        where: { id: input.id },
+        data: { archivedAt: new Date() },
       });
     }),
 
-  archive: workspaceProcedure.mutation(async ({ ctx }) => {
-    await ctx.authorize("workspace.archive");
-    return ctx.db.workspace.update({
-      where: { id: ctx.workspaceId },
-      data: { archivedAt: new Date() },
-    });
-  }),
-
-  inviteUser: workspaceProcedure
+  // Invite a member. organizationId set = client member of that org; null = agency staff.
+  inviteUser: protectedProcedure
     .input(
       z.object({
         email: z.string().email(),
         name: z.string().min(1),
         role: z.nativeEnum(Role),
+        organizationId: z.string().optional(),
         departmentId: z.string().optional(),
         subUnitId: z.string().optional(),
         title: z.string().optional(),
@@ -157,7 +93,7 @@ export const workspacesRouter = router({
       return ctx.db.membership.create({
         data: {
           userId: user.id,
-          workspaceId: ctx.workspaceId,
+          organizationId: input.organizationId ?? null,
           role: input.role,
           departmentId: input.departmentId,
           subUnitId: input.subUnitId,
@@ -167,7 +103,7 @@ export const workspacesRouter = router({
       });
     }),
 
-  removeMember: workspaceProcedure
+  removeMember: protectedProcedure
     .input(z.object({ membershipId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.authorize("workspace.removeMember");
@@ -177,7 +113,7 @@ export const workspacesRouter = router({
       });
     }),
 
-  changeRole: workspaceProcedure
+  changeRole: protectedProcedure
     .input(z.object({ membershipId: z.string(), role: z.nativeEnum(Role) }))
     .mutation(async ({ ctx, input }) => {
       await ctx.authorize("workspace.changeRole");

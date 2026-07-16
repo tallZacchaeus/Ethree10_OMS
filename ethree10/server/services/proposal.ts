@@ -12,12 +12,15 @@ export class ProposalService {
    * belongs to the proposal's workspace, or a super admin. Without this, any
    * signed-in user could accept/reject another workspace's proposal by id.
    */
-  private static async assertCanRespond(actorId: string, workspaceId: string | undefined) {
-    if (!workspaceId) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Proposal is not linked to a workspace." });
+  private static async assertCanRespond(actorId: string, organizationId: string | undefined) {
+    if (!organizationId) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Proposal is not linked to an organization." });
     }
-    const ctx = await AuthorizationService.resolve(actorId, workspaceId);
-    if (!ctx.isSuperAdmin && ctx.membershipIds.length === 0) {
+    const ctx = await AuthorizationService.resolve(actorId);
+    // Agency staff (any non-client role) can act on any proposal; a client only on their own org.
+    const isStaff = ctx.roles.some((r) => r !== "client" && r !== "client_viewer");
+    const allowed = ctx.isSuperAdmin || isStaff || ctx.organizationId === organizationId;
+    if (!allowed) {
       throw new TRPCError({ code: "FORBIDDEN", message: "You do not have access to this proposal." });
     }
   }
@@ -26,8 +29,8 @@ export class ProposalService {
     const proposal = await db.proposal.findUnique({
       where: { id },
       include: {
-        request: { select: { id: true, code: true, title: true, workspaceId: true, submittedById: true } },
-        project: { select: { id: true, code: true, name: true, workspaceId: true } },
+        request: { select: { id: true, code: true, title: true, organizationId: true, submittedById: true } },
+        project: { select: { id: true, code: true, name: true, organizationId: true } },
       },
     });
     if (!proposal) throw new TRPCError({ code: "NOT_FOUND", message: "Proposal not found." });
@@ -63,13 +66,13 @@ export class ProposalService {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Must provide requestId or projectId" });
     }
 
-    let workspaceId: string | undefined;
+    let organizationId: string | undefined;
     if (args.requestId) {
-      const req = await db.request.findUnique({ where: { id: args.requestId }, select: { workspaceId: true } });
-      workspaceId = req?.workspaceId;
+      const req = await db.request.findUnique({ where: { id: args.requestId }, select: { organizationId: true } });
+      organizationId = req?.organizationId;
     } else if (args.projectId) {
-      const proj = await db.project.findUnique({ where: { id: args.projectId }, select: { workspaceId: true } });
-      workspaceId = proj?.workspaceId;
+      const proj = await db.project.findUnique({ where: { id: args.projectId }, select: { organizationId: true } });
+      organizationId = proj?.organizationId;
     }
 
     const total = args.lineItems.reduce((acc, item) => acc + item.qty * item.unitPrice, 0);
@@ -89,10 +92,10 @@ export class ProposalService {
       },
     });
 
-    if (workspaceId) {
+    if (organizationId) {
       await AuditService.log({
         actorId: args.actorId,
-        workspaceId,
+        organizationId,
         action: "proposal.create",
         entityType: "Proposal",
         entityId: proposal.id,
@@ -132,11 +135,11 @@ export class ProposalService {
       },
     });
 
-    const workspaceId = before.request?.workspaceId || before.project?.workspaceId;
-    if (workspaceId) {
+    const organizationId = before.request?.organizationId || before.project?.organizationId;
+    if (organizationId) {
       await AuditService.log({
         actorId: args.actorId,
-        workspaceId,
+        organizationId,
         action: "proposal.update",
         entityType: "Proposal",
         entityId: updated.id,
@@ -157,11 +160,11 @@ export class ProposalService {
       data: { status: "sent", sentAt: new Date(), pdfUrl },
     });
 
-    const workspaceId = before.request?.workspaceId || before.project?.workspaceId;
-    if (workspaceId) {
+    const organizationId = before.request?.organizationId || before.project?.organizationId;
+    if (organizationId) {
       await AuditService.log({
         actorId: args.actorId,
-        workspaceId,
+        organizationId,
         action: "proposal.send",
         entityType: "Proposal",
         entityId: updated.id,
@@ -190,7 +193,7 @@ export class ProposalService {
     const before = await ProposalService.getById(args.proposalId);
     await ProposalService.assertCanRespond(
       args.actorId,
-      before.request?.workspaceId || before.project?.workspaceId,
+      before.request?.organizationId || before.project?.organizationId,
     );
     if (before.status !== "sent") {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Only sent proposals can be accepted." });
@@ -201,11 +204,11 @@ export class ProposalService {
       data: { status: "accepted", acceptedAt: new Date(), acceptedById: args.actorId },
     });
 
-    const workspaceId = before.request?.workspaceId || before.project?.workspaceId;
-    if (workspaceId) {
+    const organizationId = before.request?.organizationId || before.project?.organizationId;
+    if (organizationId) {
       await AuditService.log({
         actorId: args.actorId,
-        workspaceId,
+        organizationId,
         action: "proposal.accept",
         entityType: "Proposal",
         entityId: updated.id,
@@ -250,18 +253,18 @@ export class ProposalService {
     const before = await ProposalService.getById(args.proposalId);
     await ProposalService.assertCanRespond(
       args.actorId,
-      before.request?.workspaceId || before.project?.workspaceId,
+      before.request?.organizationId || before.project?.organizationId,
     );
     const updated = await db.proposal.update({
       where: { id: args.proposalId },
       data: { status: "rejected" },
     });
 
-    const workspaceId = before.request?.workspaceId || before.project?.workspaceId;
-    if (workspaceId) {
+    const organizationId = before.request?.organizationId || before.project?.organizationId;
+    if (organizationId) {
       await AuditService.log({
         actorId: args.actorId,
-        workspaceId,
+        organizationId,
         action: "proposal.reject",
         entityType: "Proposal",
         entityId: updated.id,

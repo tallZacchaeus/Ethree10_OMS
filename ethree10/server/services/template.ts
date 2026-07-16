@@ -108,7 +108,7 @@ export class TemplateService {
 
     await AuditService.log({
       actorId: args.actorId,
-      workspaceId: project.workspaceId,
+      organizationId: project.organizationId,
       action: "project.apply_template",
       entityType: "Project",
       entityId: project.id,

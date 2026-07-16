@@ -19,7 +19,7 @@ export class ProjectService {
   static projectInclude = {
     request: { select: { id: true, code: true, urgency: true, submittedById: true } },
     department: { select: { id: true, name: true, slug: true } },
-    workspace: { select: { id: true, name: true, type: true } },
+    organization: { select: { id: true, name: true, isExternal: true } },
   } satisfies Prisma.ProjectInclude;
 
   /** Idempotently create the Project for an approved Request. */
@@ -37,7 +37,7 @@ export class ProjectService {
       data: {
         code: generateCode("project", seq),
         requestId: request.id,
-        workspaceId: request.workspaceId,
+        organizationId: request.organizationId,
         agencyDepartmentId: request.routedDepartmentId,
         name: request.title,
         description: request.description,
@@ -48,7 +48,7 @@ export class ProjectService {
     });
     await AuditService.log({
       actorId: args.actorId,
-      workspaceId: request.workspaceId,
+      organizationId: request.organizationId,
       action: "project.create",
       entityType: "Project",
       entityId: project.id,
@@ -96,12 +96,12 @@ export class ProjectService {
   }
 
   static async listForWorkspace(
-    workspaceId: string,
+    organizationId: string,
     filters: { status?: ProjectStatus; departmentId?: string } = {},
   ) {
     return db.project.findMany({
       where: {
-        workspaceId,
+        organizationId,
         status: filters.status,
         agencyDepartmentId: filters.departmentId,
       },
@@ -139,11 +139,13 @@ export class ProjectService {
     }
     const memberships = await db.membership.findMany({
       where: { userId, removedAt: null, acceptedAt: { not: null } },
-      select: { workspaceId: true },
+      select: { organizationId: true },
     });
-    const workspaceIds = memberships.map((m) => m.workspaceId);
+    const organizationIds = memberships
+      .map((m) => m.organizationId)
+      .filter((id): id is string => id !== null);
     return db.project.findMany({
-      where: { workspaceId: { in: workspaceIds }, status: filters.status },
+      where: { organizationId: { in: organizationIds }, status: filters.status },
       orderBy: { createdAt: "desc" },
       include: {
         ...ProjectService.projectInclude,
@@ -157,13 +159,13 @@ export class ProjectService {
     if (can(agencyCtx, "project.read")) return true;
     const project = await db.project.findUnique({
       where: { id: projectId },
-      select: { workspaceId: true },
+      select: { organizationId: true },
     });
     if (!project) return false;
     const membership = await db.membership.findFirst({
       where: {
         userId,
-        workspaceId: project.workspaceId,
+        organizationId: project.organizationId,
         removedAt: null,
         acceptedAt: { not: null },
       },
@@ -191,7 +193,7 @@ export class ProjectService {
     });
     await AuditService.log({
       actorId: args.actorId,
-      workspaceId: before.workspaceId,
+      organizationId: before.organizationId,
       action: "project.update",
       entityType: "Project",
       entityId: args.projectId,
@@ -209,7 +211,7 @@ export class ProjectService {
     });
     await AuditService.log({
       actorId: args.actorId,
-      workspaceId: project.workspaceId,
+      organizationId: project.organizationId,
       action: "project.deliver",
       entityType: "Project",
       entityId: project.id,
@@ -244,7 +246,7 @@ export class ProjectService {
     });
     await AuditService.log({
       actorId: args.actorId,
-      workspaceId: project.workspaceId,
+      organizationId: project.organizationId,
       action: "project.csat_received",
       entityType: "Project",
       entityId: project.id,

@@ -48,7 +48,7 @@ export class TaskService {
   static taskInclude = {
     subUnit: { select: { id: true, name: true, departmentId: true } },
     project: {
-      select: { id: true, code: true, name: true, workspaceId: true, agencyDepartmentId: true },
+      select: { id: true, code: true, name: true, organizationId: true, agencyDepartmentId: true },
     },
     integrationLink: { select: { id: true, externalUrl: true, pendingSync: true } },
   } satisfies Prisma.TaskInclude;
@@ -155,7 +155,7 @@ export class TaskService {
   static async create(args: { actorId: string; input: CreateTaskInput }) {
     const project = await db.project.findUnique({
       where: { id: args.input.projectId },
-      select: { id: true, workspaceId: true },
+      select: { id: true, organizationId: true },
     });
     if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found." });
 
@@ -189,7 +189,7 @@ export class TaskService {
 
     await AuditService.log({
       actorId: args.actorId,
-      workspaceId: project.workspaceId,
+      organizationId: project.organizationId,
       action: "task.create",
       entityType: "Task",
       entityId: task.id,

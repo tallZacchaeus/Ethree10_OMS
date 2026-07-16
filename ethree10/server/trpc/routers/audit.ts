@@ -11,7 +11,6 @@ export const auditRouter = router({
         .object({
           entityType: z.string().optional(),
           entityId: z.string().optional(),
-          workspaceId: z.string().optional(),
           limit: z.number().min(1).max(200).default(100),
         })
         .optional(),
@@ -21,7 +20,6 @@ export const auditRouter = router({
       return AuditService.list({
         entityType: input?.entityType,
         entityId: input?.entityId,
-        workspaceId: input?.workspaceId,
         limit: input?.limit,
       });
     }),
@@ -47,7 +45,6 @@ export const auditRouter = router({
         await tx.archivedAuditLog.createMany({
           data: staleLogs.map(log => ({
             id: log.id,
-            workspaceId: log.workspaceId,
             actorId: log.actorId,
             action: log.action,
             entityType: log.entityType,

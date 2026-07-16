@@ -20,7 +20,7 @@ export const receiptsRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     await requireAgencyView(ctx.userId);
     return db.receipt.findMany({
-      include: { workspace: true, invoice: true },
+      include: { organization: true, invoice: true },
       orderBy: { createdAt: "desc" },
     });
   }),
@@ -31,7 +31,7 @@ export const receiptsRouter = router({
       await requireAgencyView(ctx.userId);
       const receipt = await db.receipt.findUnique({
         where: { id: input.id },
-        include: { workspace: true, invoice: true },
+        include: { organization: true, invoice: true },
       });
       if (!receipt) throw new TRPCError({ code: "NOT_FOUND" });
       return receipt;
@@ -43,7 +43,7 @@ export const receiptsRouter = router({
     .query(async ({ input }) => {
       const receipt = await db.receipt.findUnique({
         where: { code: input.code },
-        include: { workspace: true, invoice: true },
+        include: { organization: true, invoice: true },
       });
       if (!receipt) throw new TRPCError({ code: "NOT_FOUND" });
       return receipt;
@@ -53,7 +53,7 @@ export const receiptsRouter = router({
   issueManual: protectedProcedure
     .input(
       z.object({
-        workspaceId: z.string(),
+        organizationId: z.string(),
         invoiceId: z.string().optional(),
         amount: z.number().min(0),
         currency: z.enum(["NGN", "USD"]).default("NGN"),
@@ -64,7 +64,7 @@ export const receiptsRouter = router({
     .mutation(async ({ ctx, input }) => {
       await requireAgencyAction(ctx.userId, "workspace.read");
       const receipt = await ReceiptService.issueManual({
-        workspaceId: input.workspaceId,
+        organizationId: input.organizationId,
         invoiceId: input.invoiceId ?? null,
         amount: input.amount,
         currency: input.currency,
@@ -73,7 +73,7 @@ export const receiptsRouter = router({
       });
       await AuditService.log({
         actorId: ctx.userId,
-        workspaceId: input.workspaceId,
+        organizationId: input.organizationId,
         action: "receipt.issue",
         entityType: "Receipt",
         entityId: receipt.id,

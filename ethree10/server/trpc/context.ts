@@ -12,20 +12,18 @@ export async function createTRPCContext(opts: FetchCreateContextFnOptions) {
   const session = (await auth()) as Session | null;
   const userId = session?.user?.id ?? null;
   const headers = opts.req.headers;
-  const workspaceId = headers.get("x-workspace-id");
 
   return {
     db,
     session,
     userId,
     headers,
-    workspaceId,
     scopedDb,
-    authorize: createAuthorize(userId, workspaceId),
+    authorize: createAuthorize(userId),
   };
 }
 
-function createAuthorize(userId: string | null, workspaceId: string | null) {
+function createAuthorize(userId: string | null) {
   return async function authorize(action: Action) {
     if (!userId) {
       throw new TRPCError({
@@ -33,6 +31,6 @@ function createAuthorize(userId: string | null, workspaceId: string | null) {
         message: "You must be signed in.",
       });
     }
-    return AuthorizationService.require(userId, action, workspaceId);
+    return AuthorizationService.require(userId, action);
   };
 }

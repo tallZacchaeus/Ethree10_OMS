@@ -1,33 +1,29 @@
-import { Request, Workspace } from "@prisma/client";
+import { Request, Organization } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { NotificationService } from "@/server/services/notification";
-import { getAgencyWorkspaceId } from "@/server/services/agency";
 
 export class ApprovalService {
   /**
    * Evaluates if a request requires approval based on agency-configured rules.
    * If it does, returns the rule that matched.
    */
-  static async checkRules(request: Request, clientWorkspace: Workspace) {
-    const agencyId = await getAgencyWorkspaceId();
-    if (!agencyId) return null;
-
+  static async checkRules(request: Request, organization: Organization) {
     const rules = await db.approvalRule.findMany({
-      where: { workspaceId: agencyId, isActive: true },
+      where: { isActive: true },
     });
 
     for (const rule of rules) {
       // Evaluate triggerCondition
-      // Example condition: { "clientType": "external_client", "minBudget": 500000 }
+      // Example condition: { "isExternal": true, "minBudget": 500000 }
       const condition = rule.triggerCondition as any;
       if (!condition) continue;
 
       let matched = true;
 
-      if (condition.clientType && clientWorkspace.type !== condition.clientType) {
+      if (condition.isExternal !== undefined && organization.isExternal !== condition.isExternal) {
         matched = false;
       }
-      
+
       if (condition.minBudget && request.budgetEstimate) {
         if (request.budgetEstimate.toNumber() < condition.minBudget) {
           matched = false;
@@ -43,13 +39,10 @@ export class ApprovalService {
   }
 
   static async notifyApprovers(rule: any, request: Request) {
-    const agencyId = await getAgencyWorkspaceId();
-    if (!agencyId) return;
-
-    // Find users with the required role in the agency workspace
+    // Approvers are agency staff (org-null memberships) with the required role.
     const approvers = await db.membership.findMany({
       where: {
-        workspaceId: agencyId,
+        organizationId: null,
         role: rule.requiredRole,
         removedAt: null,
       },

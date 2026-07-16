@@ -25,16 +25,15 @@ if (env.NODE_ENV !== "production") {
  * Returns a scoped API that automatically injects `workspaceId` into
  * every read operation for workspace-owned models.
  *
- * This is the primary read/write interface for all tRPC procedures
- * that operate inside a workspace context.  Raw `db` is only used
- * for super-admin operations or pre-auth bootstrap queries.
+ * Client (org-scoped) procedures use this so a client can only ever touch their own
+ * organization's data. Staff operate globally via raw `db`.
  */
-export function scopedDb(workspaceId: string) {
-  const ws = { workspaceId };
+export function scopedDb(organizationId: string) {
+  const ws = { organizationId };
   return {
-    /** Pass-through for models that need full access within the workspace. */
+    /** Pass-through for models that need full access within the organization. */
     raw: db,
-    workspaceId,
+    organizationId,
 
     request: {
       findMany: (args: Omit<Prisma.RequestFindManyArgs, "where"> & { where?: Prisma.RequestWhereInput } = {}) =>

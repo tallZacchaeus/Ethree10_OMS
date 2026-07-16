@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { publicProcedure, middleware } from "./trpc";
+import { AuthorizationService } from "@/server/services/authorization";
 
 const enforceAuth = middleware(({ ctx, next }) => {
   if (!ctx.session || !ctx.userId) {
@@ -34,26 +35,30 @@ const enforceSuperAdmin = middleware(async ({ ctx, next }) => {
   return next({ ctx });
 });
 
-const enforceWorkspace = middleware(({ ctx, next }) => {
+// Resolves the caller's CLIENT organization from their membership and scopes the db to it.
+// For client-facing operations (submit/track their org's work). Staff have no org and are
+// rejected here — they use protectedProcedure + agency authorization instead.
+const enforceOrg = middleware(async ({ ctx, next }) => {
   if (!ctx.userId) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
-  if (!ctx.workspaceId) {
+  const resolved = await AuthorizationService.resolve(ctx.userId);
+  if (!resolved.organizationId) {
     throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "x-workspace-id header required.",
+      code: "FORBIDDEN",
+      message: "No client organization for this account.",
     });
   }
   return next({
     ctx: {
       ...ctx,
       userId: ctx.userId,
-      workspaceId: ctx.workspaceId,
-      scope: ctx.scopedDb(ctx.workspaceId),
+      organizationId: resolved.organizationId,
+      scope: ctx.scopedDb(resolved.organizationId),
     },
   });
 });
 
 export const protectedProcedure = publicProcedure.use(enforceAuth);
 export const superAdminProcedure = publicProcedure.use(enforceSuperAdmin);
-export const workspaceProcedure = publicProcedure.use(enforceAuth).use(enforceWorkspace);
+export const orgProcedure = publicProcedure.use(enforceAuth).use(enforceOrg);

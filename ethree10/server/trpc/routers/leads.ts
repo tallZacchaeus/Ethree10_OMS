@@ -47,21 +47,21 @@ export const leadsRouter = router({
     .input(
       z.object({
         leadId: z.string(),
-        workspaceName: z.string().min(2),
+        organizationName: z.string().min(2),
         requesterEmail: z.string().email(),
         requesterName: z.string().min(1),
-        type: z.enum(["external_client", "internal_client"]).optional(),
+        isExternal: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       await requireAgencyAction(ctx.userId, "lead.convert");
-      return LeadService.convertToWorkspace({
+      return LeadService.convertToOrganization({
         actorId: ctx.userId,
         leadId: input.leadId,
-        workspaceName: input.workspaceName,
+        organizationName: input.organizationName,
         requesterEmail: input.requesterEmail,
         requesterName: input.requesterName,
-        type: input.type,
+        isExternal: input.isExternal,
       });
     }),
 });

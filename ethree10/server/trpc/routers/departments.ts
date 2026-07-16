@@ -1,34 +1,34 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router } from "../trpc";
-import { workspaceProcedure } from "../procedures";
+import { protectedProcedure } from "../procedures";
 
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 export const departmentsRouter = router({
-  list: workspaceProcedure.query(async ({ ctx }) => {
+  list: protectedProcedure.query(async ({ ctx }) => {
     await ctx.authorize("department.read");
     return ctx.db.department.findMany({
-      where: { workspaceId: ctx.workspaceId, archivedAt: null },
+      where: { archivedAt: null },
       include: { subUnits: { where: { archivedAt: null } } },
       orderBy: { name: "asc" },
     });
   }),
 
-  get: workspaceProcedure
+  get: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       await ctx.authorize("department.read");
       const dept = await ctx.db.department.findFirst({
-        where: { id: input.id, workspaceId: ctx.workspaceId },
+        where: { id: input.id },
         include: { subUnits: true },
       });
       if (!dept) throw new TRPCError({ code: "NOT_FOUND" });
       return dept;
     }),
 
-  create: workspaceProcedure
+  create: protectedProcedure
     .input(
       z.object({
         name: z.string().min(2),
@@ -41,7 +41,6 @@ export const departmentsRouter = router({
       await ctx.authorize("department.create");
       return ctx.db.department.create({
         data: {
-          workspaceId: ctx.workspaceId,
           name: input.name,
           slug: slugify(input.name),
           description: input.description,
@@ -51,7 +50,7 @@ export const departmentsRouter = router({
       });
     }),
 
-  update: workspaceProcedure
+  update: protectedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -68,7 +67,7 @@ export const departmentsRouter = router({
       return ctx.db.department.update({ where: { id }, data });
     }),
 
-  archive: workspaceProcedure
+  archive: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.authorize("department.archive");

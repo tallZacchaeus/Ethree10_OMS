@@ -79,37 +79,27 @@ model OAuthAccount {
 // WORKSPACES, MEMBERSHIPS, DEPARTMENTS
 // ============================================================
 
-enum WorkspaceType {
-  agency
-  internal_client
-  master_org
-  external_client
-}
-
-model Workspace {
-  id              String        @id @default(cuid())
-  type            WorkspaceType
+// The agency (Ethree10) is implicit — there is no agency row. An Organization represents a
+// CLIENT org (sibling initiative or external client) whose people submit and track work.
+model Organization {
+  id              String    @id @default(cuid())
   name            String
-  slug            String        @unique
+  slug            String    @unique
+  isExternal      Boolean   @default(false)
   description     String?
   logoUrl         String?
   brandColor      String?
-  defaultCurrency String        @default("NGN")
+  defaultCurrency String    @default("NGN")
   archivedAt      DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  memberships      Membership[]
-  departments      Department[]
-  requests         Request[]
-  projects         Project[]
-  leads            Lead[]
-  invoices         Invoice[]
-  receipts         Receipt[]
-  approvalRules    ApprovalRule[]
-  scorecardConfigs ScorecardConfig[]
-
-  @@index([type])
+  memberships Membership[]
+  requests    Request[]
+  projects    Project[]
+  leads       Lead[]
+  invoices    Invoice[]
+  receipts    Receipt[]
 }
 
 enum Role {
@@ -125,7 +115,8 @@ enum Role {
 model Membership {
   id          String    @id @default(cuid())
   userId      String
-  workspaceId String
+  // null = agency staff (global); set = a client member of that organization.
+  organizationId String?
   role        Role
   departmentId String?
   subUnitId   String?
@@ -140,21 +131,21 @@ model Membership {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  department Department? @relation(fields: [departmentId], references: [id])
-  subUnit    SubUnit?    @relation(fields: [subUnitId], references: [id])
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department   Department?   @relation(fields: [departmentId], references: [id])
+  subUnit      SubUnit?      @relation(fields: [subUnitId], references: [id])
 
-  @@unique([userId, workspaceId, role, departmentId, subUnitId])
-  @@index([workspaceId])
+  @@unique([userId, organizationId, role, departmentId, subUnitId])
+  @@index([organizationId])
   @@index([userId])
 }
 
+// Departments belong to the (single, implicit) agency — no workspace/org scoping.
 model Department {
   id          String    @id @default(cuid())
-  workspaceId String
   name        String
-  slug        String
+  slug        String    @unique
   description String?
   color       String?
   icon        String?
@@ -163,15 +154,11 @@ model Department {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   subUnits         SubUnit[]
   memberships      Membership[]
   integrations     Integration[]
   requestsRoutedTo Request[]     @relation("RequestRoutedDepartment")
   projects         Project[]
-
-  @@unique([workspaceId, slug])
-  @@index([workspaceId])
 }
 
 model SubUnit {
@@ -248,11 +235,11 @@ model Lead {
   message      String
   source       String?
   status       LeadStatus @default(new)
-  workspaceId  String?
+  organizationId String?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+  org Organization? @relation(fields: [organizationId], references: [id])
 
   @@index([status])
 }
@@ -283,7 +270,7 @@ enum RequestStage {
 model Request {
   id                 String       @id @default(cuid())
   code               String       @unique
-  workspaceId        String
+  organizationId     String
   submittedById      String
   title              String
   description        String
@@ -301,7 +288,7 @@ model Request {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  workspace        Workspace          @relation(fields: [workspaceId], references: [id])
+  organization     Organization       @relation(fields: [organizationId], references: [id])
   routedDepartment Department?        @relation("RequestRoutedDepartment", fields: [routedDepartmentId], references: [id])
   project          Project?
   proposals        Proposal[]         @relation("RequestProposals")
@@ -309,24 +296,20 @@ model Request {
   attachments      Attachment[]       @relation("RequestAttachments")
   comments         TaskComment[]      @relation("RequestComments")
 
-  @@index([workspaceId])
+  @@index([organizationId])
   @@index([stage])
   @@index([routedDepartmentId])
 }
 
+// Agency-global approval rules (the agency is implicit).
 model ApprovalRule {
   id               String   @id @default(cuid())
-  workspaceId      String   // Agency workspace ID
   name             String
-  triggerCondition Json     // e.g. { clientType: "external_client", minBudget: 500000 }
+  triggerCondition Json     // e.g. { isExternal: true, minBudget: 500000 }
   requiredRole     Role
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-
-  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@index([workspaceId])
 }
 
 model RequestStageEvent {
@@ -356,7 +339,7 @@ model Project {
   id                 String        @id @default(cuid())
   code               String        @unique
   requestId          String        @unique
-  workspaceId        String
+  organizationId     String
   agencyDepartmentId String?
   pmUserId           String?
   name               String
@@ -370,16 +353,16 @@ model Project {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  request    Request     @relation(fields: [requestId], references: [id])
-  workspace  Workspace   @relation(fields: [workspaceId], references: [id])
-  department Department? @relation(fields: [agencyDepartmentId], references: [id])
+  request    Request      @relation(fields: [requestId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  department Department?  @relation(fields: [agencyDepartmentId], references: [id])
   tasks      Task[]
   milestones Milestone[]
   proposals  Proposal[]
   invoices   Invoice[]
   sponsorships Sponsorship[]
 
-  @@index([workspaceId])
+  @@index([organizationId])
   @@index([agencyDepartmentId])
   @@index([status])
 }
@@ -553,7 +536,7 @@ model Invoice {
   id          String        @id @default(cuid())
   code        String        @unique
   projectId   String?
-  workspaceId String
+  organizationId String
   status      InvoiceStatus @default(draft)
   currency    String        @default("NGN")
   amount      Decimal       @db.Decimal(14, 2)
@@ -566,11 +549,11 @@ model Invoice {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  project   Project?   @relation(fields: [projectId], references: [id])
-  workspace Workspace  @relation(fields: [workspaceId], references: [id])
-  receipt   Receipt?
+  project      Project?     @relation(fields: [projectId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  receipt      Receipt?
 
-  @@index([workspaceId])
+  @@index([organizationId])
   @@index([status])
 }
 
@@ -586,7 +569,7 @@ model Receipt {
   id            String        @id @default(cuid())
   code          String        @unique
   invoiceId     String?       @unique
-  workspaceId   String
+  organizationId String
   amount        Decimal       @db.Decimal(14, 2)
   currency      String        @default("NGN")
   paymentMethod PaymentMethod @default(paystack)
@@ -595,10 +578,10 @@ model Receipt {
   pdfUrl        String?
   createdAt     DateTime      @default(now())
 
-  invoice   Invoice?  @relation(fields: [invoiceId], references: [id])
-  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  invoice      Invoice?     @relation(fields: [invoiceId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
 
-  @@index([workspaceId])
+  @@index([organizationId])
   @@index([paymentRef])
 }
 
@@ -716,20 +699,17 @@ model Report {
   @@index([level, periodStart])
 }
 
+// Agency-global scorecard configs (the agency is implicit).
 model ScorecardConfig {
   id          String      @id @default(cuid())
-  workspaceId String
   level       ReportLevel
-  scopeId     String      // departmentId or workspaceId
+  scopeId     String      // departmentId or member userId
   name        String
   items       Json        // array of ScorecardItem objects
   isActive    Boolean     @default(true)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@index([workspaceId])
   @@index([level, scopeId])
 }
 
@@ -807,10 +787,10 @@ model Notification {
   @@index([userId, readAt])
 }
 
+// Agency-global audit trail (no per-tenant scoping).
 model AuditLog {
   id          String   @id @default(cuid())
   actorId     String?
-  workspaceId String?
   action      String
   entityType  String
   entityId    String
@@ -822,7 +802,6 @@ model AuditLog {
 
   actor User? @relation("ActorAuditLogs", fields: [actorId], references: [id])
 
-  @@index([workspaceId])
   @@index([entityType, entityId])
   @@index([createdAt])
 }
@@ -886,7 +865,6 @@ model Sponsorship {
 
 model ArchivedAuditLog {
   id           String   @id
-  workspaceId  String?
   actorId      String?
   action       String
   entityType   String

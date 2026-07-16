@@ -1,7 +1,7 @@
 import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { db } from "@/server/db/client";
-import { getAgencyWorkspaceId, requireAgencyAction } from "@/server/services/agency";
+import { requireAgencyAction } from "@/server/services/agency";
 
 /**
  * First-run "ready to use" checklist for agency admins. Derives each step's completion from
@@ -12,23 +12,22 @@ export const setupRouter = router({
     // department.create is admin-only — keeps this an admin setup surface.
     await requireAgencyAction(ctx.userId, "department.create");
 
-    const agencyId = await getAgencyWorkspaceId();
-    if (!agencyId) return null;
-
     const [departments, staffCount, clientCount, invoiceCount] = await Promise.all([
       db.department.findMany({
-        where: { workspaceId: agencyId, archivedAt: null },
+        where: { archivedAt: null },
         select: { id: true, leadId: true },
       }),
+      // Staff = org-null memberships.
       db.membership.count({
         where: {
-          workspaceId: agencyId,
+          organizationId: null,
           removedAt: null,
           role: { in: ["admin", "department_lead", "member"] },
         },
       }),
+      // Clients = memberships attached to an organization.
       db.membership.count({
-        where: { workspaceId: agencyId, removedAt: null, role: { in: ["client", "client_viewer"] } },
+        where: { organizationId: { not: null }, removedAt: null, role: { in: ["client", "client_viewer"] } },
       }),
       db.invoice.count(),
     ]);

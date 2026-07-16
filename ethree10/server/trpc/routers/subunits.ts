@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router } from "../trpc";
-import { workspaceProcedure } from "../procedures";
+import { protectedProcedure } from "../procedures";
 
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 export const subunitsRouter = router({
-  list: workspaceProcedure
+  list: protectedProcedure
     .input(z.object({ departmentId: z.string() }))
     .query(async ({ ctx, input }) => {
       await ctx.authorize("subunit.read");
@@ -17,7 +17,7 @@ export const subunitsRouter = router({
       });
     }),
 
-  create: workspaceProcedure
+  create: protectedProcedure
     .input(
       z.object({
         departmentId: z.string(),
@@ -28,7 +28,7 @@ export const subunitsRouter = router({
     .mutation(async ({ ctx, input }) => {
       await ctx.authorize("subunit.create");
       const dept = await ctx.db.department.findFirst({
-        where: { id: input.departmentId, workspaceId: ctx.workspaceId },
+        where: { id: input.departmentId },
       });
       if (!dept) throw new TRPCError({ code: "NOT_FOUND" });
       return ctx.db.subUnit.create({
@@ -41,7 +41,7 @@ export const subunitsRouter = router({
       });
     }),
 
-  update: workspaceProcedure
+  update: protectedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -56,7 +56,7 @@ export const subunitsRouter = router({
       return ctx.db.subUnit.update({ where: { id }, data });
     }),
 
-  archive: workspaceProcedure
+  archive: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.authorize("subunit.archive");
