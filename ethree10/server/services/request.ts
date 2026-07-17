@@ -335,6 +335,7 @@ export class RequestService {
       data: {
         code,
         publicToken,
+        publicTokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         organizationId: organization.id,
         submittedById: null,
         requesterName: args.requesterName,
@@ -388,6 +389,49 @@ export class RequestService {
     });
 
     return { id: created.id, code: created.code, publicToken };
+  }
+
+  static async rotatePublicToken(args: { actorId: string; requestId: string }) {
+    const before = await db.request.findUnique({ where: { id: args.requestId } });
+    if (!before) throw new TRPCError({ code: "NOT_FOUND" });
+    const publicToken = generatePublicToken();
+    const updated = await db.request.update({
+      where: { id: args.requestId },
+      data: {
+        publicToken,
+        publicTokenRevokedAt: null,
+        publicTokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      },
+    });
+    await AuditService.log({
+      actorId: args.actorId,
+      organizationId: before.organizationId,
+      action: "request.tracking_token_rotated",
+      entityType: "Request",
+      entityId: before.id,
+    });
+    await emailClient(updated, {
+      title: `Your secure tracking link was updated (${updated.code})`,
+      body: "For security, the previous link has been replaced. Use this new link going forward.",
+    });
+    return updated;
+  }
+
+  static async revokePublicToken(args: { actorId: string; requestId: string }) {
+    const before = await db.request.findUnique({ where: { id: args.requestId } });
+    if (!before) throw new TRPCError({ code: "NOT_FOUND" });
+    const updated = await db.request.update({
+      where: { id: args.requestId },
+      data: { publicTokenRevokedAt: new Date() },
+    });
+    await AuditService.log({
+      actorId: args.actorId,
+      organizationId: before.organizationId,
+      action: "request.tracking_token_revoked",
+      entityType: "Request",
+      entityId: before.id,
+    });
+    return updated;
   }
 
   static async route(args: {

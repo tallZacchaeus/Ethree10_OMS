@@ -21,7 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Copy } from "lucide-react";
+import { Copy, RefreshCw, ShieldOff } from "lucide-react";
 import { labelForTaskType } from "@/lib/request-types";
 import { StatusPill } from "@/components/ui-ext/status-pill";
 import { UrgencyTag } from "@/components/ui-ext/urgency-tag";
@@ -96,6 +96,8 @@ export default function RequestDetailPage() {
   });
   const approve = trpc.requests.approve.useMutation({ onSuccess: () => { void invalidate(); toast({ title: "Request accepted" }); }, onError: (err) => toast({ title: "Couldn't accept request", description: err.message, variant: "destructive" }) });
   const reject = trpc.requests.reject.useMutation({ onSuccess: () => { void invalidate(); toast({ title: "Request rejected" }); }, onError: (err) => toast({ title: "Couldn't reject request", description: err.message, variant: "destructive" }) });
+  const rotateTrackingLink = trpc.requests.rotateTrackingLink.useMutation({ onSuccess: () => { void invalidate(); toast({ title: "New tracking link issued", description: "The previous link no longer works." }); }, onError: (err) => toast({ title: "Couldn't rotate link", description: err.message, variant: "destructive" }) });
+  const revokeTrackingLink = trpc.requests.revokeTrackingLink.useMutation({ onSuccess: () => { void invalidate(); toast({ title: "Tracking link revoked" }); }, onError: (err) => toast({ title: "Couldn't revoke link", description: err.message, variant: "destructive" }) });
 
   if (isLoading) {
     return <div className="py-12 text-center text-muted-foreground">Loading…</div>;
@@ -293,6 +295,7 @@ export default function RequestDetailPage() {
                       variant="outline"
                       size="sm"
                       className="w-full"
+                      disabled={Boolean(request.publicTokenRevokedAt)}
                       onClick={() => {
                         void navigator.clipboard.writeText(
                           `${window.location.origin}/track/${request.publicToken}`,
@@ -303,6 +306,19 @@ export default function RequestDetailPage() {
                       <Copy className="h-3.5 w-3.5" />
                       Copy tracking link
                     </Button>
+                    {isAgencyStaff && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => rotateTrackingLink.mutate({ id })} disabled={rotateTrackingLink.isPending}>
+                          <RefreshCw className="h-3.5 w-3.5" /> Rotate
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => revokeTrackingLink.mutate({ id })} disabled={revokeTrackingLink.isPending || Boolean(request.publicTokenRevokedAt)}>
+                          <ShieldOff className="h-3.5 w-3.5" /> Revoke
+                        </Button>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {request.publicTokenRevokedAt ? "Revoked" : request.publicTokenExpiresAt ? `Expires ${formatDate(request.publicTokenExpiresAt)}` : "Active"}
+                    </p>
                   </div>
                 </>
               )}

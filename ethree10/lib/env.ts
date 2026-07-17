@@ -13,6 +13,7 @@ const serverSchema = z.object({
   EMAIL_FROM: z.string().min(1),
 
   REDIS_URL: z.string().min(1),
+  CRON_SECRET: z.string().min(20).optional(),
 
   INTEGRATION_SECRET_KEY: z.string().length(64),
 

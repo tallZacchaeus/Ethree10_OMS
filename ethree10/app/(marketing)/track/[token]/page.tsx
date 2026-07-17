@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { CheckCircle2, Clock, MessageSquare, Send } from "lucide-react";
+import { CheckCircle2, Clock, Download, MessageSquare, RotateCcw, Send } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,19 +10,15 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui-ext/status-pill";
-import { UrgencyTag } from "@/components/ui-ext/urgency-tag";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
-
-function stageLabel(stage: string) {
-  return stage.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
-}
 
 export default function TrackRequestPage() {
   const params = useParams<{ token: string }>();
   const token = params.token;
   const { toast } = useToast();
   const [body, setBody] = useState("");
+  const [changeRequest, setChangeRequest] = useState("");
 
   const utils = trpc.useUtils();
   const { data, isLoading, error } = trpc.track.get.useQuery(
@@ -39,6 +35,14 @@ export default function TrackRequestPage() {
     onError: (e) => {
       toast({ title: "Could not send", description: e.message, variant: "destructive" });
     },
+  });
+  const decideDelivery = trpc.track.decideDelivery.useMutation({
+    onSuccess: () => {
+      setChangeRequest("");
+      void utils.track.get.invalidate({ token });
+      toast({ title: "Response recorded", description: "The delivery team has been notified." });
+    },
+    onError: (e) => toast({ title: "Could not record response", description: e.message, variant: "destructive" }),
   });
 
   if (isLoading) {
@@ -80,15 +84,11 @@ export default function TrackRequestPage() {
             <StatusPill kind="request" value={data.stage} />
           </div>
           <CardDescription className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1">
-            <UrgencyTag value={data.urgency} />
+            <span>{data.status}</span>
             {data.teamName && <span>Handled by {data.teamName}</span>}
-            <span>Submitted {formatDate(data.createdAt)}</span>
             {data.targetDeliveryDate && <span>Target delivery {formatDate(data.targetDeliveryDate)}</span>}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="whitespace-pre-wrap text-sm text-muted-foreground">{data.description}</p>
-        </CardContent>
       </Card>
 
       {/* Progress timeline */}
@@ -115,7 +115,7 @@ export default function TrackRequestPage() {
                     {isLast ? <Clock className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium">{stageLabel(event.toStage)}</p>
+                    <p className="text-sm font-medium">{event.status}</p>
                     {event.note && <p className="text-sm text-muted-foreground">{event.note}</p>}
                     <p className="text-xs text-muted-foreground">{formatDateTime(event.createdAt)}</p>
                   </div>
@@ -125,6 +125,54 @@ export default function TrackRequestPage() {
           </ol>
         </CardContent>
       </Card>
+
+      {data.deliverables.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Delivered work</CardTitle>
+            <CardDescription>Only files and links approved for client viewing appear here.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.deliverables.map((item) => (
+              <div key={item.id} className="rounded-lg border p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">Revision {item.revision} · {formatDateTime(item.deliveredAt)}</p>
+                  </div>
+                  {item.url && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={item.url} target="_blank" rel="noreferrer"><Download className="h-4 w-4" /> Open</a>
+                    </Button>
+                  )}
+                </div>
+                {item.content && <p className="mt-2 whitespace-pre-wrap text-sm">{item.content}</p>}
+                {item.notes && <p className="mt-2 text-sm text-muted-foreground">{item.notes}</p>}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {data.canReviewDelivery && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Review this delivery</CardTitle>
+            <CardDescription>Accept to close the project, or describe the changes needed for the next revision.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Textarea value={changeRequest} onChange={(event) => setChangeRequest(event.target.value)} placeholder="Describe any changes you need…" maxLength={4000} />
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => decideDelivery.mutate({ token, decision: "accepted" })} disabled={decideDelivery.isPending}>
+                <CheckCircle2 className="h-4 w-4" /> Accept delivery
+              </Button>
+              <Button variant="outline" onClick={() => decideDelivery.mutate({ token, decision: "changes_requested", message: changeRequest })} disabled={decideDelivery.isPending || changeRequest.trim().length < 2}>
+                <RotateCcw className="h-4 w-4" /> Request changes
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Conversation */}
       <Card>
@@ -137,13 +185,13 @@ export default function TrackRequestPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {data.comments.length === 0 ? (
+          {data.messages.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No messages yet. Have a question about your request? Ask below.
             </p>
           ) : (
             <div className="space-y-3">
-              {data.comments.map((c) => (
+              {data.messages.map((c) => (
                 <div
                   key={c.id}
                   className={cn(
@@ -189,7 +237,7 @@ export default function TrackRequestPage() {
             </div>
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-muted-foreground">
-                Posting as {data.requesterName ?? "the requester"}
+                Posting as the requester
               </p>
               <Button type="submit" disabled={addComment.isPending || !body.trim()}>
                 <Send className="h-4 w-4" />

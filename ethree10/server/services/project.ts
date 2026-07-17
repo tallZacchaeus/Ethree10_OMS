@@ -6,6 +6,7 @@ import { NotificationService } from "@/server/services/notification";
 import { getAgencyAuthContext } from "@/server/services/agency";
 import { can } from "@/server/auth/permissions";
 import { generateCode } from "@/lib/utils/codes";
+import { EmailService } from "@/server/notifications/email";
 
 async function nextProjectSeq(): Promise<number> {
   const year = new Date().getUTCFullYear();
@@ -189,6 +190,9 @@ export class ProjectService {
   }) {
     const before = await db.project.findUnique({ where: { id: args.projectId } });
     if (!before) throw new TRPCError({ code: "NOT_FOUND" });
+    if (args.patch.status === "closed") {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Projects close only when the client accepts delivery." });
+    }
     const updated = await db.project.update({
       where: { id: args.projectId },
       data: args.patch,
@@ -236,10 +240,18 @@ export class ProjectService {
     if (missingReview) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Required team-head and specialist reviews must pass before delivery." });
     }
-    const project = await db.project.update({
-      where: { id: args.projectId },
-      data: { status: "delivered", actualDeliveryDate: new Date() },
-      include: { request: { select: { submittedById: true } } },
+    const deliveredAt = new Date();
+    const project = await db.$transaction(async (tx) => {
+      const updated = await tx.project.update({
+        where: { id: args.projectId },
+        data: { status: "delivered", actualDeliveryDate: deliveredAt },
+        include: { request: true },
+      });
+      await tx.request.update({ where: { id: updated.requestId }, data: { stage: "delivered" } });
+      await tx.requestStageEvent.create({
+        data: { requestId: updated.requestId, fromStage: before.request.stage, toStage: "delivered", actorId: args.actorId, note: "Work delivered for client review." },
+      });
+      return updated;
     });
     await AuditService.log({
       actorId: args.actorId,
@@ -260,6 +272,15 @@ export class ProjectService {
         entityId: project.id,
       });
     }
+    if (project.request.requesterEmail && project.request.publicToken && project.request.consentToEmail) {
+      await EmailService.sendNotification({
+        to: project.request.requesterEmail,
+        title: `Your project is ready for review (${project.request.code})`,
+        body: `The delivered work for "${project.name}" is ready. Use your secure tracking link to accept it or request changes.`,
+        ctaLabel: "Review delivery",
+        ctaPath: `/track/${project.request.publicToken}`,
+      });
+    }
     return project;
   }
 
@@ -271,12 +292,7 @@ export class ProjectService {
   }) {
     const project = await db.project.update({
       where: { id: args.projectId },
-      data: { csatScore: args.score, csatComment: args.comment ?? null, status: "closed" },
-    });
-    // Request must also transition to closed
-    await db.request.update({
-      where: { id: project.requestId },
-      data: { stage: "closed" },
+      data: { csatScore: args.score, csatComment: args.comment ?? null },
     });
     await AuditService.log({
       actorId: args.actorId,
@@ -284,7 +300,7 @@ export class ProjectService {
       action: "project.csat_received",
       entityType: "Project",
       entityId: project.id,
-      after: { csatScore: args.score, status: "closed" },
+      after: { csatScore: args.score },
     });
     
     // Also notify agency lead/PM about the feedback

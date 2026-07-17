@@ -190,6 +190,22 @@ export const requestsRouter = router({
       return request;
     }),
 
+  rotateTrackingLink: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertCanReadRequest(ctx.userId, input.id);
+      await requireAgencyAction(ctx.userId, "request.update");
+      return RequestService.rotatePublicToken({ actorId: ctx.userId, requestId: input.id });
+    }),
+
+  revokeTrackingLink: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertCanReadRequest(ctx.userId, input.id);
+      await requireAgencyAction(ctx.userId, "request.update");
+      return RequestService.revokePublicToken({ actorId: ctx.userId, requestId: input.id });
+    }),
+
   create: protectedProcedure.input(createInput.extend({ organizationId: z.string() })).mutation(async ({ ctx, input }) => {
       await requireAgencyAction(ctx.userId, "request.create");
       const { organizationId, ...rest } = input;

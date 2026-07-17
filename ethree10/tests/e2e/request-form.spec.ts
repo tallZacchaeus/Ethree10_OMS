@@ -16,5 +16,12 @@ test("organization submits a complete service request", async ({ page }) => {
   await page.locator('input[name="consentToEmail"]').check();
   await page.getByRole("button", { name: "Submit Request" }).click();
   await expect(page.getByText("Request submitted", { exact: true })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole("link", { name: "Track my request" })).toBeVisible();
+  const trackingLink = page.getByRole("link", { name: "Track my request" });
+  await expect(trackingLink).toBeVisible();
+  await trackingLink.click();
+  await expect(page.getByText("Phase 2 service request", { exact: true })).toBeVisible();
+  await expect(page.getByText("Planning", { exact: true }).first()).toBeVisible();
+  await page.getByLabel("Your message").fill("E2E client follow-up message");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByText("E2E client follow-up message", { exact: true })).toBeVisible();
 });

@@ -53,6 +53,8 @@ model User {
   auditLogs               AuditLog[]               @relation("ActorAuditLogs")
   authoredComments        TaskComment[]
   authoredReports         Report[]                 @relation("ReportAuthoredBy")
+  finalizedReports        Report[]                 @relation("ReportFinalizedBy")
+  reportAmendments        ReportAmendment[]
   timeLogs                TimeLog[]                @relation("UserTimeLogs")
   taskContributions       TaskContributor[]        @relation("TaskContributors")
   staffAvailability       StaffAvailability[]
@@ -104,6 +106,7 @@ model Organization {
   leads    Lead[]
   invoices Invoice[]
   receipts Receipt[]
+  reports  Report[]
 }
 
 model Position {
@@ -306,6 +309,8 @@ model Request {
   id                   String       @id @default(cuid())
   code                 String       @unique
   publicToken          String?      @unique
+  publicTokenExpiresAt DateTime?
+  publicTokenRevokedAt DateTime?
   organizationId       String
   submittedById        String?
   requesterName        String?
@@ -395,23 +400,54 @@ model Project {
   startDate          DateTime?
   targetDeliveryDate DateTime?
   actualDeliveryDate DateTime?
+  clientRevision     Int           @default(1)
   csatScore          Int?
   csatComment        String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  request      Request       @relation(fields: [requestId], references: [id])
-  organization Organization  @relation(fields: [organizationId], references: [id])
-  team         Team?         @relation(fields: [agencyTeamId], references: [id])
-  tasks        Task[]
-  milestones   Milestone[]
-  proposals    Proposal[]
-  invoices     Invoice[]
-  sponsorships Sponsorship[]
+  request         Request          @relation(fields: [requestId], references: [id])
+  organization    Organization     @relation(fields: [organizationId], references: [id])
+  team            Team?            @relation(fields: [agencyTeamId], references: [id])
+  tasks           Task[]
+  milestones      Milestone[]
+  proposals       Proposal[]
+  invoices        Invoice[]
+  sponsorships    Sponsorship[]
+  clientDecisions ClientDecision[]
 
   @@index([organizationId])
   @@index([agencyTeamId])
   @@index([status])
+}
+
+enum ClientDecisionType {
+  accepted
+  changes_requested
+}
+
+model ClientDecision {
+  id              String             @id @default(cuid())
+  projectId       String
+  decision        ClientDecisionType
+  projectRevision Int
+  message         String?
+  createdAt       DateTime           @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+}
+
+model PublicRateLimit {
+  key         String
+  action      String
+  windowStart DateTime
+  count       Int      @default(1)
+  expiresAt   DateTime
+
+  @@id([key, action, windowStart])
+  @@index([expiresAt])
 }
 
 enum TaskStatus {
@@ -841,6 +877,7 @@ enum ReportLevel {
   subunit
   team
   agency
+  organization
 }
 
 enum ReportPeriod {
@@ -848,23 +885,93 @@ enum ReportPeriod {
   monthly
 }
 
-model Report {
-  id           String       @id @default(cuid())
-  level        ReportLevel
-  period       ReportPeriod
-  scopeId      String
-  periodStart  DateTime
-  periodEnd    DateTime
-  metrics      Json
-  highlights   String?
-  pdfUrl       String?
-  authoredById String?
-  createdAt    DateTime     @default(now())
+enum ReportStatus {
+  draft
+  finalized
+}
 
-  authoredBy User? @relation("ReportAuthoredBy", fields: [authoredById], references: [id])
+enum ContributionType {
+  assignment
+  completion
+  deliverable
+  time
+  collaboration
+  review
+  revision
+  blocker
+}
+
+model Report {
+  id            String       @id @default(cuid())
+  level         ReportLevel
+  period        ReportPeriod
+  scopeId       String
+  periodStart   DateTime
+  periodEnd     DateTime
+  metrics       Json
+  narrative     Json?
+  highlights    String?
+  pdfUrl        String?
+  authoredById  String?
+  status        ReportStatus @default(draft)
+  timezone      String       @default("Africa/Lagos")
+  cutoffAt      DateTime
+  finalizedAt   DateTime?
+  finalizedById String?
+  version       Int          @default(1)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  authoredBy     User?                @relation("ReportAuthoredBy", fields: [authoredById], references: [id])
+  finalizedBy    User?                @relation("ReportFinalizedBy", fields: [finalizedById], references: [id])
+  organization   Organization?        @relation(fields: [organizationId], references: [id])
+  organizationId String?
+  contributions  ReportContribution[]
+  amendments     ReportAmendment[]
 
   @@unique([level, period, scopeId, periodStart])
   @@index([level, periodStart])
+}
+
+model ReportContribution {
+  id             String           @id @default(cuid())
+  reportId       String
+  sourceKey      String
+  type           ContributionType
+  userId         String?
+  taskId         String?
+  projectId      String?
+  organizationId String?
+  teamId         String?
+  summary        String
+  outcome        String?
+  effortHours    Decimal?         @db.Decimal(8, 2)
+  occurredAt     DateTime
+  metadata       Json?
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, sourceKey])
+  @@index([reportId, userId])
+  @@index([organizationId, occurredAt])
+  @@index([teamId, occurredAt])
+}
+
+model ReportAmendment {
+  id                String   @id @default(cuid())
+  reportId          String
+  amendedById       String
+  reason            String
+  previousMetrics   Json
+  previousNarrative Json?
+  newMetrics        Json
+  newNarrative      Json?
+  createdAt         DateTime @default(now())
+
+  report    Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  amendedBy User   @relation(fields: [amendedById], references: [id])
+
+  @@index([reportId, createdAt])
 }
 
 // Agency-global scorecard configs (the agency is implicit).
