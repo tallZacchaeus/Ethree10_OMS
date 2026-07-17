@@ -28,13 +28,13 @@ import { UrgencyTag } from "@/components/ui-ext/urgency-tag";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useOrganization } from "@/components/providers/workspace-provider";
+import { useAgencyContext } from "@/components/providers/agency-provider";
 import { KpiWidget } from "@/components/dashboard/kpi-widget";
 import { FirstRunChecklist } from "@/components/dashboard/first-run-checklist";
 import { AnimatedItem, AnimatedPage, AnimatedSection } from "@/components/ui-ext/animated";
 
 export default function DashboardPage() {
-  const { roles, isSuperAdmin, activeOrganization } = useOrganization();
+  const { roles, isSuperAdmin, agency: activeOrganization } = useAgencyContext();
   const experience = getDashboardExperience(roles, isSuperAdmin);
 
   const { data: myTasks } = trpc.tasks.myTasks.useQuery(undefined, {
@@ -43,8 +43,8 @@ export default function DashboardPage() {
   const { data: myWeek } = trpc.reports.myCurrentWeek.useQuery(undefined, {
     enabled: experience.isMember,
   });
-  const { data: deptData } = trpc.dashboard.departmentLead.useQuery(undefined, {
-    enabled: experience.isDeptLead,
+  const { data: teamData } = trpc.dashboard.teamLead.useQuery(undefined, {
+    enabled: experience.isTeamHead,
   });
   const { data: agencyData } = trpc.dashboard.agencyLead.useQuery(undefined, {
     enabled: experience.isAgencyLead,
@@ -71,7 +71,7 @@ export default function DashboardPage() {
     <AnimatedPage className="space-y-8">
       <AnimatedSection delay={40}>
         <DashboardHero
-          workspaceName={activeOrganization?.name ?? null}
+          agencyName={activeOrganization.name}
           showRequestCta={false}
         />
       </AnimatedSection>
@@ -159,46 +159,46 @@ export default function DashboardPage() {
         </AnimatedSection>
       )}
 
-      {experience.isDeptLead && deptData && deptData.teams.length > 0 && (
+      {experience.isTeamHead && teamData && teamData.teams.length > 0 && (
         <AnimatedSection className="space-y-4 border-t pt-6" delay={220}>
           <SectionHeader
             title="Team view"
-            description="Balance intake, delivery pressure, and client follow-ups for your department."
+            description="Balance intake, delivery pressure, and client follow-ups for your team."
           />
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <StatCard
               label="Incoming requests"
-              value={deptData.incomingRequests.length}
+              value={teamData.incomingRequests.length}
               icon={Inbox}
               tone="signature"
             />
             <StatCard
               label="Active projects"
-              value={deptData.metrics.activeProjects}
+              value={teamData.metrics.activeProjects}
               icon={FolderKanban}
               className="surface-hover"
             />
             <StatCard
               label="Awaiting client feedback"
-              value={deptData.metrics.deliveredAwaitingFeedback}
+              value={teamData.metrics.deliveredAwaitingFeedback}
               icon={MessageSquareQuote}
               className="surface-hover"
             />
             <StatCard
               label="Overdue tasks"
-              value={deptData.metrics.overdueTasksCount}
+              value={teamData.metrics.overdueTasksCount}
               icon={AlertTriangle}
               className="surface-hover"
             />
           </div>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr,0.8fr]">
-            <SurfaceCard title="Team intake queue" description="Requests that still need active departmental handling.">
-              {deptData.incomingRequests.length === 0 ? (
-                <EmptyState message="No incoming requests need department attention right now." />
+            <SurfaceCard title="Team intake queue" description="Requests that still need active team handling.">
+              {teamData.incomingRequests.length === 0 ? (
+                <EmptyState message="No incoming requests need team attention right now." />
               ) : (
-                deptData.incomingRequests.map((request, index) => (
+                teamData.incomingRequests.map((request, index) => (
                   <AnimatedItem key={request.id} delay={index * 50}>
                     <LinkCard href={`/requests/${request.id}`}>
                       <div className="min-w-0 flex-1 space-y-1">
@@ -223,7 +223,7 @@ export default function DashboardPage() {
                 <CardDescription>Operational scorecard for the teams you lead.</CardDescription>
               </CardHeader>
               <CardContent>
-                <KpiWidget snapshot={deptData.kpiSnapshot as KpiSnapshot | null} />
+                <KpiWidget snapshot={teamData.kpiSnapshot as KpiSnapshot | null} />
               </CardContent>
             </Card>
           </div>
@@ -383,10 +383,10 @@ export default function DashboardPage() {
 }
 
 function DashboardHero({
-  workspaceName,
+  agencyName,
   showRequestCta,
 }: {
-  workspaceName: string | null;
+  agencyName: string;
   showRequestCta: boolean;
 }) {
   return (
@@ -394,7 +394,7 @@ function DashboardHero({
       <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1.5">
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-white/55">
-            {workspaceName ?? "Your workspace"}
+            {agencyName}
           </p>
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             Welcome back

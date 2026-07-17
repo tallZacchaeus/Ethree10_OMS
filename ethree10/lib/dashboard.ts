@@ -11,14 +11,14 @@ export function getDashboardExperience(roles: Role[], isSuperAdmin: boolean) {
   // Agency-wide overview surface — admins plus the executive oversight role.
   const isAgencyLead = isAdmin || isExecutive;
   // Operational tiers. The executive is read-only oversight, so it is deliberately excluded
-  // from the personal "My work" and department-execution surfaces — it only gets the
-  // agency-wide overview above. (Sub-unit lead role was removed; dept leads cover sub-units.)
-  const isDeptLead = isAdmin || roles.includes("team_head");
-  const isMember = isDeptLead || roles.includes("team_member");
+  // from the personal "My work" and team-execution surfaces — it only gets the
+  // agency-wide overview above. Team heads cover optional sub-units.
+  const isTeamHead = isAdmin || roles.includes("team_head");
+  const isMember = isTeamHead || roles.includes("team_member");
 
   return {
     isAgencyLead,
-    isDeptLead,
+    isTeamHead,
     isMember,
     isExecutive,
   };

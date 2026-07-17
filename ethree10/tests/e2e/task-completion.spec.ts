@@ -25,7 +25,7 @@ test.describe("Task assign and complete flow", () => {
     await expect(page.getByRole("heading", { name: /projects/i })).toBeVisible();
   });
 
-  test("team execution workspace exposes assignments, workload, and reviews", async ({ page }) => {
+  test("team execution area exposes assignments, workload, and reviews", async ({ page }) => {
     await signInAsSeededUser(page);
     for (const [route, heading] of [
       ["/team/dashboard", "Team dashboard"],

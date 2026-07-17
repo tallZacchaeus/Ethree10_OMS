@@ -17,7 +17,7 @@ export default function LoginPage() {
         <AnimatedSection className="text-center" delay={40}>
           <Badge variant="secondary" className="mb-3 inline-flex gap-1 px-3 py-1 text-xs">
             <ShieldCheck className="h-3.5 w-3.5" />
-            Secure workspace access
+            Secure staff access
           </Badge>
           <E310Logo variant="dark" className="mx-auto h-8 w-auto" />
           <p className="mt-2 text-sm text-muted-foreground">

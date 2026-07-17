@@ -86,7 +86,7 @@ async function main() {
     });
   }
   const productTech = teamsBySlug[TEAM_SLUGS.productDevelopment];
-  if (!productTech) throw new Error("Seed failed: Product Development department missing.");
+  if (!productTech) throw new Error("Seed failed: Product Development team missing.");
 
   // ── Configurable service catalogue ─────────────────────────────────────
   for (const service of TASK_TYPES) {

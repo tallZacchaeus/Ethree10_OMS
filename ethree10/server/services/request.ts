@@ -121,8 +121,8 @@ export async function findOrCreateClientOrg(args: { name: string; requesterEmail
 }
 
 /**
- * Resolve the agency department a request should route to, based on its task type.
- * Returns null when the type isn't in the catalog or the matching department doesn't exist
+ * Resolve the agency team a request should route to, based on its task type.
+ * Returns null when the type isn't in the catalog or the matching team doesn't exist
  * (e.g. legacy free-text types) — the request then stays unrouted for manual triage.
  */
 async function resolveService(serviceId?: string) {
@@ -252,7 +252,7 @@ export class RequestService {
     const seq = await nextRequestSeq();
     const code = generateCode("request", seq);
 
-    // Self-routing: derive the target department from the chosen task type so the request
+    // Self-routing: derive the target team from the chosen task type so the request
     // lands with the right team (Creative vs Product Development) without manual triage.
     const service = await resolveService(args.input.serviceId);
     if (service) validateRequiredBrief(service, args.input);
@@ -443,11 +443,11 @@ export class RequestService {
     const before = await db.request.findUnique({ where: { id: args.requestId } });
     if (!before) throw new TRPCError({ code: "NOT_FOUND" });
 
-    const department = await db.team.findUnique({
+    const team = await db.team.findUnique({
       where: { id: args.teamId },
       select: { id: true, name: true, leadId: true },
     });
-    if (!department) throw new TRPCError({ code: "NOT_FOUND", message: "Department not found." });
+    if (!team) throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
 
     const advanceToReview = before.stage === "submitted";
     let targetStage = advanceToReview ? "under_review" : before.stage;
@@ -490,11 +490,11 @@ export class RequestService {
       before: { routedTeamId: before.routedTeamId },
       after: { routedTeamId: args.teamId },
     });
-    if (department.leadId) {
+    if (team.leadId) {
       await NotificationService.create({
-        userId: department.leadId,
+        userId: team.leadId,
         kind: "request_assigned",
-        title: `Request routed to ${department.name}`,
+        title: `Request routed to ${team.name}`,
         body: `${updated.code}: ${updated.title}`,
         link: `/requests/${updated.id}`,
         entityType: "Request",

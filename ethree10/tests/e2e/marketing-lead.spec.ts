@@ -5,7 +5,7 @@ import { test, expect } from "@playwright/test";
  *
  * Tests that the public request / lead form on the marketing site
  * is accessible and renders correctly.  Full conversion (agency lead
- * converts → external workspace created) requires authenticated state
+ * converts → external organization created) requires authenticated state
  * and is covered in integration tests.
  */
 

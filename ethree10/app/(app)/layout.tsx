@@ -26,6 +26,8 @@ export default async function AppLayout({
   });
 
   const isMfaEnabled = dbUser?.mfaEnabled;
+  const hasStaffAccess = dbUser?.isSuperAdmin || dbUser?.memberships.some((membership) => !membership.removedAt && membership.acceptedAt);
+  if (!hasStaffAccess) redirect("/unauthorized");
   // MFA is mandatory for admin and all lead roles (spec 13/Phase 2).
   const MFA_ENFORCED_ROLES = ["agency_admin", "finance_admin", "team_head"];
   const isEnforcedRole =

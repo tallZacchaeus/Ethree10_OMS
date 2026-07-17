@@ -155,7 +155,7 @@ model Membership {
   @@index([userId])
 }
 
-// Departments belong to the (single, implicit) agency — no workspace/org scoping.
+// Teams belong to the single implicit Ethree10 agency.
 model Team {
   id          String    @id @default(cuid())
   name        String

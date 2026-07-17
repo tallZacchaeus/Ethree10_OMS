@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
-import { useOrganization } from "@/components/providers/workspace-provider";
+import { useAgencyContext } from "@/components/providers/agency-provider";
 import { PageHeader } from "@/components/ui-ext/page-header";
 import { EmptyState } from "@/components/ui-ext/empty-state";
 import { Card } from "@/components/ui/card";
@@ -48,7 +48,7 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
 ];
 
 export default function MembersPage() {
-  const { activeOrganizationId, roles, isSuperAdmin } = useOrganization();
+  const { roles, isSuperAdmin } = useAgencyContext();
   const { toast } = useToast();
 
   const [query, setQuery]         = useState("");
@@ -65,12 +65,12 @@ export default function MembersPage() {
   );
 
   const { data, isLoading, refetch } = trpc.members.list.useQuery(undefined, {
-    enabled: Boolean(activeOrganizationId),
+    enabled: true,
     retry: false,
   });
 
   const { data: teams } = trpc.teams.list.useQuery(undefined, {
-    enabled: Boolean(activeOrganizationId) && open,
+    enabled: open,
   });
 
   const selectedDept = teams?.find(d => d.id === teamId);
@@ -176,7 +176,7 @@ export default function MembersPage() {
                 {teams && teams.length > 0 && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <Label htmlFor="inv-dept">Department (optional)</Label>
+                      <Label htmlFor="inv-dept">Team (optional)</Label>
                       <Select value={teamId || "__none__"} onValueChange={v => { setDeptId(v === "__none__" ? "" : v); setSubUnitId(""); }}>
                         <SelectTrigger id="inv-dept">
                           <SelectValue placeholder="None" />

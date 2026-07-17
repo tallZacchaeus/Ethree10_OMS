@@ -132,7 +132,7 @@ export class ProjectService {
 
   /**
    * Projects the caller may see: every project for agency staff, otherwise
-   * projects belonging to workspaces the caller is a member of.
+   * projects belonging to teams the caller belongs to.
    */
   static async listVisibleTo(
     userId: string,

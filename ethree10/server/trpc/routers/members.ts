@@ -12,6 +12,17 @@ const skillLevelOrder: Record<SkillLevel, number> = {
 };
 
 export const membersRouter = router({
+  positions: protectedProcedure.query(async ({ ctx }) => {
+    await requireAgencyAction(ctx.userId, "member.read");
+    return ctx.db.position.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { memberships: true } } } });
+  }),
+
+  createPosition: protectedProcedure
+    .input(z.object({ name: z.string().trim().min(2).max(120), description: z.string().trim().max(1000).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAgencyAction(ctx.userId, "organization.invite");
+      return ctx.db.position.create({ data: { name: input.name, description: input.description } });
+    }),
   list: protectedProcedure
     .input(z.object({}).optional())
     .query(async ({ ctx }) => {

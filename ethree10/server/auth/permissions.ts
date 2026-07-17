@@ -119,7 +119,7 @@ const ROLE_PERMISSIONS: Record<Role, Action[]> = {
     "invoice.read", "invoice.manage", "receipt.read", "receipt.issue",
   ],
 
-  // Department owner — runs a department and its sub-units (was team_head + subunit_lead).
+  // Team owner — runs one delivery team and its optional sub-units.
   team_head: [
     "organization.read",
     "team.read", "team.update",

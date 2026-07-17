@@ -39,6 +39,23 @@ export const organizationsRouter = router({
     });
   }),
 
+  getOrganization: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await ctx.authorize("organization.read");
+      const organization = await ctx.db.organization.findUnique({
+        where: { id: input.id },
+        include: {
+          requests: { orderBy: { createdAt: "desc" }, take: 10, select: { id: true, code: true, title: true, stage: true, createdAt: true } },
+          projects: { orderBy: { updatedAt: "desc" }, take: 10, select: { id: true, code: true, name: true, status: true, targetDeliveryDate: true } },
+          reports: { orderBy: { periodStart: "desc" }, take: 10, select: { id: true, period: true, status: true, periodStart: true, periodEnd: true } },
+          _count: { select: { requests: true, projects: true, invoices: true, receipts: true, reports: true } },
+        },
+      });
+      if (!organization) throw new TRPCError({ code: "NOT_FOUND" });
+      return organization;
+    }),
+
   createOrganization: protectedProcedure
     .input(
       z.object({

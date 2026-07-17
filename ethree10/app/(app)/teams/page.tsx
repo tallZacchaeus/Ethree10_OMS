@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
-import { useOrganization } from "@/components/providers/workspace-provider";
+import { useAgencyContext } from "@/components/providers/agency-provider";
 import { PageHeader } from "@/components/ui-ext/page-header";
 import { EmptyState } from "@/components/ui-ext/empty-state";
 import { Button } from "@/components/ui/button";
@@ -104,10 +104,10 @@ function AddSubUnit({ teamId }: { teamId: string }) {
 }
 
 export default function TeamsPage() {
-  const { activeOrganizationId, roles, isSuperAdmin } = useOrganization();
+  const { roles, isSuperAdmin } = useAgencyContext();
   const [creating, setCreating] = useState(false);
   const { data, isLoading } = trpc.teams.list.useQuery(undefined, {
-    enabled: Boolean(activeOrganizationId),
+    enabled: true,
     retry: false,
   });
 

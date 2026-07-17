@@ -9,10 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { RequestStage } from "@prisma/client";
-import { useOrganization } from "@/components/providers/workspace-provider";
+import { useAgencyContext } from "@/components/providers/agency-provider";
 
 export default function RequestsPage() {
-  const { roles, isSuperAdmin } = useOrganization();
+  const { roles, isSuperAdmin } = useAgencyContext();
   const [stageFilter, setStageFilter] = useState<RequestStage | "ALL">("ALL");
   
   const isAgencyStaff =

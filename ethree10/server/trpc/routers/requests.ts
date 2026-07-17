@@ -334,7 +334,7 @@ export const requestsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const request = await assertCanReadRequest(ctx.userId, input.requestId);
       // Staff need comment.create; the request's own submitter may always comment on it.
-      // Read-only viewers (client_viewer) who aren't the submitter are blocked.
+      // Non-agency callers who are not the submitter are blocked.
       if (request.submittedById !== ctx.userId) {
         const agencyCtx = await getAgencyAuthContext(ctx.userId);
         if (!can(agencyCtx, "comment.create")) {

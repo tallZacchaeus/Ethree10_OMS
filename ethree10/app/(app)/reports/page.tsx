@@ -9,13 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { useOrganization } from "@/components/providers/workspace-provider";
+import { useAgencyContext } from "@/components/providers/agency-provider";
 import { PageHeader } from "@/components/ui-ext/page-header";
 import { StatCard } from "@/components/ui-ext/stat-card";
 import { AnimatedPage, AnimatedSection } from "@/components/ui-ext/animated";
 
 export default function ReportsPage() {
-  const { activeOrganization: currentWorkspace } = useOrganization();
+  const { agency, roles, isSuperAdmin } = useAgencyContext();
   const { toast } = useToast();
   const { data: reports, isLoading, refetch } = trpc.reports.list.useQuery();
 
@@ -54,7 +54,7 @@ export default function ReportsPage() {
           title="Reports"
           description="Weekly and monthly rollups across the agency."
           actions={
-            currentWorkspace?.type === "agency" ? (
+            agency.type === "agency" && (isSuperAdmin || roles.some((role) => ["agency_admin", "finance_admin", "team_head"].includes(role))) ? (
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => generateWeekly.mutate()} disabled={generateWeekly.isPending}>
                   {generateWeekly.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}

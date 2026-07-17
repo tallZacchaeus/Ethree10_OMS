@@ -7,10 +7,9 @@ import { can } from "@/server/auth/permissions";
 
 
 export const dashboardRouter = router({
-  // Sub-unit-lead rollup retired in the role simplification: the subunit_lead role was folded
-  // into team_head, so sub-unit work now rolls up through the department surfaces below.
+  // Team heads receive a team-scoped operational rollup.
 
-  departmentLead: protectedProcedure.query(async ({ ctx }) => {
+  teamLead: protectedProcedure.query(async ({ ctx }) => {
     const agencyCtx = await getAgencyAuthContext(ctx.userId);
     if (!can(agencyCtx, "project.update")) return null;
 
@@ -20,7 +19,7 @@ export const dashboardRouter = router({
     });
 
     if (myTeams.length === 0) return null;
-    const teamIds = myTeams.map((department) => department.id);
+    const teamIds = myTeams.map((team) => team.id);
     const now = new Date();
 
     const incomingRequests = await db.request.findMany({

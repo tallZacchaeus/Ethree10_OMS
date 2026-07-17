@@ -25,7 +25,7 @@ import { Copy, RefreshCw, ShieldOff } from "lucide-react";
 import { labelForTaskType } from "@/lib/request-types";
 import { StatusPill } from "@/components/ui-ext/status-pill";
 import { UrgencyTag } from "@/components/ui-ext/urgency-tag";
-import { useOrganization } from "@/components/providers/workspace-provider";
+import { useAgencyContext } from "@/components/providers/agency-provider";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { humanize } from "@/lib/constants";
 import { ProposalsTab } from "./proposals-tab";
@@ -49,7 +49,7 @@ export default function RequestDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const { toast } = useToast();
-  const { roles, isSuperAdmin } = useOrganization();
+  const { roles, isSuperAdmin } = useAgencyContext();
 
   const utils = trpc.useUtils();
   const { data: request, isLoading } = trpc.requests.get.useQuery({ id });

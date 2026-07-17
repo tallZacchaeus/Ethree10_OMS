@@ -68,7 +68,7 @@ function ConnectPlaneDialog({ open, onOpenChange }: { open: boolean; onOpenChang
         <DialogHeader>
           <DialogTitle>Connect Plane</DialogTitle>
           <DialogDescription>
-            Mirror this department&apos;s tasks into a Plane project.
+            Mirror this team&apos;s tasks into a Plane project.
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[60vh] space-y-4 overflow-y-auto">
@@ -78,7 +78,7 @@ function ConnectPlaneDialog({ open, onOpenChange }: { open: boolean; onOpenChang
           <Field label="Team">
             <Select value={teamId ?? undefined} onValueChange={setTeamId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select department" />
+                <SelectValue placeholder="Select team" />
               </SelectTrigger>
               <SelectContent>
                 {(teams ?? []).map((d) => (
@@ -165,7 +165,7 @@ function ConnectTrelloDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         <DialogHeader>
           <DialogTitle>Connect Trello</DialogTitle>
           <DialogDescription>
-            Mirror this department&apos;s tasks into a Trello list as cards.
+            Mirror this team&apos;s tasks into a Trello list as cards.
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[60vh] space-y-4 overflow-y-auto">
@@ -175,7 +175,7 @@ function ConnectTrelloDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           <Field label="Team">
             <Select value={teamId ?? undefined} onValueChange={setTeamId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select department" />
+                <SelectValue placeholder="Select team" />
               </SelectTrigger>
               <SelectContent>
                 {(teams ?? []).map((d) => (

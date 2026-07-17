@@ -11,7 +11,7 @@ describe("dashboard helpers", () => {
     const experience = getDashboardExperience(["agency_admin"], false);
 
     expect(experience.isAgencyLead).toBe(true);
-    expect(experience.isDeptLead).toBe(true);
+    expect(experience.isTeamHead).toBe(true);
     expect(experience.isMember).toBe(true);
   });
 
@@ -22,7 +22,7 @@ describe("dashboard helpers", () => {
     expect(experience.isAgencyLead).toBe(true);
     expect(experience.isExecutive).toBe(true);
     // ...but not the operational/personal surfaces (read-only oversight).
-    expect(experience.isDeptLead).toBe(false);
+    expect(experience.isTeamHead).toBe(false);
     expect(experience.isMember).toBe(false);
     expect(experience.isMember).toBe(false);
   });

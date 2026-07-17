@@ -11,7 +11,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Settings" description="Your profile and workspace memberships." />
+      <PageHeader title="Settings" description="Agency preferences, staff security, services, and templates." />
 
       <Card>
         <CardHeader>
