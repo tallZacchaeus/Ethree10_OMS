@@ -29,7 +29,10 @@ export class ProjectService {
     });
     if (existing) return existing;
 
-    const request = await db.request.findUnique({ where: { id: args.requestId } });
+    const request = await db.request.findUnique({
+      where: { id: args.requestId },
+      include: { routedTeam: { select: { leadId: true } } },
+    });
     if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Request not found." });
 
     const seq = await nextProjectSeq();
@@ -39,6 +42,7 @@ export class ProjectService {
         requestId: request.id,
         organizationId: request.organizationId,
         agencyTeamId: request.routedTeamId,
+        pmUserId: request.routedTeam?.leadId ?? args.actorId,
         name: request.title,
         description: request.description,
         status: "active",
@@ -202,6 +206,36 @@ export class ProjectService {
   }
 
   static async deliver(args: { actorId: string; projectId: string }) {
+    const before = await db.project.findUnique({
+      where: { id: args.projectId },
+      include: {
+        request: { include: { service: true } },
+        tasks: { include: { reviews: true } },
+      },
+    });
+    if (!before) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found." });
+    if (before.tasks.length === 0) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "A project needs reviewed work before delivery." });
+    }
+    const incomplete = before.tasks.filter((task) => !["done", "cancelled"].includes(task.status));
+    if (incomplete.length) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Every active task must pass review before delivery." });
+    }
+    const requiredReviews = Array.isArray(before.request.service?.requiredReviews)
+      ? before.request.service.requiredReviews.filter((value): value is string => typeof value === "string")
+      : [];
+    const missingReview = before.tasks.some((task) => {
+      if (task.status === "cancelled") return false;
+      const approvals = new Set(
+        task.reviews
+          .filter((review) => review.revision === task.revision && review.decision === "approved")
+          .map((review) => review.reviewType),
+      );
+      return !approvals.has("team_head") || requiredReviews.some((reviewType) => !approvals.has(reviewType));
+    });
+    if (missingReview) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Required team-head and specialist reviews must pass before delivery." });
+    }
     const project = await db.project.update({
       where: { id: args.projectId },
       data: { status: "delivered", actualDeliveryDate: new Date() },

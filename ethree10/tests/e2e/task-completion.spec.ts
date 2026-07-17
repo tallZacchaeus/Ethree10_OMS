@@ -24,4 +24,17 @@ test.describe("Task assign and complete flow", () => {
     await page.goto("/projects");
     await expect(page.getByRole("heading", { name: /projects/i })).toBeVisible();
   });
+
+  test("team execution workspace exposes assignments, workload, and reviews", async ({ page }) => {
+    await signInAsSeededUser(page);
+    for (const [route, heading] of [
+      ["/team/dashboard", "Team dashboard"],
+      ["/team/assignments", "Assignments"],
+      ["/team/workload", "Team workload"],
+      ["/team/reviews", "Review queue"],
+    ] as const) {
+      await page.goto(route);
+      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    }
+  });
 });

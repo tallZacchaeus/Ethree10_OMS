@@ -28,6 +28,7 @@ import { sponsorshipsRouter } from "./sponsorships";
 import { setupRouter } from "./setup";
 import { trackRouter } from "./track";
 import { servicesRouter } from "./services";
+import { executionRouter } from "./execution";
 
 export const appRouter = router({
   auth: authRouter,
@@ -59,6 +60,7 @@ export const appRouter = router({
   setup: setupRouter,
   track: trackRouter,
   services: servicesRouter,
+  execution: executionRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -21,6 +21,8 @@ import {
   Layers,
   FileSpreadsheet,
   ReceiptText,
+  ClipboardCheck,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@prisma/client";
@@ -58,6 +60,10 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/agency/dashboard", label: "Agency", icon: Briefcase, allow: ["agency_admin", "finance_admin"] },
       { href: "/inbox", label: "Inbox", icon: Inbox, allow: TRIAGE },
       { href: "/team/intake", label: "Team Intake", icon: FileText, allow: TRIAGE },
+      { href: "/team/dashboard", label: "Team Dashboard", icon: LayoutDashboard, allow: TRIAGE },
+      { href: "/team/assignments", label: "Assignments", icon: Briefcase, allow: AGENCY_EXEC },
+      { href: "/team/workload", label: "Workload", icon: Activity, allow: AGENCY_EXEC },
+      { href: "/team/reviews", label: "Reviews", icon: ClipboardCheck, allow: TRIAGE },
       { href: "/requests", label: "Requests", icon: FileText, allow: "all" },
       { href: "/projects", label: "Projects", icon: FolderKanban, allow: "all" },
       { href: "/tasks", label: "My Tasks", icon: CheckSquare, allow: AGENCY_EXEC },
