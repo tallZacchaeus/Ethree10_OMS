@@ -1,24 +1,13 @@
 "use client";
 
 import { trpc } from "@/lib/trpc/client";
-import { useWorkspace } from "@/components/providers/workspace-provider";
 import { PageHeader } from "@/components/ui-ext/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { humanize } from "@/lib/constants";
 import Link from "next/link";
-
-const TYPE_LABEL: Record<string, string> = {
-  agency: "Agency",
-  internal_client: "Sibling initiative",
-  master_org: "Master org",
-  external_client: "External client",
-};
 
 export default function SettingsPage() {
   const { data: me } = trpc.auth.me.useQuery();
-  const { workspaces, activeWorkspace } = useWorkspace();
 
   return (
     <div className="space-y-6">
@@ -49,38 +38,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Workspaces</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {workspaces.map((w) => (
-            <div
-              key={w.id}
-              className="flex items-center justify-between rounded-md border p-3 text-sm"
-            >
-              <div>
-                <span className="font-medium">{w.name}</span>
-                {activeWorkspace?.id === w.id && (
-                  <Badge variant="info" className="ml-2">
-                    Active
-                  </Badge>
-                )}
-                <div className="text-xs text-muted-foreground">{TYPE_LABEL[w.type] ?? w.type}</div>
-              </div>
-              <div className="flex gap-1">
-                {w.roles.map((r) => (
-                  <Badge key={r} variant="neutral">
-                    {humanize(r)}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {workspaces.some((w) => w.type === "agency" && w.roles.some(r => ["admin", "super_admin"].includes(r))) && (
+      {true && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Agency Configuration</CardTitle>

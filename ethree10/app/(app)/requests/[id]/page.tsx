@@ -18,17 +18,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Copy } from "lucide-react";
 import { labelForTaskType } from "@/lib/request-types";
 import { StatusPill } from "@/components/ui-ext/status-pill";
 import { UrgencyTag } from "@/components/ui-ext/urgency-tag";
-import { useWorkspace } from "@/components/providers/workspace-provider";
+import { useOrganization } from "@/components/providers/workspace-provider";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { humanize } from "@/lib/constants";
 import { ProposalsTab } from "./proposals-tab";
 
 // Allowed onward transitions per stage (mirrors the server-side guard).
 const NEXT_STAGES: Partial<Record<RequestStage, RequestStage[]>> = {
-  submitted: ["under_review", "rejected", "cancelled", "pending_approval"],
+  submitted: ["under_review", "needs_clarification", "rejected", "cancelled", "pending_approval"],
+  needs_clarification: ["under_review", "rejected", "cancelled"],
   pending_approval: ["under_review", "scoping", "rejected", "cancelled"],
   under_review: ["scoping", "rejected", "on_hold", "cancelled"],
   scoping: ["proposal", "approved", "on_hold", "cancelled", "pending_approval"],
@@ -44,23 +49,22 @@ export default function RequestDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const { toast } = useToast();
-  const { roles, isSuperAdmin } = useWorkspace();
+  const { roles, isSuperAdmin } = useOrganization();
 
   const utils = trpc.useUtils();
   const { data: request, isLoading } = trpc.requests.get.useQuery({ id });
 
   const isAgencyStaff =
     isSuperAdmin ||
-    roles.some((r) =>
-      ["admin", "department_lead"].includes(r),
-    );
+    roles.some((r: string) => ["agency_admin", "team_head"].includes(r));
 
-  const { data: departments } = trpc.requests.agencyDepartments.useQuery(undefined, {
+  const { data: teams } = trpc.requests.agencyTeams.useQuery(undefined, {
     retry: false,
     enabled: isAgencyStaff,
   });
 
   const [commentBody, setCommentBody] = useState("");
+  const [internalNote, setInternalNote] = useState(false);
 
   const invalidate = () => utils.requests.get.invalidate({ id });
 
@@ -90,6 +94,8 @@ export default function RequestDetailPage() {
     onError: (err) =>
       toast({ title: "Couldn't route", description: err.message, variant: "destructive" }),
   });
+  const approve = trpc.requests.approve.useMutation({ onSuccess: () => { void invalidate(); toast({ title: "Request accepted" }); }, onError: (err) => toast({ title: "Couldn't accept request", description: err.message, variant: "destructive" }) });
+  const reject = trpc.requests.reject.useMutation({ onSuccess: () => { void invalidate(); toast({ title: "Request rejected" }); }, onError: (err) => toast({ title: "Couldn't reject request", description: err.message, variant: "destructive" }) });
 
   if (isLoading) {
     return <div className="py-12 text-center text-muted-foreground">Loading…</div>;
@@ -109,8 +115,8 @@ export default function RequestDetailPage() {
             <span className="font-mono text-xs text-muted-foreground">{request.code}</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            {request.workspace?.name} · submitted by {request.submitter?.name ?? "—"} ·{" "}
-            {formatDate(request.createdAt)}
+            {request.organization?.name} · submitted by{" "}
+            {request.submitter?.name ?? request.requesterName ?? "—"} · {formatDate(request.createdAt)}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -144,6 +150,8 @@ export default function RequestDetailPage() {
             </CardContent>
           </Card>
 
+          <Card><CardHeader><CardTitle>Requested outcome</CardTitle></CardHeader><CardContent className="space-y-4 text-sm"><div><strong>Outcome</strong><p className="whitespace-pre-wrap text-muted-foreground">{request.expectedOutcome || "Not supplied"}</p></div><div><strong>Deliverables</strong><p className="whitespace-pre-wrap text-muted-foreground">{request.expectedDeliverables || "Not supplied"}</p></div><div><strong>Acceptance criteria</strong><p className="whitespace-pre-wrap text-muted-foreground">{request.acceptanceCriteria || "Not supplied"}</p></div>{request.supportingLinks.length > 0 && <div><strong>Supporting links</strong><ul className="list-disc pl-5">{request.supportingLinks.map((link) => <li key={link}><a className="text-brand-600 hover:underline" href={link} target="_blank" rel="noreferrer">{link}</a></li>)}</ul></div>}</CardContent></Card>
+
           <Tabs defaultValue="comments">
             <TabsList>
               <TabsTrigger value="comments">Comments</TabsTrigger>
@@ -157,36 +165,60 @@ export default function RequestDetailPage() {
               {request.comments.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No comments yet.</p>
               ) : (
-                request.comments.map((comment) => (
-                  <div key={comment.id} className="rounded-lg bg-muted/50 p-4">
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-sm font-semibold">{comment.author.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDateTime(comment.createdAt)}
-                      </span>
+                request.comments.map((comment) => {
+                  const isClient = !comment.author;
+                  return (
+                    <div
+                      key={comment.id}
+                      className={
+                        comment.isInternal
+                          ? "rounded-lg border border-dashed border-amber-300 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-900/10"
+                          : isClient
+                            ? "rounded-lg bg-brand-50 p-4 dark:bg-brand-950/40"
+                            : "rounded-lg bg-muted/50 p-4"
+                      }
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2 text-sm font-semibold">
+                          {comment.author?.name ?? comment.authorName ?? "Client"}
+                          {isClient && <Badge variant="default">Client</Badge>}
+                          {comment.isInternal && <Badge variant="warning">Internal</Badge>}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDateTime(comment.createdAt)}
+                        </span>
+                      </div>
+                      <p className="whitespace-pre-wrap text-sm">{comment.body}</p>
                     </div>
-                    <p className="whitespace-pre-wrap text-sm">{comment.body}</p>
-                  </div>
-                ))
+                  );
+                })
               )}
 
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (commentBody.trim()) {
-                    addComment.mutate({ requestId: id, body: commentBody });
+                    addComment.mutate({ requestId: id, body: commentBody, isInternal: internalNote });
                   }
                 }}
                 className="space-y-3"
               >
                 <Textarea
-                  placeholder="Add a comment…"
+                  placeholder={internalNote ? "Add an internal note (hidden from the client)…" : "Reply — the client sees this on their tracking page…"}
                   value={commentBody}
                   onChange={(e) => setCommentBody(e.target.value)}
                 />
-                <Button type="submit" disabled={addComment.isPending || !commentBody.trim()}>
-                  {addComment.isPending ? "Posting…" : "Post comment"}
-                </Button>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Switch id="internal-note" checked={internalNote} onCheckedChange={setInternalNote} />
+                    <Label htmlFor="internal-note" className="text-sm text-muted-foreground">
+                      Internal note (hidden from client)
+                    </Label>
+                  </div>
+                  <Button type="submit" disabled={addComment.isPending || !commentBody.trim()}>
+                    {addComment.isPending ? "Posting…" : internalNote ? "Post internal note" : "Reply to client"}
+                  </Button>
+                </div>
               </form>
             </TabsContent>
 
@@ -219,7 +251,7 @@ export default function RequestDetailPage() {
             <CardContent className="space-y-3 text-sm">
               <Detail label="Task type" value={labelForTaskType(request.projectType)} />
               <Separator />
-              <Detail label="Department" value={request.routedDepartment?.name ?? "Unassigned"} />
+              <Detail label="Team" value={request.routedTeam?.name ?? "Unassigned"} />
               <Separator />
               <Detail label="Deadline" value={formatDate(request.deadline)} />
               <Separator />
@@ -245,6 +277,35 @@ export default function RequestDetailPage() {
                   </div>
                 </>
               )}
+              {request.publicToken && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-muted-foreground">Client</div>
+                    <p className="text-sm">
+                      {request.requesterName ?? "—"}
+                      {request.requesterEmail && (
+                        <span className="block text-xs text-muted-foreground">{request.requesterEmail}</span>
+                      )}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(
+                          `${window.location.origin}/track/${request.publicToken}`,
+                        );
+                        toast({ title: "Tracking link copied" });
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy tracking link
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -257,23 +318,29 @@ export default function RequestDetailPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
                   <span className="text-xs font-medium text-muted-foreground">
-                    Route to department
+                    Route to team
                   </span>
                   <Select
-                    value={request.routedDepartmentId ?? undefined}
-                    onValueChange={(departmentId) => route.mutate({ id, departmentId })}
+                    value={request.routedTeamId ?? undefined}
+                    onValueChange={(teamId) => route.mutate({ id, teamId })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select department" />
+                      <SelectValue placeholder="Select team" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(departments ?? []).map((d) => (
+                      {(teams ?? []).map((d) => (
                         <SelectItem key={d.id} value={d.id}>
                           {d.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                  <Button type="button" onClick={() => approve.mutate({ id })} disabled={approve.isPending}>Accept request</Button>
+                  <Button type="button" variant="outline" onClick={() => transition.mutate({ id, toStage: "needs_clarification", note: window.prompt("What clarification is needed?") || undefined })}>Request clarification</Button>
+                  <Button type="button" variant="destructive" onClick={() => { const reason = window.prompt("Reason for rejection"); if (reason?.trim()) reject.mutate({ id, reason }); }}>Reject request</Button>
                 </div>
 
                 {nextStages.length > 0 && (

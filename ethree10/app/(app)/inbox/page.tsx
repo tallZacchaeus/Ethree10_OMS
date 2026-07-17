@@ -24,13 +24,13 @@ export default function InboxPage() {
     <div className="container py-8 space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Agency Inbox</h1>
-        <p className="text-muted-foreground">Triage new and under-review requests across all workspaces.</p>
+        <p className="text-muted-foreground">Triage new and under-review requests across all organizations.</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Needs Routing</CardTitle>
-          <CardDescription>Requests that are submitted and need to be routed to a department or reviewed.</CardDescription>
+          <CardDescription>Requests that are submitted and need team routing or triage.</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (

@@ -12,24 +12,23 @@ import { PrismaClient } from "@prisma/client";
  * against a real Paystack test account during staging, and the idempotent
  * auto-issue is covered deterministically by tests/integration/receipt-idempotency.
  */
-const BASE = process.env["PLAYWRIGHT_BASE_URL"] ?? "http://localhost:3000";
 const db = new PrismaClient();
 
 const stamp = Date.now();
 const INVOICE_CODE = `INV-E2E-${stamp}`;
 const RECEIPT_CODE = `RCPT-E2E-${stamp}`;
-let workspaceId: string;
+let organizationId: string;
 let invoiceId: string;
 
 test.beforeAll(async () => {
-  const ws = await db.workspace.create({
-    data: { type: "agency", name: "E2E Money WS", slug: `e2e-money-${stamp}`, defaultCurrency: "NGN" },
+  const ws = await db.organization.create({
+    data: { name: "E2E Money WS", slug: `e2e-money-${stamp}`, defaultCurrency: "NGN" },
   });
-  workspaceId = ws.id;
+  organizationId = ws.id;
   const invoice = await db.invoice.create({
     data: {
       code: INVOICE_CODE,
-      workspaceId: ws.id,
+      organizationId: ws.id,
       status: "paid",
       currency: "NGN",
       amount: "250000.00",
@@ -44,7 +43,7 @@ test.beforeAll(async () => {
     data: {
       code: RECEIPT_CODE,
       invoiceId: invoice.id,
-      workspaceId: ws.id,
+      organizationId: ws.id,
       amount: "250000.00",
       currency: "NGN",
       paymentMethod: "paystack",
@@ -56,32 +55,32 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await db.receipt.deleteMany({ where: { invoiceId } });
   await db.invoice.delete({ where: { id: invoiceId } }).catch(() => {});
-  await db.workspace.delete({ where: { id: workspaceId } }).catch(() => {});
+  await db.organization.delete({ where: { id: organizationId } }).catch(() => {});
   await db.$disconnect();
 });
 
 test.describe("Money path — public invoice & receipt", () => {
   test("public invoice page renders a paid invoice", async ({ page }) => {
-    await page.goto(`${BASE}/invoice/${INVOICE_CODE}`);
+    await page.goto(`/invoice/${INVOICE_CODE}`);
     await expect(page.getByText(`Invoice ${INVOICE_CODE}`)).toBeVisible();
     await expect(page.getByText("PAID", { exact: true })).toBeVisible();
     await expect(page.getByText(/Website build/)).toBeVisible();
   });
 
   test("public receipt page renders the issued receipt", async ({ page }) => {
-    await page.goto(`${BASE}/receipt/${RECEIPT_CODE}`);
+    await page.goto(`/receipt/${RECEIPT_CODE}`);
     await expect(page.getByText(`Receipt ${RECEIPT_CODE}`)).toBeVisible();
     await expect(page.getByText("PAID", { exact: true })).toBeVisible();
     await expect(page.getByText(/Paystack/)).toBeVisible();
   });
 
   test("unknown invoice code returns 404, not a server error", async ({ page }) => {
-    const res = await page.goto(`${BASE}/invoice/INV-DOES-NOT-EXIST`);
+    const res = await page.goto("/invoice/INV-DOES-NOT-EXIST");
     expect(res?.status()).toBe(404);
   });
 
   test("unknown receipt code returns 404, not a server error", async ({ page }) => {
-    const res = await page.goto(`${BASE}/receipt/RCPT-DOES-NOT-EXIST`);
+    const res = await page.goto("/receipt/RCPT-DOES-NOT-EXIST");
     expect(res?.status()).toBe(404);
   });
 });

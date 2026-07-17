@@ -23,7 +23,7 @@ const PAY_ERRORS: Record<string, string> = {
 export default async function PublicInvoicePage({ params, searchParams }: Props) {
   const invoice = await db.invoice.findUnique({
     where: { code: params.code },
-    include: { workspace: true, project: true, receipt: true },
+    include: { organization: true, project: true, receipt: true },
   });
 
   if (!invoice) notFound();
@@ -61,7 +61,7 @@ export default async function PublicInvoicePage({ params, searchParams }: Props)
           <div className="grid grid-cols-2 gap-8">
             <div>
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">Billed To</h3>
-              <p className="font-medium text-lg">{invoice.workspace.name}</p>
+              <p className="font-medium text-lg">{invoice.organization.name}</p>
             </div>
             <div className="text-right">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">Amount Due</h3>

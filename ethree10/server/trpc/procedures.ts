@@ -35,30 +35,5 @@ const enforceSuperAdmin = middleware(async ({ ctx, next }) => {
   return next({ ctx });
 });
 
-// Resolves the caller's CLIENT organization from their membership and scopes the db to it.
-// For client-facing operations (submit/track their org's work). Staff have no org and are
-// rejected here — they use protectedProcedure + agency authorization instead.
-const enforceOrg = middleware(async ({ ctx, next }) => {
-  if (!ctx.userId) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
-  }
-  const resolved = await AuthorizationService.resolve(ctx.userId);
-  if (!resolved.organizationId) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "No client organization for this account.",
-    });
-  }
-  return next({
-    ctx: {
-      ...ctx,
-      userId: ctx.userId,
-      organizationId: resolved.organizationId,
-      scope: ctx.scopedDb(resolved.organizationId),
-    },
-  });
-});
-
 export const protectedProcedure = publicProcedure.use(enforceAuth);
 export const superAdminProcedure = publicProcedure.use(enforceSuperAdmin);
-export const orgProcedure = publicProcedure.use(enforceAuth).use(enforceOrg);

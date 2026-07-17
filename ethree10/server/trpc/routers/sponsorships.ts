@@ -7,7 +7,7 @@ import { db } from "@/server/db/client";
 export const sponsorshipsRouter = router({
   list: protectedProcedure
     .query(async ({ ctx }) => {
-      await requireAgencyAction(ctx.userId, "workspace.read");
+      await requireAgencyAction(ctx.userId, "organization.read");
       return db.sponsorship.findMany({
         include: { project: true },
         orderBy: { createdAt: "desc" },
@@ -21,7 +21,7 @@ export const sponsorshipsRouter = router({
       currency: z.string().default("USD"),
     }))
     .mutation(async ({ ctx, input }) => {
-      await requireAgencyAction(ctx.userId, "workspace.read");
+      await requireAgencyAction(ctx.userId, "organization.read");
       return db.sponsorship.create({
         data: {
           sponsorName: input.sponsorName,

@@ -15,9 +15,9 @@ import { useToast } from "@/components/ui/use-toast";
 export default function NewInvoicePage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { data: workspaces } = trpc.workspaces.list.useQuery();
+  const { data: organizations } = trpc.organizations.listOrganizations.useQuery();
   
-  const [workspaceId, setWorkspaceId] = useState("");
+  const [organizationId, setOrganizationId] = useState("");
   const [currency, setCurrency] = useState<"NGN" | "USD">("NGN");
   const [lineItems, setLineItems] = useState([{ description: "", quantity: 1, unitPrice: 0 }]);
 
@@ -47,8 +47,8 @@ export default function NewInvoicePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workspaceId) {
-      toast({ title: "Please select a client workspace", variant: "destructive" });
+    if (!organizationId) {
+      toast({ title: "Please select a client organization", variant: "destructive" });
       return;
     }
     if (lineItems.length === 0 || lineItems.some(i => !i.description)) {
@@ -57,7 +57,7 @@ export default function NewInvoicePage() {
     }
 
     createMutation.mutate({
-      workspaceId,
+      organizationId,
       currency,
       lineItems,
     });
@@ -74,15 +74,15 @@ export default function NewInvoicePage() {
           <CardContent className="pt-6 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Client Workspace</Label>
-                <Select value={workspaceId} onValueChange={setWorkspaceId}>
+                <Label>Client organization</Label>
+                <Select value={organizationId} onValueChange={setOrganizationId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select client..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {workspaces?.map((m) => (
-                      <SelectItem key={m.workspace.id} value={m.workspace.id}>
-                        {m.workspace.name}
+                    {organizations?.map((organization) => (
+                      <SelectItem key={organization.id} value={organization.id}>
+                        {organization.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

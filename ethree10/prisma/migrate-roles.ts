@@ -21,14 +21,14 @@ import { PrismaClient } from "@prisma/client";
 const db = new PrismaClient();
 
 // New enum values that may not yet exist in the database's Role type.
-const NEW_VALUES = ["executive", "admin", "client", "client_viewer"] as const;
+const NEW_VALUES = ["finance_admin", "agency_admin", "client", "client_viewer"] as const;
 
 // Legacy role -> new role. Order matters: roles mapping to the same target are processed
 // sequentially so the collision-delete sees rows converted earlier in the loop.
 const REMAP: Array<[string, string]> = [
-  ["agency_admin", "admin"],
-  ["agency_lead", "admin"],
-  ["subunit_lead", "department_lead"],
+  ["agency_admin", "agency_admin"],
+  ["agency_lead", "agency_admin"],
+  ["subunit_lead", "team_head"],
   ["project_manager", "member"],
   ["requester_admin", "client"],
   ["requester_member", "client"],

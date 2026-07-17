@@ -6,10 +6,10 @@ import { protectedProcedure } from "../procedures";
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-export const departmentsRouter = router({
+export const teamsRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
-    await ctx.authorize("department.read");
-    return ctx.db.department.findMany({
+    await ctx.authorize("team.read");
+    return ctx.db.team.findMany({
       where: { archivedAt: null },
       include: { subUnits: { where: { archivedAt: null } } },
       orderBy: { name: "asc" },
@@ -19,13 +19,13 @@ export const departmentsRouter = router({
   get: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      await ctx.authorize("department.read");
-      const dept = await ctx.db.department.findFirst({
+      await ctx.authorize("team.read");
+      const team = await ctx.db.team.findFirst({
         where: { id: input.id },
         include: { subUnits: true },
       });
-      if (!dept) throw new TRPCError({ code: "NOT_FOUND" });
-      return dept;
+      if (!team) throw new TRPCError({ code: "NOT_FOUND" });
+      return team;
     }),
 
   create: protectedProcedure
@@ -38,8 +38,8 @@ export const departmentsRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.authorize("department.create");
-      return ctx.db.department.create({
+      await ctx.authorize("team.create");
+      return ctx.db.team.create({
         data: {
           name: input.name,
           slug: slugify(input.name),
@@ -62,16 +62,21 @@ export const departmentsRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.authorize("department.update");
+      const authCtx = await ctx.authorize("team.update");
+      if (!authCtx.isSuperAdmin && !authCtx.roles.includes("agency_admin")) {
+        if (authCtx.teamId !== input.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Cannot update a team you do not head." });
+        }
+      }
       const { id, ...data } = input;
-      return ctx.db.department.update({ where: { id }, data });
+      return ctx.db.team.update({ where: { id }, data });
     }),
 
   archive: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.authorize("department.archive");
-      return ctx.db.department.update({
+      await ctx.authorize("team.archive");
+      return ctx.db.team.update({
         where: { id: input.id },
         data: { archivedAt: new Date() },
       });

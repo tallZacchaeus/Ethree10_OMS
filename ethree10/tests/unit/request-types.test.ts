@@ -1,26 +1,26 @@
 import { describe, it, expect } from "vitest";
 import {
-  DEFAULT_DEPARTMENTS,
-  DEPARTMENT_SLUGS,
+  DEFAULT_TEAMS,
+  TEAM_SLUGS,
   TASK_TYPES,
   TASK_TYPE_GROUPS,
-  departmentSlugForTaskType,
+  teamSlugForTaskType,
   labelForTaskType,
   isOtherTaskType,
 } from "@/lib/request-types";
 
 describe("request task-type catalog", () => {
-  it("seeds exactly the two fixed departments", () => {
-    expect(DEFAULT_DEPARTMENTS.map((d) => d.slug)).toEqual([
-      DEPARTMENT_SLUGS.creative,
-      DEPARTMENT_SLUGS.productDevelopment,
+  it("seeds exactly the two fixed teams", () => {
+    expect(DEFAULT_TEAMS.map((d) => d.slug)).toEqual([
+      TEAM_SLUGS.brandsCommunications,
+      TEAM_SLUGS.productDevelopment,
     ]);
   });
 
-  it("every task type routes to one of the two departments", () => {
-    const valid = new Set<string>([DEPARTMENT_SLUGS.creative, DEPARTMENT_SLUGS.productDevelopment]);
+  it("every task type routes to one of the two teams", () => {
+    const valid = new Set<string>([TEAM_SLUGS.brandsCommunications, TEAM_SLUGS.productDevelopment]);
     for (const t of TASK_TYPES) {
-      expect(valid.has(t.departmentSlug)).toBe(true);
+      expect(valid.has(t.teamSlug)).toBe(true);
     }
   });
 
@@ -30,16 +30,16 @@ describe("request task-type catalog", () => {
   });
 
   it("routes representative types to the right team", () => {
-    expect(departmentSlugForTaskType("branded_email")).toBe(DEPARTMENT_SLUGS.creative);
-    expect(departmentSlugForTaskType("graphic_design")).toBe(DEPARTMENT_SLUGS.creative);
-    expect(departmentSlugForTaskType("website")).toBe(DEPARTMENT_SLUGS.productDevelopment);
+    expect(teamSlugForTaskType("branded_email")).toBe(TEAM_SLUGS.brandsCommunications);
+    expect(teamSlugForTaskType("graphic_design")).toBe(TEAM_SLUGS.brandsCommunications);
+    expect(teamSlugForTaskType("website")).toBe(TEAM_SLUGS.productDevelopment);
     // Budget Request was explicitly placed under Product Development.
-    expect(departmentSlugForTaskType("budget_request")).toBe(DEPARTMENT_SLUGS.productDevelopment);
+    expect(teamSlugForTaskType("budget_request")).toBe(TEAM_SLUGS.productDevelopment);
   });
 
   it("returns null for unknown / legacy free-text types (stays unrouted)", () => {
-    expect(departmentSlugForTaskType("Internal Tool")).toBeNull();
-    expect(departmentSlugForTaskType("")).toBeNull();
+    expect(teamSlugForTaskType("Internal Tool")).toBeNull();
+    expect(teamSlugForTaskType("")).toBeNull();
   });
 
   it("flags the two Other options and offers one per group", () => {

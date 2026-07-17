@@ -41,7 +41,7 @@ export const scorecardsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await requireAgencyAction(ctx.userId, "department.update");
+      await requireAgencyAction(ctx.userId, "team.update");
       return db.scorecardConfig.create({
         data: {
           level: input.level,
@@ -71,7 +71,7 @@ export const scorecardsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await requireAgencyAction(ctx.userId, "department.update");
+      await requireAgencyAction(ctx.userId, "team.update");
       return db.scorecardConfig.update({
         where: { id: input.id },
         data: {

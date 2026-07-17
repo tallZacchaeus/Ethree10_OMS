@@ -21,7 +21,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { StatusPill } from "@/components/ui-ext/status-pill";
 import { UrgencyTag } from "@/components/ui-ext/urgency-tag";
-import { useWorkspace } from "@/components/providers/workspace-provider";
+
 import { formatDate, formatDateTime } from "@/lib/format";
 import { humanize } from "@/lib/constants";
 import { TimeLogDialog } from "@/components/tasks/time-log-dialog";
@@ -33,7 +33,8 @@ export default function TaskDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const { toast } = useToast();
-  const { roles, isSuperAdmin } = useWorkspace();
+  const isSuperAdmin = false; // Stub
+  const roles: string[] = [];
   const utils = trpc.useUtils();
 
   const { data: me } = trpc.auth.me.useQuery();
@@ -90,7 +91,7 @@ export default function TaskDetailPage() {
   const isLead =
     isSuperAdmin ||
     roles.some((r) =>
-      ["admin", "department_lead"].includes(r),
+      ["agency_admin", "team_head"].includes(r),
     );
 
   return (
@@ -247,7 +248,7 @@ export default function TaskDetailPage() {
                 task.comments.map((c) => (
                   <div key={c.id} className="rounded-lg bg-muted/50 p-3">
                     <div className="mb-1 flex items-center justify-between">
-                      <span className="text-sm font-semibold">{c.author.name}</span>
+                      <span className="text-sm font-semibold">{c.author?.name ?? "Unknown"}</span>
                       <span className="text-xs text-muted-foreground">
                         {formatDateTime(c.createdAt)}
                       </span>

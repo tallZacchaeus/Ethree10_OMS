@@ -158,7 +158,8 @@ export function LoginForm() {
           Continue with Google
         </Button>
 
-        {process.env.NODE_ENV === "development" && (
+        {(process.env.NODE_ENV === "development" ||
+          process.env.NEXT_PUBLIC_E2E_TEST_AUTH === "true") && (
           <>
             <div className="relative">
               <Separator />

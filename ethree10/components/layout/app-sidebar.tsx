@@ -1,5 +1,7 @@
 "use client";
 
+
+import { useOrganization } from "@/components/providers/workspace-provider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -22,7 +24,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@prisma/client";
-import { useWorkspace } from "@/components/providers/workspace-provider";
+
 import { E310Logo } from "@/components/brand/e310-logo";
 import { cn } from "@/lib/utils/cn";
 
@@ -38,23 +40,24 @@ interface NavSection {
   items: NavItem[];
 }
 
-const AGENCY_EXEC: Role[] = ["admin", "executive", "department_lead", "member"];
-const AGENCY_LEADS: Role[] = ["admin", "executive", "department_lead"];
-const TRIAGE: Role[] = ["admin", "department_lead"];
+const AGENCY_EXEC: Role[] = ["agency_admin", "finance_admin", "team_head", "team_member"];
+const AGENCY_LEADS: Role[] = ["agency_admin", "finance_admin", "team_head"];
+const TRIAGE: Role[] = ["agency_admin", "team_head"];
 
 const NAV_SECTIONS: NavSection[] = [
   {
     title: "Overview",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, allow: "all" },
-      { href: "/workspaces", label: "Workspaces", icon: Layers, allow: "all" },
+      { href: "/organizations", label: "Organizations", icon: Layers, allow: "all" },
     ],
   },
   {
     title: "Operations",
     items: [
-      { href: "/agency/dashboard", label: "Agency", icon: Briefcase, allow: ["admin", "executive"] },
+      { href: "/agency/dashboard", label: "Agency", icon: Briefcase, allow: ["agency_admin", "finance_admin"] },
       { href: "/inbox", label: "Inbox", icon: Inbox, allow: TRIAGE },
+      { href: "/team/intake", label: "Team Intake", icon: FileText, allow: TRIAGE },
       { href: "/requests", label: "Requests", icon: FileText, allow: "all" },
       { href: "/projects", label: "Projects", icon: FolderKanban, allow: "all" },
       { href: "/tasks", label: "My Tasks", icon: CheckSquare, allow: AGENCY_EXEC },
@@ -64,16 +67,16 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Organization",
     items: [
       { href: "/members", label: "Members", icon: Users, allow: AGENCY_EXEC },
-      { href: "/agency/skills", label: "Skills", icon: Sparkles, allow: ["admin"] },
-      { href: "/departments", label: "Departments", icon: Building2, allow: AGENCY_LEADS },
-      { href: "/leads", label: "Leads", icon: Sparkles, allow: ["admin", "executive"] },
+      { href: "/agency/skills", label: "Skills", icon: Sparkles, allow: ["agency_admin"] },
+      { href: "/teams", label: "Teams", icon: Building2, allow: AGENCY_LEADS },
+      { href: "/leads", label: "Leads", icon: Sparkles, allow: ["agency_admin", "finance_admin"] },
     ],
   },
   {
     title: "Billing",
     items: [
-      { href: "/invoices", label: "Invoices", icon: FileSpreadsheet, allow: ["admin"] },
-      { href: "/receipts", label: "Receipts", icon: ReceiptText, allow: ["admin"] },
+      { href: "/invoices", label: "Invoices", icon: FileSpreadsheet, allow: ["agency_admin", "finance_admin"] },
+      { href: "/receipts", label: "Receipts", icon: ReceiptText, allow: ["agency_admin", "finance_admin"] },
     ],
   },
   {
@@ -83,45 +86,19 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/integrations", label: "Integrations", icon: Plug, allow: AGENCY_LEADS },
       { href: "/audit", label: "Audit log", icon: ScrollText, allow: AGENCY_LEADS },
       { href: "/settings", label: "Settings", icon: Settings, allow: "all" },
+      { href: "/settings/services", label: "Services", icon: Briefcase, allow: TRIAGE },
     ],
   },
 ];
-
-/**
- * Focused portal nav for client-only users (no internal/staff role). Keeps the surface to the
- * essentials — submit & track work, see deliveries, manage the account — with no org structure.
- */
-const CLIENT_NAV: NavSection[] = [
-  {
-    title: "Portal",
-    items: [
-      { href: "/dashboard", label: "Home", icon: LayoutDashboard, allow: "all" },
-      { href: "/requests", label: "My Requests", icon: FileText, allow: "all" },
-      { href: "/projects", label: "My Projects", icon: FolderKanban, allow: "all" },
-    ],
-  },
-  {
-    title: "Account",
-    items: [
-      { href: "/settings", label: "Settings", icon: Settings, allow: "all" },
-    ],
-  },
-];
-
-const CLIENT_ROLES: Role[] = ["client", "client_viewer"];
 
 /** Shared sidebar inner content — used by the desktop rail and the mobile drawer. */
 export function SidebarContent() {
   const pathname = usePathname();
-  const { roles, isSuperAdmin } = useWorkspace();
-
-  // A client-only user (no staff role, not super admin) gets the trimmed portal nav.
-  const isClientOnly =
-    !isSuperAdmin && roles.length > 0 && roles.every((r) => CLIENT_ROLES.includes(r));
-  const sections = isClientOnly ? CLIENT_NAV : NAV_SECTIONS;
+  const { isSuperAdmin, roles } = useOrganization();
+  const sections = NAV_SECTIONS;
 
   const canSee = (item: NavItem) =>
-    item.allow === "all" || isSuperAdmin || item.allow.some((r) => roles.includes(r));
+    item.allow === "all" || isSuperAdmin || item.allow.some((r) => roles.includes(r as Role));
 
   return (
     <div className="flex h-full flex-col">

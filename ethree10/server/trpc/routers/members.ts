@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { router } from "../trpc";
-import { workspaceProcedure } from "../procedures";
+import { protectedProcedure } from "../procedures";
 import { SkillLevel } from "@prisma/client";
+import { requireAgencyAction } from "@/server/services/agency";
 
 const skillLevelOrder: Record<SkillLevel, number> = {
   expert: 4,
@@ -11,10 +12,12 @@ const skillLevelOrder: Record<SkillLevel, number> = {
 };
 
 export const membersRouter = router({
-  list: workspaceProcedure.query(async ({ ctx }) => {
-    await ctx.authorize("member.read");
-    const memberships = await ctx.db.membership.findMany({
-      where: { workspaceId: ctx.workspaceId, removedAt: null },
+  list: protectedProcedure
+    .input(z.object({}).optional())
+    .query(async ({ ctx }) => {
+      await requireAgencyAction(ctx.userId, "member.read");
+      const memberships = await ctx.db.membership.findMany({
+        where: { removedAt: null },
       include: {
         user: {
           select: {
@@ -26,7 +29,7 @@ export const membersRouter = router({
             skills: { include: { skill: true } },
           },
         },
-        department: { select: { id: true, name: true } },
+        team: { select: { id: true, name: true } },
         subUnit: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: "asc" },
@@ -49,40 +52,39 @@ export const membersRouter = router({
       membershipId: m.id,
       role: m.role,
       title: m.title,
-      department: m.department,
+      team: m.team,
       subUnit: m.subUnit,
       user: m.user,
       openTaskCount: workload.get(m.userId) ?? 0,
     }));
   }),
 
-  get: workspaceProcedure
+  get: protectedProcedure
     .input(z.object({ userId: z.string() }))
     .query(async ({ ctx, input }) => {
-      await ctx.authorize("member.read");
+      await requireAgencyAction(ctx.userId, "member.read");
       return ctx.db.user.findUnique({
         where: { id: input.userId },
         include: {
           skills: { include: { skill: true } },
           memberships: {
-            where: { workspaceId: ctx.workspaceId, removedAt: null },
-            include: { department: true, subUnit: true },
+            where: { removedAt: null },
+            include: { team: true, subUnit: true },
           },
         },
       });
     }),
 
-  getAllSkills: workspaceProcedure.query(async ({ ctx }) => {
+  getAllSkills: protectedProcedure.query(async ({ ctx }) => {
     return ctx.db.skill.findMany({ orderBy: { name: "asc" } });
   }),
 
-  searchBySkill: workspaceProcedure
+  searchBySkill: protectedProcedure
     .input(z.object({ skillId: z.string() }))
     .query(async ({ ctx, input }) => {
-      await ctx.authorize("member.read");
+      await requireAgencyAction(ctx.userId, "member.read");
       const memberships = await ctx.db.membership.findMany({
         where: {
-          workspaceId: ctx.workspaceId,
           removedAt: null,
           user: {
             skills: {
@@ -102,7 +104,7 @@ export const membersRouter = router({
               },
             },
           },
-          department: { select: { name: true } },
+          team: { select: { name: true } },
         },
       });
 
@@ -119,7 +121,7 @@ export const membersRouter = router({
         userId: m.user.id,
         name: m.user.name,
         avatarUrl: m.user.avatarUrl,
-        department: m.department?.name,
+        team: m.team?.name,
         level: m.user.skills[0]?.level,
         role: m.role,
       }));

@@ -136,7 +136,7 @@ export const authConfig: NextAuthConfig = {
       clientId: env.AUTH_GOOGLE_ID ?? "",
       clientSecret: env.AUTH_GOOGLE_SECRET ?? "",
     }),
-    ...(process.env.NODE_ENV === "development"
+    ...(process.env.NODE_ENV === "development" || process.env["E2E_TEST_AUTH"] === "true"
       ? [
           Credentials({
             id: "credentials",

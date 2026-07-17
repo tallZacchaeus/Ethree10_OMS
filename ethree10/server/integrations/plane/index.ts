@@ -25,9 +25,9 @@ const PRIORITY_TO_PLANE: Record<string, string> = {
 
 function apiBase(cfg: AdapterConfig): string {
   const root = (cfg.baseUrl ?? "https://api.plane.so").replace(/\/$/, "");
-  const workspaceSlug = String(cfg.config["workspaceSlug"] ?? "");
+  const organizationSlug = String(cfg.config["organizationSlug"] ?? "");
   const projectId = String(cfg.config["projectId"] ?? "");
-  return `${root}/api/v1/workspaces/${workspaceSlug}/projects/${projectId}`;
+  return `${root}/api/v1/organizations/${organizationSlug}/projects/${projectId}`;
 }
 
 function headers(cfg: AdapterConfig): Record<string, string> {
@@ -78,11 +78,11 @@ export const planeAdapter: IntegrationAdapter = {
       throw new Error(`Plane create failed: ${res.status}`);
     }
     const issue = (await res.json()) as { id: string };
-    const workspaceSlug = String(cfg.config["workspaceSlug"] ?? "");
+    const organizationSlug = String(cfg.config["organizationSlug"] ?? "");
     const projectId = String(cfg.config["projectId"] ?? "");
     return {
       externalId: issue.id,
-      externalUrl: `https://app.plane.so/${workspaceSlug}/projects/${projectId}/issues/${issue.id}`,
+      externalUrl: `https://app.plane.so/${organizationSlug}/projects/${projectId}/issues/${issue.id}`,
       hash: hashTask(task),
     };
   },

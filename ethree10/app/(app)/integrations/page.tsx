@@ -39,12 +39,12 @@ const STATUS_VARIANT: Record<string, "success" | "warning" | "destructive" | "ne
 function ConnectPlaneDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const { toast } = useToast();
   const utils = trpc.useUtils();
-  const { data: departments } = trpc.requests.agencyDepartments.useQuery(undefined, { enabled: open });
+  const { data: teams } = trpc.requests.agencyTeams.useQuery(undefined, { enabled: open });
 
   const [name, setName] = useState("Plane — Product & Tech");
-  const [departmentId, setDepartmentId] = useState<string | null>(null);
+  const [teamId, setTeamId] = useState<string | null>(null);
   const [baseUrl, setBaseUrl] = useState("https://api.plane.so");
-  const [workspaceSlug, setWorkspaceSlug] = useState("");
+  const [organizationSlug, setOrganizationSlug] = useState("");
   const [projectId, setProjectId] = useState("");
   const [apiToken, setApiToken] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
@@ -75,13 +75,13 @@ function ConnectPlaneDialog({ open, onOpenChange }: { open: boolean; onOpenChang
           <Field label="Display name">
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
-          <Field label="Department">
-            <Select value={departmentId ?? undefined} onValueChange={setDepartmentId}>
+          <Field label="Team">
+            <Select value={teamId ?? undefined} onValueChange={setTeamId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
-                {(departments ?? []).map((d) => (
+                {(teams ?? []).map((d) => (
                   <SelectItem key={d.id} value={d.id}>
                     {d.name}
                   </SelectItem>
@@ -93,7 +93,7 @@ function ConnectPlaneDialog({ open, onOpenChange }: { open: boolean; onOpenChang
             <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
           </Field>
           <Field label="Workspace slug">
-            <Input value={workspaceSlug} onChange={(e) => setWorkspaceSlug(e.target.value)} />
+            <Input value={organizationSlug} onChange={(e) => setOrganizationSlug(e.target.value)} />
           </Field>
           <Field label="Project ID">
             <Input value={projectId} onChange={(e) => setProjectId(e.target.value)} />
@@ -114,14 +114,14 @@ function ConnectPlaneDialog({ open, onOpenChange }: { open: boolean; onOpenChang
             Cancel
           </Button>
           <Button
-            disabled={connect.isPending || !departmentId || !workspaceSlug || !projectId || !apiToken}
+            disabled={connect.isPending || !teamId || !organizationSlug || !projectId || !apiToken}
             onClick={() =>
               connect.mutate({
                 provider: "plane",
                 name,
-                departmentId: departmentId ?? undefined,
+                teamId: teamId ?? undefined,
                 baseUrl: baseUrl || undefined,
-                config: { workspaceSlug, projectId },
+                config: { organizationSlug, projectId },
                 secrets: { apiToken, webhookSecret },
               })
             }
@@ -137,10 +137,10 @@ function ConnectPlaneDialog({ open, onOpenChange }: { open: boolean; onOpenChang
 function ConnectTrelloDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const { toast } = useToast();
   const utils = trpc.useUtils();
-  const { data: departments } = trpc.requests.agencyDepartments.useQuery(undefined, { enabled: open });
+  const { data: teams } = trpc.requests.agencyTeams.useQuery(undefined, { enabled: open });
 
   const [name, setName] = useState("Trello — Product & Tech");
-  const [departmentId, setDepartmentId] = useState<string | null>(null);
+  const [teamId, setTeamId] = useState<string | null>(null);
   const [listId, setListId] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [apiToken, setApiToken] = useState("");
@@ -172,13 +172,13 @@ function ConnectTrelloDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           <Field label="Display name">
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
-          <Field label="Department">
-            <Select value={departmentId ?? undefined} onValueChange={setDepartmentId}>
+          <Field label="Team">
+            <Select value={teamId ?? undefined} onValueChange={setTeamId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
-                {(departments ?? []).map((d) => (
+                {(teams ?? []).map((d) => (
                   <SelectItem key={d.id} value={d.id}>
                     {d.name}
                   </SelectItem>
@@ -208,12 +208,12 @@ function ConnectTrelloDialog({ open, onOpenChange }: { open: boolean; onOpenChan
             Cancel
           </Button>
           <Button
-            disabled={connect.isPending || !departmentId || !listId || !apiKey || !apiToken}
+            disabled={connect.isPending || !teamId || !listId || !apiKey || !apiToken}
             onClick={() =>
               connect.mutate({
                 provider: "trello",
                 name,
-                departmentId: departmentId ?? undefined,
+                teamId: teamId ?? undefined,
                 config: { listId },
                 secrets: { apiKey, apiToken, webhookSecret },
               })
@@ -303,7 +303,7 @@ export default function IntegrationsPage() {
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <p className="text-muted-foreground">
-                  {i.department?.name ?? "Agency-wide"} · {i._count.links} linked tasks
+                  {i.team?.name ?? "Agency-wide"} · {i._count.links} linked tasks
                 </p>
                 {i.lastSyncedAt && (
                   <p className="text-xs text-muted-foreground">

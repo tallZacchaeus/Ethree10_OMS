@@ -136,10 +136,14 @@ jobs:
       - run: pnpm build
         env:
           CI: true
+          E2E_TEST_AUTH: true
+          NEXT_PUBLIC_E2E_TEST_AUTH: true
       - name: Start server
         run: pnpm start &
         env:
           PORT: 3000
+          E2E_TEST_AUTH: true
+          NEXT_PUBLIC_E2E_TEST_AUTH: true
       - name: Wait for server
         run: npx wait-on http://localhost:3000 --timeout 60000
       - run: pnpm test:e2e

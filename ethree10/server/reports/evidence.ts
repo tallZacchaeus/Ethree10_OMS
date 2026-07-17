@@ -1,10 +1,10 @@
 import { db } from "@/server/db/client";
 
-export async function computeDepartmentEvidence(departmentId: string, start: Date, end: Date) {
+export async function computeTeamEvidence(teamId: string, start: Date, end: Date) {
   // 1. Milestone delivery (% of milestones completed on or before due date)
   const milestones = await db.milestone.findMany({
     where: {
-      project: { agencyDepartmentId: departmentId },
+      project: { agencyTeamId: teamId },
       completedAt: { gte: start, lte: end },
     },
   });
@@ -21,14 +21,14 @@ export async function computeDepartmentEvidence(departmentId: string, start: Dat
   const [completedTasks, totalTasks] = await Promise.all([
     db.task.count({
       where: {
-        project: { agencyDepartmentId: departmentId },
+        project: { agencyTeamId: teamId },
         status: "done",
         completedAt: { gte: start, lte: end },
       },
     }),
     db.task.count({
       where: {
-        project: { agencyDepartmentId: departmentId },
+        project: { agencyTeamId: teamId },
         createdAt: { lte: end },
         OR: [{ completedAt: null }, { completedAt: { lte: end } }],
       },
@@ -44,7 +44,7 @@ export async function computeDepartmentEvidence(departmentId: string, start: Dat
   // 4. Projects delivered in period
   const requestsDelivered = await db.project.count({
     where: {
-      agencyDepartmentId: departmentId,
+      agencyTeamId: teamId,
       status: "delivered",
       actualDeliveryDate: { gte: start, lte: end },
     },
@@ -54,7 +54,7 @@ export async function computeDepartmentEvidence(departmentId: string, start: Dat
   const [reviewedTasks, completedTasksTotal] = await Promise.all([
     db.task.count({
       where: {
-        project: { agencyDepartmentId: departmentId },
+        project: { agencyTeamId: teamId },
         status: "done",
         completedAt: { gte: start, lte: end },
         reviewedById: { not: null },
@@ -62,7 +62,7 @@ export async function computeDepartmentEvidence(departmentId: string, start: Dat
     }),
     db.task.count({
       where: {
-        project: { agencyDepartmentId: departmentId },
+        project: { agencyTeamId: teamId },
         status: "done",
         completedAt: { gte: start, lte: end },
       },
@@ -74,14 +74,14 @@ export async function computeDepartmentEvidence(departmentId: string, start: Dat
   const [projectsWithMilestones, totalProjects] = await Promise.all([
     db.project.count({
       where: {
-        agencyDepartmentId: departmentId,
+        agencyTeamId: teamId,
         milestones: { some: {} },
         createdAt: { lte: end },
       },
     }),
     db.project.count({
       where: {
-        agencyDepartmentId: departmentId,
+        agencyTeamId: teamId,
         createdAt: { lte: end },
         status: { notIn: ["cancelled"] },
       },
@@ -94,14 +94,14 @@ export async function computeDepartmentEvidence(departmentId: string, start: Dat
   const [crossUnitTasks, totalAssignedTasks] = await Promise.all([
     db.task.count({
       where: {
-        project: { agencyDepartmentId: departmentId },
+        project: { agencyTeamId: teamId },
         subUnitId: { not: null },
         completedAt: { gte: start, lte: end },
       },
     }),
     db.task.count({
       where: {
-        project: { agencyDepartmentId: departmentId },
+        project: { agencyTeamId: teamId },
         assigneeUserId: { not: null },
         completedAt: { gte: start, lte: end },
       },
@@ -112,7 +112,7 @@ export async function computeDepartmentEvidence(departmentId: string, start: Dat
   // 8. Release coordination — % of milestones completed on-time agency-wide (all departments)
   const allMilestones = await db.milestone.findMany({
     where: {
-      project: { agencyDepartmentId: departmentId },
+      project: { agencyTeamId: teamId },
       completedAt: { gte: start, lte: end },
       dueDate: { not: null },
     },

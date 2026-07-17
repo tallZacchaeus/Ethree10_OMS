@@ -20,7 +20,7 @@ const METHOD_LABELS: Record<string, string> = {
 export default async function PublicReceiptPage({ params }: Props) {
   const receipt = await db.receipt.findUnique({
     where: { code: params.code },
-    include: { workspace: true, invoice: true },
+    include: { organization: true, invoice: true },
   });
 
   if (!receipt) notFound();
@@ -52,7 +52,7 @@ export default async function PublicReceiptPage({ params }: Props) {
           <dl className="divide-y">
             <div className="flex justify-between py-3">
               <dt className="text-muted-foreground">Paid By</dt>
-              <dd className="font-medium">{receipt.workspace.name}</dd>
+              <dd className="font-medium">{receipt.organization.name}</dd>
             </div>
             <div className="flex justify-between py-3">
               <dt className="text-muted-foreground">Payment Method</dt>

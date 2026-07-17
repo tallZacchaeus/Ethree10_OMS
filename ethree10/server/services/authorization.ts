@@ -5,9 +5,7 @@ import { can, type Action, type AuthContext } from "@/server/auth/permissions";
 
 export interface ResolvedContext extends AuthContext {
   userId: string;
-  /** The caller's client organization, or null if they are agency staff. */
-  organizationId: string | null;
-  departmentId: string | null;
+  teamId: string | null;
   subUnitId: string | null;
   membershipIds: string[];
 }
@@ -32,8 +30,7 @@ export class AuthorizationService {
       select: {
         id: true,
         role: true,
-        organizationId: true,
-        departmentId: true,
+        teamId: true,
         subUnitId: true,
         canManageProjects: true,
       },
@@ -44,8 +41,7 @@ export class AuthorizationService {
     return {
       userId,
       isSuperAdmin: user.isSuperAdmin,
-      organizationId: memberships.find((m) => m.organizationId)?.organizationId ?? null,
-      departmentId: memberships[0]?.departmentId ?? null,
+      teamId: memberships[0]?.teamId ?? null,
       subUnitId: memberships[0]?.subUnitId ?? null,
       membershipIds: memberships.map((m) => m.id),
       roles,

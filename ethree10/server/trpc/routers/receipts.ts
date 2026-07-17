@@ -11,7 +11,7 @@ import { AuditService } from "@/server/services/audit";
 
 async function requireAgencyView(userId: string) {
   const authCtx = await getAgencyAuthContext(userId);
-  if (!authCtx.isSuperAdmin && !authCtx.roles.includes("admin")) {
+  if (!authCtx.isSuperAdmin && !authCtx.roles.includes("agency_admin") && !authCtx.roles.includes("finance_admin")) {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
 }
@@ -62,7 +62,7 @@ export const receiptsRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await requireAgencyAction(ctx.userId, "workspace.read");
+      await requireAgencyAction(ctx.userId, "receipt.issue");
       const receipt = await ReceiptService.issueManual({
         organizationId: input.organizationId,
         invoiceId: input.invoiceId ?? null,
@@ -86,7 +86,7 @@ export const receiptsRouter = router({
   regeneratePdf: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await requireAgencyAction(ctx.userId, "workspace.read");
+      await requireAgencyAction(ctx.userId, "receipt.issue");
       const url = await ReceiptService.generateReceiptPdf(input.id);
       return { pdfUrl: url };
     }),

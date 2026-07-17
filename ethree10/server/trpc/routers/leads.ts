@@ -43,13 +43,13 @@ export const leadsRouter = router({
       return LeadService.updateStatus(ctx.userId, input.id, input.status);
     }),
 
-  convertToWorkspace: protectedProcedure
+  convertToOrganization: protectedProcedure
     .input(
       z.object({
         leadId: z.string(),
         organizationName: z.string().min(2),
-        requesterEmail: z.string().email(),
-        requesterName: z.string().min(1),
+        requesterEmail: z.string().email().optional(), // No longer provisioning users
+        requesterName: z.string().min(1).optional(),
         isExternal: z.boolean().optional(),
       }),
     )

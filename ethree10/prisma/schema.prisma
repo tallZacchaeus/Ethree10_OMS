@@ -27,34 +27,34 @@ model VerificationToken {
 // ============================================================
 
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  emailVerified  DateTime?
-  hashedPassword String?
-  name           String
-  avatarUrl      String?
-  phone          String?
-  phoneVerifiedAt DateTime?
+  id                    String    @id @default(cuid())
+  email                 String    @unique
+  emailVerified         DateTime?
+  hashedPassword        String?
+  name                  String
+  avatarUrl             String?
+  phone                 String?
+  phoneVerifiedAt       DateTime?
   phoneVerificationCode String?
-  timezone       String   @default("Africa/Lagos")
-  workingHoursPerWeek Int @default(40)
-  isSuperAdmin   Boolean  @default(false)
-  mfaEnabled     Boolean  @default(false)
-  mfaSecret      String?
-  mfaRecoveryCodes String[]
-  deactivatedAt  DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  timezone              String    @default("Africa/Lagos")
+  workingHoursPerWeek   Int       @default(40)
+  isSuperAdmin          Boolean   @default(false)
+  mfaEnabled            Boolean   @default(false)
+  mfaSecret             String?
+  mfaRecoveryCodes      String[]
+  deactivatedAt         DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  memberships      Membership[]
-  skills           UserSkill[]
-  notifications    Notification[]
+  memberships             Membership[]
+  skills                  UserSkill[]
+  notifications           Notification[]
   notificationPreferences NotificationPreference[]
-  auditLogs        AuditLog[]     @relation("ActorAuditLogs")
-  authoredComments TaskComment[]
-  authoredReports  Report[]       @relation("ReportAuthoredBy")
-  timeLogs         TimeLog[]      @relation("UserTimeLogs")
-  oauthAccounts    OAuthAccount[]
+  auditLogs               AuditLog[]               @relation("ActorAuditLogs")
+  authoredComments        TaskComment[]
+  authoredReports         Report[]                 @relation("ReportAuthoredBy")
+  timeLogs                TimeLog[]                @relation("UserTimeLogs")
+  oauthAccounts           OAuthAccount[]
 
   @@index([email])
 }
@@ -94,7 +94,6 @@ model Organization {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  memberships Membership[]
   requests    Request[]
   projects    Project[]
   leads       Lead[]
@@ -102,47 +101,53 @@ model Organization {
   receipts    Receipt[]
 }
 
+model Position {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships Membership[]
+}
+
 enum Role {
   super_admin
-  executive
-  admin
-  department_lead
-  member
-  client
-  client_viewer
+  agency_admin
+  team_head
+  team_member
+  finance_admin
 }
 
 model Membership {
-  id          String    @id @default(cuid())
-  userId      String
-  // null = agency staff (global); set = a client member of that organization.
-  organizationId String?
-  role        Role
-  departmentId String?
-  subUnitId   String?
-  title       String?
-  isPrimary   Boolean   @default(false)
+  id                String    @id @default(cuid())
+  userId            String
+    role              Role
+  teamId            String?
+  subUnitId         String?
+  positionId        String?
+  title             String?
+  isPrimary         Boolean   @default(false)
   // Capability toggle: lets a `member` manage projects (create/update projects, create/assign
   // tasks) without granting a separate lead role. Ignored for non-member roles.
-  canManageProjects Boolean @default(false)
-  invitedAt   DateTime?
-  acceptedAt  DateTime?
-  removedAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  canManageProjects Boolean   @default(false)
+  invitedAt         DateTime?
+  acceptedAt        DateTime?
+  removedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  department   Department?   @relation(fields: [departmentId], references: [id])
+    team         Team?         @relation(fields: [teamId], references: [id])
   subUnit      SubUnit?      @relation(fields: [subUnitId], references: [id])
+  position     Position?     @relation(fields: [positionId], references: [id])
 
-  @@unique([userId, organizationId, role, departmentId, subUnitId])
-  @@index([organizationId])
-  @@index([userId])
+  @@unique([userId, role, teamId, subUnitId])
+    @@index([userId])
 }
 
 // Departments belong to the (single, implicit) agency — no workspace/org scoping.
-model Department {
+model Team {
   id          String    @id @default(cuid())
   name        String
   slug        String    @unique
@@ -157,28 +162,51 @@ model Department {
   subUnits         SubUnit[]
   memberships      Membership[]
   integrations     Integration[]
-  requestsRoutedTo Request[]     @relation("RequestRoutedDepartment")
+  requestsRoutedTo Request[]     @relation("RequestRoutedTeam")
   projects         Project[]
+  services         Service[]
+}
+
+model Service {
+  id                    String    @id @default(cuid())
+  name                  String
+  slug                  String    @unique
+  description           String?
+  teamId                String?
+  requiredBriefFields   Json      @default("[]")
+  expectedDeliverables  Json      @default("[]")
+  defaultUrgency        Urgency   @default(medium)
+  defaultSlaHours       Int?
+  requiredReviews       Json      @default("[]")
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  team     Team?     @relation(fields: [teamId], references: [id])
+  requests Request[]
+
+  @@index([teamId])
+  @@index([isActive])
 }
 
 model SubUnit {
-  id           String    @id @default(cuid())
-  departmentId String
-  name         String
-  slug         String
-  description  String?
-  leadId       String?
-  archivedAt   DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  teamId      String
+  name        String
+  slug        String
+  description String?
+  leadId      String?
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  department   Department    @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  team         Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
   memberships  Membership[]
   tasks        Task[]
   integrations Integration[]
 
-  @@unique([departmentId, slug])
-  @@index([departmentId])
+  @@unique([teamId, slug])
+  @@index([teamId])
 }
 
 // ============================================================
@@ -186,10 +214,10 @@ model SubUnit {
 // ============================================================
 
 model Skill {
-  id        String    @id @default(cuid())
-  name      String    @unique
+  id        String   @id @default(cuid())
+  name      String   @unique
   category  String?
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   users UserSkill[]
 }
@@ -227,17 +255,17 @@ enum LeadStatus {
 }
 
 model Lead {
-  id           String     @id @default(cuid())
-  name         String
-  email        String
-  phone        String?
-  organization String?
-  message      String
-  source       String?
-  status       LeadStatus @default(new)
+  id             String     @id @default(cuid())
+  name           String
+  email          String
+  phone          String?
+  organization   String?
+  message        String
+  source         String?
+  status         LeadStatus @default(new)
   organizationId String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
   org Organization? @relation(fields: [organizationId], references: [id])
 
@@ -253,6 +281,7 @@ enum Urgency {
 
 enum RequestStage {
   submitted
+  needs_clarification
   pending_approval
   under_review
   scoping
@@ -268,44 +297,56 @@ enum RequestStage {
 }
 
 model Request {
-  id                 String       @id @default(cuid())
-  code               String       @unique
-  organizationId     String
-  submittedById      String
-  title              String
-  description        String
-  projectType        String
-  urgency            Urgency      @default(medium)
-  deadline           DateTime?
-  stage              RequestStage @default(submitted)
-  routedDepartmentId String?
-  primaryContact     String?
-  externalRef        String?
-  approvedById       String?
-  rejectedReason     String?
-  budgetEstimate     Decimal?     @db.Decimal(14, 2)
-  currency           String       @default("NGN")
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  id             String       @id @default(cuid())
+  code           String       @unique
+  publicToken    String?      @unique
+  organizationId String
+  submittedById  String?
+  requesterName  String?
+  requesterEmail String?
+  requesterPhone String?
+  title          String
+  description    String
+  projectType    String
+  serviceId      String?
+  expectedOutcome String?
+  expectedDeliverables String?
+  acceptanceCriteria String?
+  supportingLinks String[]     @default([])
+  consentToEmail Boolean        @default(false)
+  urgency        Urgency      @default(medium)
+  deadline       DateTime?
+  stage          RequestStage @default(submitted)
+  routedTeamId   String?
+  primaryContact String?
+  externalRef    String?
+  approvedById   String?
+  rejectedReason String?
+  budgetEstimate Decimal?     @db.Decimal(14, 2)
+  currency       String       @default("NGN")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  organization     Organization       @relation(fields: [organizationId], references: [id])
-  routedDepartment Department?        @relation("RequestRoutedDepartment", fields: [routedDepartmentId], references: [id])
-  project          Project?
-  proposals        Proposal[]         @relation("RequestProposals")
-  stageEvents      RequestStageEvent[]
-  attachments      Attachment[]       @relation("RequestAttachments")
-  comments         TaskComment[]      @relation("RequestComments")
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  service      Service?             @relation(fields: [serviceId], references: [id])
+  routedTeam   Team?               @relation("RequestRoutedTeam", fields: [routedTeamId], references: [id])
+  project      Project?
+  proposals    Proposal[]          @relation("RequestProposals")
+  stageEvents  RequestStageEvent[]
+  attachments  Attachment[]        @relation("RequestAttachments")
+  comments     TaskComment[]       @relation("RequestComments")
 
   @@index([organizationId])
   @@index([stage])
-  @@index([routedDepartmentId])
+  @@index([routedTeamId])
+  @@index([serviceId])
 }
 
 // Agency-global approval rules (the agency is implicit).
 model ApprovalRule {
   id               String   @id @default(cuid())
   name             String
-  triggerCondition Json     // e.g. { isExternal: true, minBudget: 500000 }
+  triggerCondition Json // e.g. { isExternal: true, minBudget: 500000 }
   requiredRole     Role
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
@@ -317,7 +358,7 @@ model RequestStageEvent {
   requestId String
   fromStage RequestStage?
   toStage   RequestStage
-  actorId   String
+  actorId   String?
   note      String?
   createdAt DateTime      @default(now())
 
@@ -340,7 +381,7 @@ model Project {
   code               String        @unique
   requestId          String        @unique
   organizationId     String
-  agencyDepartmentId String?
+  agencyTeamId       String?
   pmUserId           String?
   name               String
   description        String?
@@ -353,17 +394,17 @@ model Project {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  request    Request      @relation(fields: [requestId], references: [id])
-  organization Organization @relation(fields: [organizationId], references: [id])
-  department Department?  @relation(fields: [agencyDepartmentId], references: [id])
-  tasks      Task[]
-  milestones Milestone[]
-  proposals  Proposal[]
-  invoices   Invoice[]
+  request      Request       @relation(fields: [requestId], references: [id])
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  team         Team?         @relation(fields: [agencyTeamId], references: [id])
+  tasks        Task[]
+  milestones   Milestone[]
+  proposals    Proposal[]
+  invoices     Invoice[]
   sponsorships Sponsorship[]
 
   @@index([organizationId])
-  @@index([agencyDepartmentId])
+  @@index([agencyTeamId])
   @@index([status])
 }
 
@@ -435,19 +476,21 @@ model TaskDependency {
 }
 
 model TaskComment {
-  id         String   @id @default(cuid())
-  taskId     String?
-  requestId  String?
-  authorId   String
-  body       String
-  mentions   String[]
-  isInternal Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(cuid())
+  taskId      String?
+  requestId   String?
+  authorId    String?
+  authorName  String?
+  authorEmail String?
+  body        String
+  mentions    String[]
+  isInternal  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   task    Task?    @relation("TaskComments", fields: [taskId], references: [id], onDelete: Cascade)
   request Request? @relation("RequestComments", fields: [requestId], references: [id], onDelete: Cascade)
-  author  User     @relation(fields: [authorId], references: [id])
+  author  User?    @relation(fields: [authorId], references: [id])
 
   @@index([taskId])
   @@index([requestId])
@@ -502,8 +545,8 @@ model Proposal {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
-  project      Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  request      Request?       @relation("RequestProposals", fields: [requestId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  request Request? @relation("RequestProposals", fields: [requestId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([requestId])
@@ -533,21 +576,21 @@ enum InvoiceStatus {
 }
 
 model Invoice {
-  id          String        @id @default(cuid())
-  code        String        @unique
-  projectId   String?
+  id             String        @id @default(cuid())
+  code           String        @unique
+  projectId      String?
   organizationId String
-  status      InvoiceStatus @default(draft)
-  currency    String        @default("NGN")
-  amount      Decimal       @db.Decimal(14, 2)
-  lineItems   Json
-  issuedAt    DateTime?
-  dueAt       DateTime?
-  paidAt      DateTime?
-  paymentRef  String?
-  pdfUrl      String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  status         InvoiceStatus @default(draft)
+  currency       String        @default("NGN")
+  amount         Decimal       @db.Decimal(14, 2)
+  lineItems      Json
+  issuedAt       DateTime?
+  dueAt          DateTime?
+  paidAt         DateTime?
+  paymentRef     String?
+  pdfUrl         String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   project      Project?     @relation(fields: [projectId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
@@ -566,17 +609,17 @@ enum PaymentMethod {
 }
 
 model Receipt {
-  id            String        @id @default(cuid())
-  code          String        @unique
-  invoiceId     String?       @unique
+  id             String        @id @default(cuid())
+  code           String        @unique
+  invoiceId      String?       @unique
   organizationId String
-  amount        Decimal       @db.Decimal(14, 2)
-  currency      String        @default("NGN")
-  paymentMethod PaymentMethod @default(paystack)
-  paymentRef    String?
-  issuedAt      DateTime      @default(now())
-  pdfUrl        String?
-  createdAt     DateTime      @default(now())
+  amount         Decimal       @db.Decimal(14, 2)
+  currency       String        @default("NGN")
+  paymentMethod  PaymentMethod @default(paystack)
+  paymentRef     String?
+  issuedAt       DateTime      @default(now())
+  pdfUrl         String?
+  createdAt      DateTime      @default(now())
 
   invoice      Invoice?     @relation(fields: [invoiceId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
@@ -612,7 +655,7 @@ model Integration {
   id               String              @id @default(cuid())
   provider         IntegrationProvider
   status           IntegrationStatus   @default(active)
-  departmentId     String?
+  teamId           String?
   subUnitId        String?
   name             String
   baseUrl          String?
@@ -623,11 +666,11 @@ model Integration {
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
-  department Department? @relation(fields: [departmentId], references: [id])
-  subUnit    SubUnit?    @relation(fields: [subUnitId], references: [id])
-  links      IntegrationLink[]
+  team    Team?             @relation(fields: [teamId], references: [id])
+  subUnit SubUnit?          @relation(fields: [subUnitId], references: [id])
+  links   IntegrationLink[]
 
-  @@index([departmentId])
+  @@index([teamId])
 }
 
 model IntegrationLink {
@@ -671,7 +714,7 @@ model ProjectTemplate {
 enum ReportLevel {
   member
   subunit
-  department
+  team
   agency
 }
 
@@ -701,14 +744,14 @@ model Report {
 
 // Agency-global scorecard configs (the agency is implicit).
 model ScorecardConfig {
-  id          String      @id @default(cuid())
-  level       ReportLevel
-  scopeId     String      // departmentId or member userId
-  name        String
-  items       Json        // array of ScorecardItem objects
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id        String      @id @default(cuid())
+  level     ReportLevel
+  scopeId   String // teamId or member userId
+  name      String
+  items     Json // array of ScorecardItem objects
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
   @@index([level, scopeId])
 }
@@ -733,7 +776,7 @@ model KpiSnapshot {
 // ============================================================
 
 model Attachment {
-  id           String    @id @default(cuid())
+  id           String   @id @default(cuid())
   taskId       String?
   requestId    String?
   commentId    String?
@@ -744,7 +787,7 @@ model Attachment {
   storageKey   String
   publicUrl    String?
   uploadedById String
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime @default(now())
 
   task    Task?    @relation("TaskAttachments", fields: [taskId], references: [id], onDelete: Cascade)
   request Request? @relation("RequestAttachments", fields: [requestId], references: [id], onDelete: Cascade)
@@ -789,16 +832,16 @@ model Notification {
 
 // Agency-global audit trail (no per-tenant scoping).
 model AuditLog {
-  id          String   @id @default(cuid())
-  actorId     String?
-  action      String
-  entityType  String
-  entityId    String
-  before      Json?
-  after       Json?
-  ip          String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  before     Json?
+  after      Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 
   actor User? @relation("ActorAuditLogs", fields: [actorId], references: [id])
 
@@ -847,16 +890,16 @@ enum SponsorshipStatus {
 }
 
 model Sponsorship {
-  id            String            @id @default(cuid())
-  sponsorName   String
-  amount        Decimal?          @db.Decimal(14, 2)
-  currency      String            @default("USD")
-  status        SponsorshipStatus @default(prospect)
-  projectId     String?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id          String            @id @default(cuid())
+  sponsorName String
+  amount      Decimal?          @db.Decimal(14, 2)
+  currency    String            @default("USD")
+  status      SponsorshipStatus @default(prospect)
+  projectId   String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
-  project       Project?          @relation(fields: [projectId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
 }
 
 // ============================================================
@@ -864,15 +907,12 @@ model Sponsorship {
 // ============================================================
 
 model ArchivedAuditLog {
-  id           String   @id
-  actorId      String?
-  action       String
-  entityType   String
-  entityId     String
-  changes      Json     @default("{}")
-  createdAt    DateTime
-  archivedAt   DateTime @default(now())
+  id         String   @id
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  changes    Json     @default("{}")
+  createdAt  DateTime
+  archivedAt DateTime @default(now())
 }
-
-
-

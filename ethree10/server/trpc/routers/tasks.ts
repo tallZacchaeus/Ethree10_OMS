@@ -48,11 +48,11 @@ export const tasksRouter = router({
       await requireAgencyAction(ctx.userId, "task.create");
       const project = await db.project.findUnique({
         where: { id: input.projectId },
-        select: { agencyDepartmentId: true },
+        select: { agencyTeamId: true },
       });
-      if (!project?.agencyDepartmentId) return [];
+      if (!project?.agencyTeamId) return [];
       return db.subUnit.findMany({
-        where: { departmentId: project.agencyDepartmentId, archivedAt: null },
+        where: { teamId: project.agencyTeamId, archivedAt: null },
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       });
@@ -80,6 +80,7 @@ export const tasksRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      if (!(await ProjectService.canRead(ctx.userId, input.projectId))) throw new TRPCError({ code: "FORBIDDEN" });
       await requireAgencyAction(ctx.userId, "task.create");
       return TaskService.create({ actorId: ctx.userId, input });
     }),
@@ -108,6 +109,7 @@ export const tasksRouter = router({
   assign: protectedProcedure
     .input(z.object({ taskId: z.string(), assigneeUserId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await loadTaskForRead(ctx.userId, input.taskId);
       await requireAgencyAction(ctx.userId, "task.assign");
       const result = await TaskService.assign({
         actorId: ctx.userId,
@@ -187,6 +189,7 @@ export const tasksRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await loadTaskForRead(ctx.userId, input.taskId);
       await requireAgencyAction(ctx.userId, "task.review");
       return TaskService.review({
         actorId: ctx.userId,
@@ -199,6 +202,7 @@ export const tasksRouter = router({
   reopen: protectedProcedure
     .input(z.object({ taskId: z.string(), reason: z.string().min(2) }))
     .mutation(async ({ ctx, input }) => {
+      await loadTaskForRead(ctx.userId, input.taskId);
       await requireAgencyAction(ctx.userId, "task.review");
       return TaskService.reopen({
         actorId: ctx.userId,

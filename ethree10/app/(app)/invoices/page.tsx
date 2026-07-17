@@ -59,7 +59,7 @@ export default function InvoicesPage() {
                       {inv.code}
                     </Link>
                   </TableCell>
-                  <TableCell>{inv.workspace.name}</TableCell>
+                  <TableCell>{inv.organization.name}</TableCell>
                   <TableCell>{formatMoney(Number(inv.amount), inv.currency)}</TableCell>
                   <TableCell>
                     <StatusPill kind="invoice" value={inv.status} />

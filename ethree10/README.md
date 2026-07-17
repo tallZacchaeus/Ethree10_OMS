@@ -1,6 +1,6 @@
 # Ethree10 OMS
 
-Ethree10 OMS is a multi-workspace operations management system for handling inbound requests, internal delivery, reporting, and client-facing workflow around Ethree10's agency operations.
+Ethree10 OMS is the operating system for Ethree10's single agency: organizations submit solution requests, services route them to Product Development or Brands & Communications, staff deliver the work, and clients track progress through secure links.
 
 This repository is split into two layers:
 
@@ -25,8 +25,9 @@ From the current codebase, the application provides:
    - Dev-only credentials flow
    - MFA enforcement inside the authenticated app
 
-3. Internal OMS workspace
-   - Workspace switching and membership management
+3. Internal agency operations
+   - Staff, team, position, and organization management
+   - Configurable service catalog, complete request briefs, team routing, and fallback intake
    - Role-based access control
    - Request intake, triage, routing, approval, and stage tracking
    - Project and task execution
@@ -44,7 +45,6 @@ From the current codebase, the application provides:
 Authenticated route groups under `app/(app)` include:
 
 - `/dashboard`
-- `/workspaces`
 - `/agency/dashboard`
 - `/agency/skills`
 - `/inbox`
@@ -52,7 +52,9 @@ Authenticated route groups under `app/(app)` include:
 - `/projects`, `/projects/[id]`
 - `/tasks`, `/tasks/[id]`
 - `/members`
-- `/departments`
+- `/teams`
+- `/team/intake`
+- `/settings/services`
 - `/leads`
 - `/integrations`
 - `/reports`, `/reports/[id]`
@@ -70,7 +72,7 @@ Authenticated route groups under `app/(app)` include:
 
 Public/auth route groups under `app/` include:
 
-- `(marketing)`: `/`, `/about`, `/services`, `/contact`, `/request`, `/invoice/[code]`
+- `(marketing)`: `/`, `/about`, `/services`, `/contact`, `/request`, `/track/[token]`, `/invoice/[code]`, `/receipt/[code]`
 - `(auth)`: `/login`, `/magic-link-sent`
 
 Server/API endpoints found in the app include:
@@ -103,7 +105,7 @@ Stack confirmed from the runnable app:
 Key architectural patterns:
 
 - Route groups split the system into marketing, auth, and authenticated app surfaces.
-- Workspace isolation is enforced through `scopedDb(workspaceId)` in server-side procedures.
+- The agency is implicit. Staff authorization is membership/team scoped; client-owned records carry `organizationId` and public access uses unguessable tracking tokens.
 - RBAC is defined centrally in `server/auth/permissions.ts`.
 - tRPC routers are composed in `server/trpc/routers/_app.ts`.
 - Background processing runs from `workers/index.ts` with queues for notifications, reports, and integrations.
@@ -115,8 +117,9 @@ Key architectural patterns:
 The tRPC app router currently wires these modules:
 
 - auth
-- workspaces
-- departments
+- organizations
+- teams
+- services
 - subunits
 - members
 - requests
@@ -150,7 +153,8 @@ The Prisma schema currently contains:
 Core model groups:
 
 - Identity: `User`, `OAuthAccount`, `VerificationToken`
-- Organization: `Workspace`, `Membership`, `Department`, `SubUnit`
+- Organization and people: `Organization`, `Membership`, `Team`, `Position`, `SubUnit`
+- Intake configuration: `Service`
 - Work intake/delivery: `Lead`, `Request`, `Project`, `Task`, `TaskDependency`, `TaskComment`, `TimeLog`
 - Commercial/financial: `Proposal`, `Milestone`, `Invoice`, `Sponsorship`
 - Reporting/performance: `Report`, `ScorecardConfig`, `KpiSnapshot`

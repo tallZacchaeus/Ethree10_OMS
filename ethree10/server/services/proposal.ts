@@ -17,9 +17,7 @@ export class ProposalService {
       throw new TRPCError({ code: "NOT_FOUND", message: "Proposal is not linked to an organization." });
     }
     const ctx = await AuthorizationService.resolve(actorId);
-    // Agency staff (any non-client role) can act on any proposal; a client only on their own org.
-    const isStaff = ctx.roles.some((r) => r !== "client" && r !== "client_viewer");
-    const allowed = ctx.isSuperAdmin || isStaff || ctx.organizationId === organizationId;
+    const allowed = ctx.isSuperAdmin;
     if (!allowed) {
       throw new TRPCError({ code: "FORBIDDEN", message: "You do not have access to this proposal." });
     }
@@ -174,7 +172,7 @@ export class ProposalService {
     }
 
     // Notify requester
-    if (before.request) {
+    if (before.request && before.request.submittedById) {
       await NotificationService.create({
         userId: before.request.submittedById,
         kind: "proposal_sent",

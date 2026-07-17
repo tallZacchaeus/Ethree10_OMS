@@ -81,7 +81,7 @@ export default function ProjectsPage() {
                 <TableHead>Code</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Client</TableHead>
-                <TableHead>Department</TableHead>
+                <TableHead>Team</TableHead>
                 <TableHead>Tasks</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Updated</TableHead>
@@ -97,10 +97,10 @@ export default function ProjectsPage() {
                     <Link href={`/projects/${p.id}`}>{p.name}</Link>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {p.workspace?.name ?? "—"}
+                    {p.organization.name}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {p.department?.name ?? "—"}
+                    {p.team?.name ?? "—"}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {p._count.tasks}

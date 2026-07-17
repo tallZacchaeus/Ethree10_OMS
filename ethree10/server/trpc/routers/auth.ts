@@ -43,19 +43,10 @@ export const authRouter = router({
           select: {
             id: true,
             role: true,
-            workspaceId: true,
-            departmentId: true,
+
+            teamId: true,
             subUnitId: true,
             isPrimary: true,
-            workspace: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                type: true,
-                logoUrl: true,
-              },
-            },
           },
         },
       },
@@ -64,28 +55,7 @@ export const authRouter = router({
       throw new TRPCError({ code: "NOT_FOUND", message: "User not found." });
     }
 
-    // Super admins can switch into any workspace — synthesise membership
-    // entries for every workspace they are not already a member of.
-    if (user.isSuperAdmin) {
-      const memberWorkspaceIds = new Set(user.memberships.map((m) => m.workspaceId));
-      const allWorkspaces = await ctx.db.workspace.findMany({
-        where: { archivedAt: null },
-        select: { id: true, name: true, slug: true, type: true, logoUrl: true },
-        orderBy: { name: "asc" },
-      });
-      const synthetic = allWorkspaces
-        .filter((ws) => !memberWorkspaceIds.has(ws.id))
-        .map((ws) => ({
-          id: `synthetic-${ws.id}`,
-          role: "super_admin" as const,
-          workspaceId: ws.id,
-          departmentId: null,
-          subUnitId: null,
-          isPrimary: false,
-          workspace: ws,
-        }));
-      return { ...user, memberships: [...user.memberships, ...synthetic] };
-    }
+
 
     return user;
   }),
@@ -211,7 +181,7 @@ export const authRouter = router({
     }),
 
   /**
-   * Verifies the invitation token and returns workspace context.
+   * Verifies the invitation token and returns organization context.
    * The actual acceptance is handled by the POST (mutation).
    */
   getInvitation: publicProcedure
@@ -219,6 +189,7 @@ export const authRouter = router({
     .query(async ({ input, ctx }) => {
       const membership = await ctx.db.membership.findFirst({
         where: {
+          id: input.token,
           invitedAt: { not: null },
           acceptedAt: null,
           removedAt: null,
@@ -226,7 +197,6 @@ export const authRouter = router({
         select: {
           id: true,
           role: true,
-          workspace: { select: { id: true, name: true, slug: true } },
         },
       });
       if (!membership) {

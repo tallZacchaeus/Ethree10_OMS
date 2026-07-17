@@ -24,7 +24,7 @@ export const approvalRulesRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const agencyCtx = await getAgencyAuthContext(ctx.userId);
-      if (!can(agencyCtx, "workspace.update")) {
+      if (!can(agencyCtx, "organization.update")) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Only agency admins can manage approval rules." });
       }
 
@@ -50,7 +50,7 @@ export const approvalRulesRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const agencyCtx = await getAgencyAuthContext(ctx.userId);
-      if (!can(agencyCtx, "workspace.update")) {
+      if (!can(agencyCtx, "organization.update")) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -65,7 +65,7 @@ export const approvalRulesRouter = router({
     .input(z.string())
     .mutation(async ({ input, ctx }) => {
       const agencyCtx = await getAgencyAuthContext(ctx.userId);
-      if (!can(agencyCtx, "workspace.update")) {
+      if (!can(agencyCtx, "organization.update")) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 

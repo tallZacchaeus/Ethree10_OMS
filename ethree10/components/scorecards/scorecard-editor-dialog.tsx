@@ -26,17 +26,15 @@ type ScorecardItem = {
 export function ScorecardEditorDialog({
   isOpen,
   onClose,
-  workspaceId,
   scorecardId,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  workspaceId: string;
   scorecardId?: string;
 }) {
   const utils = trpc.useUtils();
   const [name, setName] = useState("");
-  const [level, setLevel] = useState<ReportLevel>("department");
+  const [level, setLevel] = useState<ReportLevel>("team");
   const [scopeId, setScopeId] = useState("");
   const [items, setItems] = useState<ScorecardItem[]>([]);
 
@@ -53,7 +51,7 @@ export function ScorecardEditorDialog({
     }
   }, [existing]);
 
-  const { data: departments } = trpc.departments.list.useQuery();
+  const { data: teams } = trpc.teams.list.useQuery();
 
   const createScorecard = trpc.scorecards.create.useMutation({
     onSuccess: () => {
@@ -76,7 +74,7 @@ export function ScorecardEditorDialog({
       updateScorecard.mutate({ id: scorecardId, name, items });
     } else {
       createScorecard.mutate({
-        workspaceId,
+
         level,
         scopeId,
         name,
@@ -112,7 +110,7 @@ export function ScorecardEditorDialog({
                 <Select value={level} onValueChange={(v) => setLevel(v as ReportLevel)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="department">Department</SelectItem>
+                    <SelectItem value="team">Team</SelectItem>
                     <SelectItem value="agency">Agency</SelectItem>
                   </SelectContent>
                 </Select>
@@ -122,7 +120,7 @@ export function ScorecardEditorDialog({
                 <Select value={scopeId} onValueChange={setScopeId}>
                   <SelectTrigger><SelectValue placeholder="Select dept" /></SelectTrigger>
                   <SelectContent>
-                    {departments?.map((d) => (
+                    {teams?.map((d) => (
                       <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                     ))}
                   </SelectContent>

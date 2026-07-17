@@ -21,6 +21,7 @@ export interface BottleneckRow {
 
 const STAGE_LABELS: Record<RequestStage, string> = {
   submitted: "Submitted",
+  needs_clarification: "Needs Clarification",
   pending_approval: "Pending Approval",
   under_review: "Under Review",
   scoping: "Scoping",
@@ -38,6 +39,7 @@ const STAGE_LABELS: Record<RequestStage, string> = {
 /** Canonical lifecycle order, used to sort the bottleneck rows for display. */
 const STAGE_ORDER: RequestStage[] = [
   "submitted",
+  "needs_clarification",
   "pending_approval",
   "under_review",
   "scoping",

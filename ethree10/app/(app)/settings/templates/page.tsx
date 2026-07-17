@@ -4,15 +4,16 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { useWorkspace } from "@/components/providers/workspace-provider";
+
 import { formatDate } from "@/lib/format";
 import { CreateTemplateDialog } from "@/components/templates/create-template-dialog";
 
 export default function TemplatesPage() {
-  const { roles, isSuperAdmin } = useWorkspace();
+  const isSuperAdmin = false; // Stub
+  const roles: string[] = [];
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  const isAgencyAdmin = isSuperAdmin || roles.includes("admin");
+  const isAgencyAdmin = isSuperAdmin || roles.includes("agency_admin");
 
   const { data: templates, isLoading, refetch } = trpc.templates.list.useQuery();
 

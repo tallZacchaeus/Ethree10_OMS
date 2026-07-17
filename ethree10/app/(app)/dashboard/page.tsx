@@ -28,13 +28,13 @@ import { UrgencyTag } from "@/components/ui-ext/urgency-tag";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useWorkspace } from "@/components/providers/workspace-provider";
+import { useOrganization } from "@/components/providers/workspace-provider";
 import { KpiWidget } from "@/components/dashboard/kpi-widget";
 import { FirstRunChecklist } from "@/components/dashboard/first-run-checklist";
 import { AnimatedItem, AnimatedPage, AnimatedSection } from "@/components/ui-ext/animated";
 
 export default function DashboardPage() {
-  const { roles, isSuperAdmin, activeWorkspace } = useWorkspace();
+  const { roles, isSuperAdmin, activeOrganization } = useOrganization();
   const experience = getDashboardExperience(roles, isSuperAdmin);
 
   const { data: myTasks } = trpc.tasks.myTasks.useQuery(undefined, {
@@ -49,9 +49,7 @@ export default function DashboardPage() {
   const { data: agencyData } = trpc.dashboard.agencyLead.useQuery(undefined, {
     enabled: experience.isAgencyLead,
   });
-  const { data: requesterData } = trpc.dashboard.requester.useQuery(undefined, {
-    enabled: experience.isRequester,
-  });
+  // Removed requesterData
 
   const now = new Date();
   const myTaskList = myTasks ?? [];
@@ -73,8 +71,8 @@ export default function DashboardPage() {
     <AnimatedPage className="space-y-8">
       <AnimatedSection delay={40}>
         <DashboardHero
-          workspaceName={activeWorkspace?.name ?? null}
-          showRequestCta={experience.isRequester}
+          workspaceName={activeOrganization?.name ?? null}
+          showRequestCta={false}
         />
       </AnimatedSection>
 
@@ -85,91 +83,7 @@ export default function DashboardPage() {
         </AnimatedSection>
       )}
 
-      {experience.isRequester && requesterData && (
-        <AnimatedSection className="space-y-4" delay={80}>
-          <SectionHeader
-            title="Client overview"
-            description="Track requests, active deliveries, and items waiting for your sign-off."
-          />
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <StatCard
-              label="Open requests"
-              value={requesterData.metrics.openRequestsCount}
-              icon={Inbox}
-              hint="Requests still moving through the pipeline"
-              tone="signature"
-            />
-            <StatCard
-              label="Active projects"
-              value={requesterData.metrics.activeProjectsCount}
-              icon={FolderKanban}
-              hint="Current delivery work in progress"
-              className="surface-hover"
-            />
-            <StatCard
-              label="Awaiting feedback"
-              value={requesterData.metrics.awaitingFeedbackCount}
-              icon={MessageSquareQuote}
-              hint="Delivered work that still needs client sign-off"
-              className="surface-hover"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <SurfaceCard
-              title="Recent requests"
-              description="What your organization has submitted most recently."
-              actionHref="/requests"
-              actionLabel="View all requests"
-            >
-              {requesterData.recentRequests.length === 0 ? (
-                <EmptyState message="No requests yet. Submit your first brief to start a project." />
-              ) : (
-                requesterData.recentRequests.map((request, index) => (
-                  <AnimatedItem key={request.id} delay={index * 50}>
-                    <LinkCard href={`/requests/${request.id}`}>
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="block min-w-0 truncate font-medium">{request.title}</span>
-                          <UrgencyTag value={request.urgency} />
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {request.workspace.name} · Updated {formatDate(request.updatedAt)}
-                        </p>
-                      </div>
-                      <StatusPill kind="request" value={request.stage} />
-                    </LinkCard>
-                  </AnimatedItem>
-                ))
-              )}
-            </SurfaceCard>
-
-            <SurfaceCard
-              title="Projects awaiting your sign-off"
-              description="Delivered work that still needs a final client response."
-            >
-              {requesterData.awaitingFeedback.length === 0 ? (
-                <EmptyState message="Nothing is waiting on client feedback right now." />
-              ) : (
-                requesterData.awaitingFeedback.map((project, index) => (
-                  <AnimatedItem key={project.id} delay={index * 50}>
-                    <LinkCard href={`/projects/${project.id}`}>
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <span className="block min-w-0 truncate font-medium">{project.name}</span>
-                        <p className="text-xs text-muted-foreground">
-                          {project.workspace.name} · Delivered {formatDate(project.updatedAt)}
-                        </p>
-                      </div>
-                      <StatusPill kind="project" value={project.status} />
-                    </LinkCard>
-                  </AnimatedItem>
-                ))
-              )}
-            </SurfaceCard>
-          </div>
-        </AnimatedSection>
-      )}
 
       {experience.isMember && (
         <AnimatedSection className="space-y-4" delay={120}>
@@ -245,10 +159,10 @@ export default function DashboardPage() {
         </AnimatedSection>
       )}
 
-      {experience.isDeptLead && deptData && deptData.departments.length > 0 && (
+      {experience.isDeptLead && deptData && deptData.teams.length > 0 && (
         <AnimatedSection className="space-y-4 border-t pt-6" delay={220}>
           <SectionHeader
-            title="Department view"
+            title="Team view"
             description="Balance intake, delivery pressure, and client follow-ups for your department."
           />
 
@@ -280,7 +194,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr,0.8fr]">
-            <SurfaceCard title="Department intake queue" description="Requests that still need active departmental handling.">
+            <SurfaceCard title="Team intake queue" description="Requests that still need active departmental handling.">
               {deptData.incomingRequests.length === 0 ? (
                 <EmptyState message="No incoming requests need department attention right now." />
               ) : (
@@ -293,7 +207,7 @@ export default function DashboardPage() {
                           <UrgencyTag value={request.urgency} />
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {request.workspace?.name ?? "Workspace"} · Submitted {formatDate(request.createdAt)}
+                          {request.organization?.name ?? "Organization"} · Submitted {formatDate(request.createdAt)}
                         </p>
                       </div>
                       <StatusPill kind="request" value={request.stage} />
@@ -306,7 +220,7 @@ export default function DashboardPage() {
             <Card className="surface-hover border-border/60 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">Latest KPI snapshot</CardTitle>
-                <CardDescription>Operational scorecard for the departments you lead.</CardDescription>
+                <CardDescription>Operational scorecard for the teams you lead.</CardDescription>
               </CardHeader>
               <CardContent>
                 <KpiWidget snapshot={deptData.kpiSnapshot as KpiSnapshot | null} />
@@ -322,7 +236,7 @@ export default function DashboardPage() {
             title={experience.isExecutive && !experience.isMember ? "Executive overview" : "Agency overview"}
             description={
               experience.isExecutive && !experience.isMember
-                ? "A read-only pulse of the whole agency — queue health, throughput, and delivery pressure across both departments."
+                ? "A read-only pulse of the whole agency — queue health, throughput, and delivery pressure across both teams."
                 : "A real leadership surface for queue health, throughput, and delivery pressure."
             }
           />
@@ -372,8 +286,8 @@ export default function DashboardPage() {
                           <UrgencyTag value={request.urgency} />
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {request.workspace?.name ?? "Workspace"}
-                          {request.routedDepartment?.name ? ` · ${request.routedDepartment.name}` : " · Unassigned"}
+                          {request.organization?.name ?? "Organization"}
+                          {request.routedTeamId ? ` · Assigned` : " · Unassigned"}
                         </p>
                       </div>
                       <StatusPill kind="request" value={request.stage} />
@@ -447,8 +361,8 @@ export default function DashboardPage() {
                           <StatusPill kind="project" value={project.status} />
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {project.workspace?.name ?? "Workspace"}
-                          {project.department?.name ? ` · ${project.department.name}` : ""}
+                          {project.organization?.name ?? "Organization"}
+                          {project.team?.name ? ` · ${project.team.name}` : ""}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {project.targetDeliveryDate

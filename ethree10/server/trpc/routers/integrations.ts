@@ -7,10 +7,10 @@ import { requireAgencyAction } from "@/server/services/agency";
 
 export const integrationsRouter = router({
   list: protectedProcedure
-    .input(z.object({ departmentId: z.string().optional() }).optional())
+    .input(z.object({ teamId: z.string().optional() }).optional())
     .query(async ({ ctx, input }) => {
       await requireAgencyAction(ctx.userId, "integration.read");
-      const integrations = await IntegrationService.list({ departmentId: input?.departmentId });
+      const integrations = await IntegrationService.list({ teamId: input?.teamId });
       // Never expose encrypted secrets to the client.
       return integrations.map(({ encryptedSecrets: _omit, config: _config, ...rest }) => rest);
     }),
@@ -20,7 +20,7 @@ export const integrationsRouter = router({
       z.object({
         provider: z.nativeEnum(IntegrationProvider),
         name: z.string().min(2),
-        departmentId: z.string().optional(),
+        teamId: z.string().optional(),
         subUnitId: z.string().optional(),
         baseUrl: z.string().url().optional(),
         config: z.record(z.unknown()),
@@ -33,7 +33,7 @@ export const integrationsRouter = router({
         actorId: ctx.userId,
         provider: input.provider,
         name: input.name,
-        departmentId: input.departmentId,
+        teamId: input.teamId,
         subUnitId: input.subUnitId,
         baseUrl: input.baseUrl,
         config: input.config,

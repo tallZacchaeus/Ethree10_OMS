@@ -10,7 +10,7 @@ export function KpiWidget({ snapshot }: { snapshot: KpiSnapshot | null }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Department KPI Scorecard</CardTitle>
+          <CardTitle>Team KPI Scorecard</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">No scorecard available for this period.</p>

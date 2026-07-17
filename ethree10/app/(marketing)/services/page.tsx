@@ -1,76 +1,12 @@
-import type { Metadata } from "next";
+"use client";
+
 import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
-
-export const metadata: Metadata = {
-  title: "Services — Ethree10",
-  description: "Web, Mobile, Brand, and Strategy services for Kingdom impact.",
-};
-
-const SERVICES = [
-  {
-    title: "Web & Product Development",
-    description: "We build fast, accessible, and scalable web applications and internal tools.",
-    features: ["Marketing sites", "Custom dashboards", "E-commerce", "API Integrations"],
-  },
-  {
-    title: "Mobile App Development",
-    description: "Cross-platform mobile applications designed to work smoothly on all devices.",
-    features: ["React Native", "Offline-first architectures", "Push notifications", "App Store deployment"],
-  },
-  {
-    title: "Brand & Creative",
-    description: "Cohesive brand identities and design systems that communicate excellence.",
-    features: ["Logo design", "Brand guidelines", "UI/UX design", "Marketing assets"],
-  },
-  {
-    title: "Strategy & Operations",
-    description: "Consulting and systems implementation to help your organization scale.",
-    features: ["Process optimization", "Tech stack audits", "Team training", "Data analytics"],
-  },
-];
+import { trpc } from "@/lib/trpc/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 export default function ServicesPage() {
-  return (
-    <main className="py-20 px-6">
-      <div className="mx-auto max-w-4xl">
-        <h1 className="text-4xl font-bold tracking-tight text-brand-900 sm:text-5xl">Our Services</h1>
-        <p className="mt-6 text-lg text-muted-foreground">
-          Ethree10 provides end-to-end creative and technology services. Whether you need a simple landing page or a complex operational system, we deliver with excellence.
-        </p>
-
-        <div className="mt-16 space-y-16">
-          {SERVICES.map((service, index) => (
-            <div key={index} className="grid gap-8 md:grid-cols-2 items-center">
-              <div>
-                <h2 className="text-2xl font-semibold text-brand-900">{service.title}</h2>
-                <p className="mt-4 text-muted-foreground">{service.description}</p>
-              </div>
-              <ul className="space-y-3 rounded-lg bg-neutral-50 p-6 border">
-                {service.features.map((feature, i) => (
-                  <li key={i} className="flex items-center gap-3 text-sm text-neutral-700">
-                    <CheckCircle2 className="h-5 w-5 text-brand-600 shrink-0" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-20 rounded-xl bg-brand-50 p-10 text-center">
-          <h2 className="text-2xl font-bold text-brand-900">Ready to start?</h2>
-          <p className="mt-4 text-muted-foreground">
-            Submit a request and our team will get back to you with scoping details.
-          </p>
-          <Link
-            href="/request"
-            className="mt-8 inline-block rounded-md bg-brand-700 px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-brand-600"
-          >
-            Request a Project
-          </Link>
-        </div>
-      </div>
-    </main>
-  );
+  const { data: services = [], isLoading } = trpc.services.publicList.useQuery();
+  const groups = Map.groupBy(services, (service) => service.team?.name || "Agency & cross-team solutions");
+  return <main className="container mx-auto space-y-10 px-4 py-14"><header className="mx-auto max-w-3xl text-center"><h1 className="text-4xl font-bold">Services</h1><p className="mt-3 text-muted-foreground">Choose the closest service. Its brief and routing rules send your request directly to the responsible Ethree10 team.</p></header>{isLoading ? <p className="text-center">Loading services…</p> : Array.from(groups.entries()).map(([team, entries]) => <section key={team} className="space-y-4"><h2 className="text-2xl font-semibold">{team}</h2><div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{entries.map((service) => <Card key={service.id}><CardHeader><CardTitle>{service.name}</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-muted-foreground">{service.description || "Tell us the outcome you need and our team will scope the solution."}</p><p className="text-xs text-muted-foreground">Typical response SLA: {service.defaultSlaHours ? `${service.defaultSlaHours} hours` : "confirmed during triage"}</p><Button asChild size="sm"><Link href="/request">Request this service</Link></Button></CardContent></Card>)}</div></section>)}<div className="text-center"><Button asChild><Link href="/request">Submit a request</Link></Button></div></main>;
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
-import { useWorkspace } from "@/components/providers/workspace-provider";
+import { useOrganization } from "@/components/providers/workspace-provider";
 import { PageHeader } from "@/components/ui-ext/page-header";
 import { EmptyState } from "@/components/ui-ext/empty-state";
 import { Button } from "@/components/ui/button";
@@ -21,16 +21,16 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 
-function NewDepartmentDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+function NewTeamDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const { toast } = useToast();
   const utils = trpc.useUtils();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
-  const create = trpc.departments.create.useMutation({
+  const create = trpc.teams.create.useMutation({
     onSuccess: () => {
-      toast({ title: "Department created" });
-      void utils.departments.list.invalidate();
+      toast({ title: "Team created" });
+      void utils.teams.list.invalidate();
       setName("");
       setDescription("");
       onOpenChange(false);
@@ -42,8 +42,8 @@ function NewDepartmentDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New department</DialogTitle>
-          <DialogDescription>Departments organise the agency&apos;s teams.</DialogDescription>
+          <DialogTitle>New team</DialogTitle>
+          <DialogDescription>Teams organize Ethree10&apos;s delivery personnel and services.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
@@ -71,13 +71,13 @@ function NewDepartmentDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   );
 }
 
-function AddSubUnit({ departmentId }: { departmentId: string }) {
+function AddSubUnit({ teamId }: { teamId: string }) {
   const { toast } = useToast();
   const utils = trpc.useUtils();
   const [name, setName] = useState("");
   const create = trpc.subunits.create.useMutation({
     onSuccess: () => {
-      void utils.departments.list.invalidate();
+      void utils.teams.list.invalidate();
       setName("");
     },
     onError: (e) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
@@ -87,7 +87,7 @@ function AddSubUnit({ departmentId }: { departmentId: string }) {
       className="flex gap-2"
       onSubmit={(e) => {
         e.preventDefault();
-        if (name.trim().length >= 2) create.mutate({ departmentId, name });
+        if (name.trim().length >= 2) create.mutate({ teamId, name });
       }}
     >
       <Input
@@ -103,39 +103,39 @@ function AddSubUnit({ departmentId }: { departmentId: string }) {
   );
 }
 
-export default function DepartmentsPage() {
-  const { activeWorkspaceId, roles, isSuperAdmin } = useWorkspace();
+export default function TeamsPage() {
+  const { activeOrganizationId, roles, isSuperAdmin } = useOrganization();
   const [creating, setCreating] = useState(false);
-  const { data, isLoading } = trpc.departments.list.useQuery(undefined, {
-    enabled: Boolean(activeWorkspaceId),
+  const { data, isLoading } = trpc.teams.list.useQuery(undefined, {
+    enabled: Boolean(activeOrganizationId),
     retry: false,
   });
 
   const canManage =
-    isSuperAdmin || roles.some((r) => ["admin"].includes(r));
+    isSuperAdmin || roles.some((r: string) => ["agency_admin"].includes(r));
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Departments"
-        description="Departments and sub-units inside the agency."
+        title="Teams"
+        description="Delivery teams and optional sub-units inside the agency."
         actions={
           canManage ? (
             <Button onClick={() => setCreating(true)}>
               <Plus className="h-4 w-4" />
-              New department
+              New team
             </Button>
           ) : undefined
         }
       />
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading departments…</p>
+        <p className="text-sm text-muted-foreground">Loading teams…</p>
       ) : !data || data.length === 0 ? (
         <EmptyState
-          title="No departments yet"
-          description="Create the first department to organise the agency."
-          action={canManage ? <Button onClick={() => setCreating(true)}>New department</Button> : undefined}
+          title="No teams yet"
+          description="Create the first team to organize the agency."
+          action={canManage ? <Button onClick={() => setCreating(true)}>New team</Button> : undefined}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
@@ -157,14 +157,14 @@ export default function DepartmentsPage() {
                     ))
                   )}
                 </div>
-                {canManage && <AddSubUnit departmentId={d.id} />}
+                {canManage && <AddSubUnit teamId={d.id} />}
               </CardContent>
             </Card>
           ))}
         </div>
       )}
 
-      <NewDepartmentDialog open={creating} onOpenChange={setCreating} />
+      <NewTeamDialog open={creating} onOpenChange={setCreating} />
     </div>
   );
 }

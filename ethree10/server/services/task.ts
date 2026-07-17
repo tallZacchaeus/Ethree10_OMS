@@ -46,9 +46,9 @@ export interface CreateTaskInput {
 
 export class TaskService {
   static taskInclude = {
-    subUnit: { select: { id: true, name: true, departmentId: true } },
+    subUnit: { select: { id: true, name: true, teamId: true } },
     project: {
-      select: { id: true, code: true, name: true, organizationId: true, agencyDepartmentId: true },
+      select: { id: true, code: true, name: true, organizationId: true, agencyTeamId: true },
     },
     integrationLink: { select: { id: true, externalUrl: true, pendingSync: true } },
   } satisfies Prisma.TaskInclude;
@@ -107,7 +107,7 @@ export class TaskService {
   /** Candidate assignees for a sub-unit, ranked by current load (best fit first). */
   static async candidates(subUnitId: string) {
     const memberships = await db.membership.findMany({
-      where: { subUnitId, removedAt: null, role: { in: ["member", "department_lead"] } },
+      where: { subUnitId, removedAt: null, role: { in: ["team_member", "team_head"] } },
       select: {
         user: {
           select: {

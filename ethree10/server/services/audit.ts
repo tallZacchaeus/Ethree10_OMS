@@ -4,7 +4,6 @@ export interface AuditEntry {
   actorId: string | null;
   // Audit is agency-global now; any org/workspace hint passed by callers is accepted but
   // ignored (kept optional so existing call sites compile without churn).
-  workspaceId?: string | null;
   organizationId?: string | null;
   action: string;
   entityType: string;

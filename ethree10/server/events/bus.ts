@@ -28,12 +28,12 @@ class EventBus<TEvents extends EventMap = EventMap> {
 }
 
 export type OmsEvents = {
-  "request.created": { requestId: string; workspaceId: string; createdById: string };
+  "request.created": { requestId: string; organizationId: string; createdById: string };
   "request.status_changed": { requestId: string; fromStatus: string; toStatus: string; changedById: string };
-  "project.created": { projectId: string; workspaceId: string; createdById: string };
+  "project.created": { projectId: string; organizationId: string; createdById: string };
   "task.assigned": { taskId: string; assigneeId: string; assignedById: string };
   "task.completed": { taskId: string; completedById: string };
-  "member.invited": { email: string; workspaceId: string; invitedById: string };
+  "member.invited": { email: string; organizationId: string; invitedById: string };
 };
 
 export const bus = new EventBus<OmsEvents>();

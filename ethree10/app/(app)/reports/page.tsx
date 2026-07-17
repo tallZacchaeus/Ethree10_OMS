@@ -9,13 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { useWorkspace } from "@/components/providers/workspace-provider";
+import { useOrganization } from "@/components/providers/workspace-provider";
 import { PageHeader } from "@/components/ui-ext/page-header";
 import { StatCard } from "@/components/ui-ext/stat-card";
 import { AnimatedPage, AnimatedSection } from "@/components/ui-ext/animated";
 
 export default function ReportsPage() {
-  const { activeWorkspace: currentWorkspace } = useWorkspace();
+  const { activeOrganization: currentWorkspace } = useOrganization();
   const { toast } = useToast();
   const { data: reports, isLoading, refetch } = trpc.reports.list.useQuery();
 

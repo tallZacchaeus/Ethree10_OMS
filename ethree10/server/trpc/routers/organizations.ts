@@ -8,10 +8,10 @@ const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 /**
- * Membership + client-organization management. (Workspaces were removed; the agency is
+ * Membership + client-organization management. (Organizations were removed; the agency is
  * implicit and clients are grouped into Organizations.)
  */
-export const workspacesRouter = router({
+export const organizationsRouter = router({
   // The caller's memberships, with their org (null = agency staff). Used by the session provider.
   list: protectedProcedure.query(async ({ ctx }) => {
     const memberships = await ctx.db.membership.findMany({
@@ -20,20 +20,19 @@ export const workspacesRouter = router({
         id: true,
         role: true,
         isPrimary: true,
-        organization: { select: { id: true, name: true, slug: true, logoUrl: true } },
       },
     });
     return memberships.map((m) => ({
       membershipId: m.id,
       role: m.role,
       isPrimary: m.isPrimary,
-      organization: m.organization,
+      organization: null,
     }));
   }),
 
   // List all client organizations (staff view).
   listOrganizations: protectedProcedure.query(async ({ ctx }) => {
-    await ctx.authorize("workspace.read");
+    await ctx.authorize("organization.read");
     return ctx.db.organization.findMany({
       where: { archivedAt: null },
       orderBy: { name: "asc" },
@@ -49,7 +48,7 @@ export const workspacesRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.authorize("workspace.create");
+      await ctx.authorize("organization.create");
       return ctx.db.organization.create({
         data: {
           name: input.name,
@@ -63,7 +62,7 @@ export const workspacesRouter = router({
   archiveOrganization: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.authorize("workspace.archive");
+      await ctx.authorize("organization.archive");
       return ctx.db.organization.update({
         where: { id: input.id },
         data: { archivedAt: new Date() },
@@ -77,14 +76,13 @@ export const workspacesRouter = router({
         email: z.string().email(),
         name: z.string().min(1),
         role: z.nativeEnum(Role),
-        organizationId: z.string().optional(),
-        departmentId: z.string().optional(),
+        teamId: z.string().optional(),
         subUnitId: z.string().optional(),
         title: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.authorize("workspace.invite");
+      await ctx.authorize("organization.invite");
       const user = await ctx.db.user.upsert({
         where: { email: input.email },
         create: { email: input.email, name: input.name },
@@ -93,9 +91,8 @@ export const workspacesRouter = router({
       return ctx.db.membership.create({
         data: {
           userId: user.id,
-          organizationId: input.organizationId ?? null,
           role: input.role,
-          departmentId: input.departmentId,
+          teamId: input.teamId,
           subUnitId: input.subUnitId,
           title: input.title,
           invitedAt: new Date(),
@@ -106,7 +103,7 @@ export const workspacesRouter = router({
   removeMember: protectedProcedure
     .input(z.object({ membershipId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.authorize("workspace.removeMember");
+      await ctx.authorize("organization.removeMember");
       return ctx.db.membership.update({
         where: { id: input.membershipId },
         data: { removedAt: new Date() },
@@ -116,7 +113,7 @@ export const workspacesRouter = router({
   changeRole: protectedProcedure
     .input(z.object({ membershipId: z.string(), role: z.nativeEnum(Role) }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.authorize("workspace.changeRole");
+      await ctx.authorize("organization.changeRole");
       return ctx.db.membership.update({
         where: { id: input.membershipId },
         data: { role: input.role },

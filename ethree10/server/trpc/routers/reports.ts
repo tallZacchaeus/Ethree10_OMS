@@ -16,7 +16,7 @@ export const reportsRouter = router({
     .input(
       z
         .object({
-          level: z.enum(["member", "department", "agency"]).optional(),
+          level: z.enum(["member", "team", "agency"]).optional(),
           scopeId: z.string().optional(),
         })
         .optional(),
@@ -24,7 +24,7 @@ export const reportsRouter = router({
     .query(async ({ ctx, input }) => {
       const agencyCtx = await getAgencyAuthContext(ctx.userId);
       if (can(agencyCtx, "report.read")) {
-        return ReportService.list({ level: input?.level, scopeId: input?.scopeId });
+        return ReportService.list({ level: input?.level as any, scopeId: input?.scopeId });
       }
       // Members only see their own member-level reports.
       return ReportService.list({ level: "member", scopeId: ctx.userId });

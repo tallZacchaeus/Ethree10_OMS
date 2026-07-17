@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
-import { useWorkspace } from "@/components/providers/workspace-provider";
+import { useOrganization } from "@/components/providers/workspace-provider";
 import { PageHeader } from "@/components/ui-ext/page-header";
 import { EmptyState } from "@/components/ui-ext/empty-state";
 import { Card } from "@/components/ui/card";
@@ -40,43 +40,42 @@ import { humanize } from "@/lib/constants";
 import type { Role } from "@prisma/client";
 
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
-  { value: "admin",           label: "Admin" },
-  { value: "executive",       label: "Executive Overview" },
-  { value: "department_lead", label: "Department Lead" },
-  { value: "member",          label: "Member" },
-  { value: "client",          label: "Client" },
-  { value: "client_viewer",   label: "Client Viewer (read-only)" },
+  { value: "agency_admin",           label: "Admin" },
+  { value: "finance_admin",       label: "Executive Overview" },
+  { value: "team_head", label: "Team Head" },
+  { value: "team_member",          label: "Member" },
+
 ];
 
 export default function MembersPage() {
-  const { activeWorkspaceId, roles, isSuperAdmin } = useWorkspace();
+  const { activeOrganizationId, roles, isSuperAdmin } = useOrganization();
   const { toast } = useToast();
 
   const [query, setQuery]         = useState("");
   const [open, setOpen]           = useState(false);
   const [email, setEmail]         = useState("");
   const [name, setName]           = useState("");
-  const [role, setRole]           = useState<Role>("member");
+  const [role, setRole]           = useState<Role>("team_member");
   const [title, setTitle]         = useState("");
-  const [departmentId, setDeptId] = useState<string>("");
+  const [teamId, setDeptId] = useState<string>("");
   const [subUnitId, setSubUnitId] = useState<string>("");
 
-  const canInvite = isSuperAdmin || roles.some(r =>
-    ["admin"].includes(r)
+  const canInvite = isSuperAdmin || roles.some((r: string) =>
+    ["agency_admin"].includes(r)
   );
 
   const { data, isLoading, refetch } = trpc.members.list.useQuery(undefined, {
-    enabled: Boolean(activeWorkspaceId),
+    enabled: Boolean(activeOrganizationId),
     retry: false,
   });
 
-  const { data: departments } = trpc.departments.list.useQuery(undefined, {
-    enabled: Boolean(activeWorkspaceId) && open,
+  const { data: teams } = trpc.teams.list.useQuery(undefined, {
+    enabled: Boolean(activeOrganizationId) && open,
   });
 
-  const selectedDept = departments?.find(d => d.id === departmentId);
+  const selectedDept = teams?.find(d => d.id === teamId);
 
-  const invite = trpc.workspaces.inviteUser.useMutation({
+  const invite = trpc.organizations.inviteUser.useMutation({
     onSuccess: () => {
       toast({ title: "Member invited", description: `${name} (${email}) has been added.` });
       setOpen(false);
@@ -93,7 +92,7 @@ export default function MembersPage() {
       name,
       role,
       title: title || undefined,
-      departmentId: departmentId || undefined,
+      teamId: teamId || undefined,
       subUnitId: subUnitId || undefined,
     });
   }
@@ -105,7 +104,7 @@ export default function MembersPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Members" description="People in this workspace and their current load." />
+      <PageHeader title="Members" description="Ethree10 staff, roles, positions, teams, and current load." />
 
       <div className="flex items-center justify-between gap-4">
         <Input
@@ -174,17 +173,17 @@ export default function MembersPage() {
                   />
                 </div>
 
-                {departments && departments.length > 0 && (
+                {teams && teams.length > 0 && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label htmlFor="inv-dept">Department (optional)</Label>
-                      <Select value={departmentId || "__none__"} onValueChange={v => { setDeptId(v === "__none__" ? "" : v); setSubUnitId(""); }}>
+                      <Select value={teamId || "__none__"} onValueChange={v => { setDeptId(v === "__none__" ? "" : v); setSubUnitId(""); }}>
                         <SelectTrigger id="inv-dept">
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none__">None</SelectItem>
-                          {departments.map(d => (
+                          {teams.map(d => (
                             <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -236,7 +235,7 @@ export default function MembersPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Department</TableHead>
+                <TableHead>Team</TableHead>
                 <TableHead>Sub-unit</TableHead>
                 <TableHead>Skills</TableHead>
                 <TableHead>Open tasks</TableHead>
@@ -257,7 +256,7 @@ export default function MembersPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-sm">{humanize(m.role)}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{m.department?.name ?? "—"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{m.team?.name ?? "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{m.subUnit?.name ?? "—"}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">

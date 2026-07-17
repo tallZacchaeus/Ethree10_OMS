@@ -42,7 +42,7 @@ export class ApprovalService {
     // Approvers are agency staff (org-null memberships) with the required role.
     const approvers = await db.membership.findMany({
       where: {
-        organizationId: null,
+
         role: rule.requiredRole,
         removedAt: null,
       },

@@ -36,7 +36,7 @@ export interface SubUnitMetrics {
 }
 
 export class ReportService {
-  static async list(filters: { level?: "member" | "department" | "agency"; scopeId?: string } = {}) {
+  static async list(filters: { level?: "member" | "team" | "agency"; scopeId?: string } = {}) {
     return db.report.findMany({
       where: filters,
       orderBy: { createdAt: "desc" },
@@ -108,9 +108,9 @@ export class ReportService {
     return report;
   }
 
-  static async generateDepartmentReport(departmentId: string, period: ReportPeriod, start: Date, end: Date) {
-    const department = await db.department.findUnique({
-      where: { id: departmentId },
+  static async generateTeamReport(teamId: string, period: ReportPeriod, start: Date, end: Date) {
+    const department = await db.team.findUnique({
+      where: { id: teamId },
     });
     if (!department) throw new TRPCError({ code: "NOT_FOUND" });
 
@@ -123,26 +123,26 @@ export class ReportService {
     const report = await db.report.upsert({
       where: {
         level_period_scopeId_periodStart: {
-          level: "department",
+          level: "team",
           period,
-          scopeId: departmentId,
+          scopeId: teamId,
           periodStart: start,
         },
       },
       update: { metrics, periodEnd: end },
       create: {
-        level: "department",
+        level: "team",
         period,
-        scopeId: departmentId,
+        scopeId: teamId,
         periodStart: start,
         periodEnd: end,
         metrics,
-        pdfUrl: `/api/reports/generate/department/${departmentId}/${period}/${start.toISOString()}/pdf`,
+        pdfUrl: `/api/reports/generate/department/${teamId}/${period}/${start.toISOString()}/pdf`,
       },
     });
 
     const scorecardConfig = await db.scorecardConfig.findFirst({
-      where: { level: "department", scopeId: departmentId, isActive: true },
+      where: { level: "team", scopeId: teamId, isActive: true },
     });
 
     if (scorecardConfig) {
@@ -172,9 +172,9 @@ export class ReportService {
   static async generateWeekly(args: { actorId: string }) {
     const { periodStart, periodEnd } = weekBounds();
 
-    const departments = await db.department.findMany();
-    for (const dept of departments) {
-      await this.generateDepartmentReport(dept.id, "weekly", periodStart, periodEnd);
+    const teams = await db.team.findMany();
+    for (const dept of teams) {
+      await this.generateTeamReport(dept.id, "weekly", periodStart, periodEnd);
     }
     
     return { ok: true };
