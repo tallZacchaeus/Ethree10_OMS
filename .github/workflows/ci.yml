@@ -7,8 +7,8 @@ on:
     branches: [main, develop]
 
 env:
-  NODE_VERSION: "20"
-  PNPM_VERSION: "9"
+  NODE_VERSION: "24"
+  PNPM_VERSION: "11.4.0"
 
 jobs:
   typecheck:
@@ -135,9 +135,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm db:generate
-      # This project uses `prisma db push` (no migrations folder); `migrate dev`
-      # would hang/fail in CI. db:push creates the schema incl. the Receipt table.
-      - run: pnpm db:push
+      - run: pnpm prisma migrate deploy
       - run: pnpm build
         env:
           CI: true

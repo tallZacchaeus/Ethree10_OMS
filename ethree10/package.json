@@ -2,6 +2,11 @@
   "name": "ethree10",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=11 <12"
+  },
   "scripts": {
     "dev": "concurrently \"next dev\" \"tsx watch workers/index.ts\"",
     "dev:next": "next dev",
@@ -26,7 +31,7 @@
     "@aws-sdk/client-s3": "^3.1058.0",
     "@aws-sdk/s3-request-presigner": "^3.1058.0",
     "@hookform/resolvers": "^3.10.0",
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "6.19.3",
     "@radix-ui/react-accordion": "^1.2.10",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-collapsible": "^1.1.11",
@@ -91,7 +96,7 @@
     "pino-pretty": "^13.0.0",
     "postcss": "^8",
     "prettier": "^3.5.3",
-    "prisma": "^5.22.0",
+    "prisma": "6.19.3",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.19.4",
     "typescript": "^5",
