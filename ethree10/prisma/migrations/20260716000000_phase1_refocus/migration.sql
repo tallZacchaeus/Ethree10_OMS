@@ -2,7 +2,7 @@
 
 -- 1. Rename Department to Team
 ALTER TABLE "Department" RENAME TO "Team";
-ALTER INDEX "Department_slug_key" RENAME TO "Team_slug_key";
+ALTER INDEX "Department_workspaceId_slug_key" RENAME TO "Team_workspaceId_slug_key";
 
 -- 2. Rename columns
 ALTER TABLE "Membership" RENAME COLUMN "departmentId" TO "teamId";
@@ -59,7 +59,7 @@ ALTER TABLE "ApprovalRule" ALTER COLUMN "requiredRole" TYPE "Role" USING (
 
 DROP TYPE "Role_old";
 
-ALTER TABLE "Membership" DROP COLUMN "organizationId";
+ALTER TABLE "Membership" DROP COLUMN IF EXISTS "organizationId";
 CREATE UNIQUE INDEX "Membership_userId_role_teamId_subUnitId_key"
   ON "Membership"("userId", "role", "teamId", "subUnitId");
 

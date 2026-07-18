@@ -1,3 +1,68 @@
+-- Workspace-to-organization transition for existing production data.
+CREATE TABLE IF NOT EXISTS "Organization" (
+  "id" TEXT NOT NULL,
+  "name" TEXT NOT NULL,
+  "slug" TEXT NOT NULL,
+  "isExternal" BOOLEAN NOT NULL DEFAULT false,
+  "description" TEXT,
+  "logoUrl" TEXT,
+  "brandColor" TEXT,
+  "defaultCurrency" TEXT NOT NULL DEFAULT 'NGN',
+  "archivedAt" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "Organization_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Organization_slug_key" ON "Organization"("slug");
+
+INSERT INTO "Organization" (
+  "id", "name", "slug", "isExternal", "createdAt", "updatedAt"
+)
+SELECT
+  "id",
+  "name",
+  "slug",
+  "slug" <> 'ethree10',
+  "createdAt",
+  "updatedAt"
+FROM "Workspace"
+ON CONFLICT ("id") DO NOTHING;
+
+ALTER TABLE "Request" ADD COLUMN IF NOT EXISTS "organizationId" TEXT;
+UPDATE "Request" SET "organizationId" = "workspaceId" WHERE "organizationId" IS NULL;
+ALTER TABLE "Request" ALTER COLUMN "organizationId" SET NOT NULL;
+CREATE INDEX IF NOT EXISTS "Request_organizationId_idx" ON "Request"("organizationId");
+ALTER TABLE "Request" ADD CONSTRAINT "Request_organizationId_fkey"
+  FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "Project" ADD COLUMN IF NOT EXISTS "organizationId" TEXT;
+UPDATE "Project" SET "organizationId" = "workspaceId" WHERE "organizationId" IS NULL;
+ALTER TABLE "Project" ALTER COLUMN "organizationId" SET NOT NULL;
+CREATE INDEX IF NOT EXISTS "Project_organizationId_idx" ON "Project"("organizationId");
+ALTER TABLE "Project" ADD CONSTRAINT "Project_organizationId_fkey"
+  FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "organizationId" TEXT;
+UPDATE "Invoice" SET "organizationId" = "workspaceId" WHERE "organizationId" IS NULL;
+ALTER TABLE "Invoice" ALTER COLUMN "organizationId" SET NOT NULL;
+CREATE INDEX IF NOT EXISTS "Invoice_organizationId_idx" ON "Invoice"("organizationId");
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_organizationId_fkey"
+  FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "Receipt" ADD COLUMN IF NOT EXISTS "organizationId" TEXT;
+UPDATE "Receipt" SET "organizationId" = "workspaceId" WHERE "organizationId" IS NULL;
+ALTER TABLE "Receipt" ALTER COLUMN "organizationId" SET NOT NULL;
+CREATE INDEX IF NOT EXISTS "Receipt_organizationId_idx" ON "Receipt"("organizationId");
+ALTER TABLE "Receipt" ADD CONSTRAINT "Receipt_organizationId_fkey"
+  FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "organizationId" TEXT;
+UPDATE "Lead" SET "organizationId" = "workspaceId" WHERE "organizationId" IS NULL;
+CREATE INDEX IF NOT EXISTS "Lead_organizationId_idx" ON "Lead"("organizationId");
+ALTER TABLE "Lead" ADD CONSTRAINT "Lead_organizationId_fkey"
+  FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
 -- Phase 4: revocable capability links and client delivery decisions.
 ALTER TABLE "Request"
   ADD COLUMN "publicTokenExpiresAt" TIMESTAMP(3),
