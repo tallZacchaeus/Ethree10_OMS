@@ -19,7 +19,7 @@ From the current codebase, the application provides:
    - Public invoice viewer by code
 
 2. Authentication
-   - Auth.js v5
+   - NextAuth.js v4
    - Resend magic-link login
    - Google OAuth
    - Dev-only credentials flow
@@ -89,12 +89,12 @@ Server/API endpoints found in the app include:
 
 Stack confirmed from the runnable app:
 
-- Next.js 14 App Router
+- Next.js 16 App Router
 - TypeScript
 - tRPC for internal API surface
 - Prisma + PostgreSQL
 - BullMQ + Redis for background jobs
-- Auth.js v5 for authentication
+- NextAuth.js v4 for authentication
 - Tailwind CSS + Radix UI + shadcn-style components
 - S3-compatible object storage via AWS SDK (configured for MinIO path-style access)
 - Resend for email
@@ -223,6 +223,8 @@ pnpm lint
 pnpm test
 pnpm test:e2e
 pnpm build
+pnpm check:readiness       # env/runtime launch checks
+pnpm check:readiness:db    # env/runtime + seeded database checks
 pnpm db:generate
 pnpm db:migrate
 pnpm db:push
@@ -240,6 +242,7 @@ Required server-side variables currently enforced by code:
 - `DIRECT_URL`
 - `AUTH_SECRET`
 - `AUTH_URL`
+- `NEXTAUTH_URL`
 - `RESEND_API_KEY`
 - `EMAIL_FROM`
 - `REDIS_URL`
@@ -265,6 +268,7 @@ Optional/conditional variables present in the app:
 Important notes:
 
 - `.env.example` is aligned with the current `lib/env.ts` contract.
+- Run `pnpm check:readiness` before promoting a build and `pnpm check:readiness:db` after the target database is migrated and seeded.
 - For local development, ensure your real `.env.local` also carries the storage variables documented here.
 - When the env contract changes, update both `lib/env.ts` and `.env.example` in the same change.
 

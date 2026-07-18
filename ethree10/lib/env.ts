@@ -6,6 +6,7 @@ const serverSchema = z.object({
 
   AUTH_SECRET: z.string().min(1),
   AUTH_URL: z.string().url(),
+  NEXTAUTH_URL: z.string().url(),
   AUTH_GOOGLE_ID: z.string().optional(),
   AUTH_GOOGLE_SECRET: z.string().optional(),
 

@@ -7,6 +7,7 @@ const VALID_ENV: NodeJS.ProcessEnv = {
   DIRECT_URL: "postgresql://user:password@localhost:5432/db",
   AUTH_SECRET: "a-secret-that-is-long-enough-yes!",
   AUTH_URL: "http://localhost:3000",
+  NEXTAUTH_URL: "http://localhost:3000",
   RESEND_API_KEY: "re_test_key",
   EMAIL_FROM: "noreply@example.com",
   REDIS_URL: "redis://localhost:6379",
@@ -47,6 +48,7 @@ describe("lib/env - environment validation", () => {
 
     expect(env.DATABASE_URL).toBe(VALID_ENV.DATABASE_URL);
     expect(env.AUTH_SECRET).toBe(VALID_ENV.AUTH_SECRET);
+    expect(env.NEXTAUTH_URL).toBe(VALID_ENV.NEXTAUTH_URL);
     expect(env.STORAGE_ENDPOINT).toBe(VALID_ENV.STORAGE_ENDPOINT);
     expect(clientEnv.NEXT_PUBLIC_STORAGE_URL).toBe(VALID_ENV.NEXT_PUBLIC_STORAGE_URL);
   });

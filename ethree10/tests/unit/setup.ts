@@ -6,6 +6,7 @@ vi.mock("@/lib/env", () => ({
     DIRECT_URL: "postgresql://test:password@localhost:5432/test",
     AUTH_SECRET: "test-secret-32-chars-long-enough!!",
     AUTH_URL: "http://localhost:3000",
+    NEXTAUTH_URL: "http://localhost:3000",
     AUTH_GOOGLE_ID: "test-google-client-id",
     AUTH_GOOGLE_SECRET: "test-google-client-secret",
     RESEND_API_KEY: "re_test_key",
