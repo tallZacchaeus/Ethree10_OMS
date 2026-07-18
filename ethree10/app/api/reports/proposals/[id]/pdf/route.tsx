@@ -14,10 +14,11 @@ const styles = StyleSheet.create({
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const proposal = await ProposalService.getById(params.id);
+    const { id } = await params;
+    const proposal = await ProposalService.getById(id);
 
     const ProposalDocument = () => (
       <Document>
@@ -46,7 +47,7 @@ export async function GET(
     return new NextResponse(stream as unknown as ReadableStream, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="proposal-${params.id}.pdf"`,
+        "Content-Disposition": `inline; filename="proposal-${id}.pdf"`,
       },
     });
   } catch (error) {

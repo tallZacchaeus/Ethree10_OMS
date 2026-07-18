@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle2, FileText, Save } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
@@ -21,17 +21,18 @@ const labels: Record<(typeof sections)[number], string> = {
   risksAndNextSteps: "Risks and next steps",
 };
 
-export default function ReportViewerPage({ params }: { params: { id: string } }) {
+export default function ReportViewerPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const { toast } = useToast();
   const utils = trpc.useUtils();
-  const { data: report, isLoading } = trpc.reports.get.useQuery({ id: params.id });
+  const { data: report, isLoading } = trpc.reports.get.useQuery({ id });
   const [draft, setDraft] = useState<Record<string, string>>({});
   useEffect(() => {
     if (report?.narrative && typeof report.narrative === "object" && !Array.isArray(report.narrative)) {
       setDraft(Object.fromEntries(Object.entries(report.narrative).map(([key, value]) => [key, String(value)])));
     }
   }, [report]);
-  const refresh = () => utils.reports.get.invalidate({ id: params.id });
+  const refresh = () => utils.reports.get.invalidate({ id });
   const save = trpc.reports.updateNarrative.useMutation({ onSuccess: () => { void refresh(); toast({ title: "Narrative saved" }); }, onError: (error) => toast({ title: "Could not save", description: error.message, variant: "destructive" }) });
   const finalize = trpc.reports.finalize.useMutation({ onSuccess: () => { void refresh(); toast({ title: "Report finalized" }); }, onError: (error) => toast({ title: "Could not finalize", description: error.message, variant: "destructive" }) });
 

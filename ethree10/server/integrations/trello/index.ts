@@ -29,6 +29,19 @@ function hashTask(task: Task): string {
     .digest("hex");
 }
 
+type TrelloWebhookPayload = {
+  action?: {
+    id: string;
+    type: string;
+    date: string;
+    data?: {
+      card?: { id: string };
+      listAfter?: { id: string };
+      board?: { config?: { doneListId?: unknown } };
+    };
+  };
+};
+
 export const trelloAdapter: IntegrationAdapter = {
   provider: "trello",
   displayName: "Trello",
@@ -111,10 +124,10 @@ export const trelloAdapter: IntegrationAdapter = {
   },
 
   async parseWebhook(payload) {
-    const body = payload as any;
+    const body = payload as TrelloWebhookPayload;
     
     const action = body.action;
-    if (!action || !action.data || !action.data.card) return [];
+    if (!action?.data?.card) return [];
     
     const externalId = action.data.card.id;
     let kind: InboundEvent["kind"] = "task_updated";

@@ -10,8 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Building2, CheckCircle2, Download, ReceiptText } from "lucide-react";
 
 interface Props {
-  params: { code: string };
-  searchParams: { error?: string };
+  params: Promise<{ code: string }>;
+  searchParams: Promise<{ error?: string }>;
 }
 
 const PAY_ERRORS: Record<string, string> = {
@@ -21,8 +21,10 @@ const PAY_ERRORS: Record<string, string> = {
 };
 
 export default async function PublicInvoicePage({ params, searchParams }: Props) {
+  const { code } = await params;
+  const { error } = await searchParams;
   const invoice = await db.invoice.findUnique({
-    where: { code: params.code },
+    where: { code },
     include: { organization: true, project: true, receipt: true },
   });
 
@@ -36,7 +38,7 @@ export default async function PublicInvoicePage({ params, searchParams }: Props)
 
   const isPaid = invoice.status === "paid";
   const qrDataUrl = await toDataURL(invoicePublicUrl(invoice.code), { margin: 1, width: 160 });
-  const payError = searchParams.error ? PAY_ERRORS[searchParams.error] : undefined;
+  const payError = error ? PAY_ERRORS[error] : undefined;
 
   return (
     <div className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">

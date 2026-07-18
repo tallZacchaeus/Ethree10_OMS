@@ -83,7 +83,7 @@ export class ProposalService {
         summary: args.summary,
         currency: args.currency,
         total,
-        lineItems: args.lineItems as any,
+        lineItems: args.lineItems as Prisma.InputJsonValue,
         terms: args.terms,
         validUntil: args.validUntil,
         status: "draft",

@@ -1,2 +1,5 @@
 import { redirect } from "next/navigation";
-export default function OrganizationReportsPage({ params }: { params: { id: string } }) { redirect(`/organizations/${params.id}`); }
+export default async function OrganizationReportsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  redirect(`/organizations/${id}`);
+}

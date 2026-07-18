@@ -455,10 +455,10 @@ export class RequestService {
     if (advanceToReview) {
       const organization = await db.organization.findUnique({ where: { id: before.organizationId } });
       if (organization) {
-        const rule = await ApprovalService.checkRules(before as any, organization);
+        const rule = await ApprovalService.checkRules(before, organization);
         if (rule) {
           targetStage = "pending_approval";
-          await ApprovalService.notifyApprovers(rule, before as any);
+          await ApprovalService.notifyApprovers(rule, before);
         }
       }
     }
@@ -467,7 +467,7 @@ export class RequestService {
       where: { id: args.requestId },
       data: {
         routedTeamId: args.teamId,
-        stage: targetStage as any,
+        stage: targetStage,
       },
     });
     if (targetStage !== before.stage) {
@@ -475,7 +475,7 @@ export class RequestService {
         data: {
           requestId: args.requestId,
           fromStage: before.stage,
-          toStage: targetStage as any,
+          toStage: targetStage,
           actorId: args.actorId,
           note: args.note ?? null,
         },

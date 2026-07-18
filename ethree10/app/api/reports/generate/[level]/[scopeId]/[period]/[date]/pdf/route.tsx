@@ -9,16 +9,17 @@ export async function GET(
   {
     params,
   }: {
-    params: { level: string; scopeId: string; period: string; date: string };
+    params: Promise<{ level: string; scopeId: string; period: string; date: string }>;
   }
 ) {
   try {
+    const { level, scopeId, period, date } = await params;
     const report = await db.report.findFirst({
       where: {
-        level: params.level as ReportLevel,
-        period: params.period as ReportPeriod,
-        scopeId: params.scopeId,
-        periodStart: new Date(params.date),
+        level: level as ReportLevel,
+        period: period as ReportPeriod,
+        scopeId,
+        periodStart: new Date(date),
       },
     });
 
@@ -28,10 +29,10 @@ export async function GET(
 
     const scorecard = await db.kpiSnapshot.findFirst({
       where: {
-        level: params.level as ReportLevel,
-        period: params.period as ReportPeriod,
-        scopeId: params.scopeId,
-        periodStart: new Date(params.date),
+        level: level as ReportLevel,
+        period: period as ReportPeriod,
+        scopeId,
+        periodStart: new Date(date),
       },
     });
 
@@ -49,7 +50,7 @@ export async function GET(
     return new NextResponse(webStream as ReadableStream, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="Report_${params.level}_${params.date}.pdf"`,
+        "Content-Disposition": `inline; filename="Report_${level}_${date}.pdf"`,
       },
     });
   } catch (error) {

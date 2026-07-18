@@ -32,7 +32,7 @@ export class TemplateService {
         name: args.name,
         description: args.description,
         projectType: args.projectType,
-        tasks: args.tasks as any,
+        tasks: args.tasks as unknown as Prisma.InputJsonValue,
         createdById: args.actorId,
       },
     });
@@ -55,7 +55,7 @@ export class TemplateService {
     const project = await db.project.findUnique({ where: { id: args.projectId } });
     if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
 
-    const taskDefs = (template.tasks as any[]) as TemplateTaskDef[];
+    const taskDefs = template.tasks as Prisma.JsonArray as unknown as TemplateTaskDef[];
     
     // Create tasks first so we have their actual IDs
     const createdTasks = [];

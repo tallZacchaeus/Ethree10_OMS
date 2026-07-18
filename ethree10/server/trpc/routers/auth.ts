@@ -170,7 +170,8 @@ export const authRouter = router({
       }
 
       // Set cookie to remember MFA verified state for this session
-      cookies().set("mfa-verified", "true", { 
+      const cookieStore = await cookies();
+      cookieStore.set("mfa-verified", "true", {
         httpOnly: true, 
         secure: process.env.NODE_ENV === "production",
         path: "/",

@@ -1,2 +1,5 @@
 import { redirect } from "next/navigation";
-export default function ExportReportPage({ params }: { params: { id: string } }) { redirect(`/api/reports/${params.id}/pdf`); }
+export default async function ExportReportPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  redirect(`/api/reports/${id}/pdf`);
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 
 export default function InboxPage() {
+  const [renderedAt] = useState(() => Date.now());
   const { data: requests, isLoading } = trpc.requests.inbox.useQuery();
 
   const getUrgencyBadge = (urgency: string) => {
@@ -54,7 +56,7 @@ export default function InboxPage() {
               </TableHeader>
               <TableBody>
                 {requests?.map((req) => {
-                  const daysOld = Math.floor((Date.now() - new Date(req.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+                  const daysOld = Math.floor((renderedAt - new Date(req.createdAt).getTime()) / (1000 * 60 * 60 * 24));
                   return (
                     <TableRow key={req.id}>
                       <TableCell className="font-medium">{req.code}</TableCell>

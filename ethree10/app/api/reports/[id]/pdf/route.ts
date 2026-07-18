@@ -8,12 +8,13 @@ import { getAgencyAuthContext } from "@/server/services/agency";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const session = await auth();
     if (!session?.user?.id) return new NextResponse("Unauthorized", { status: 401 });
     const report = await db.report.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!report) {

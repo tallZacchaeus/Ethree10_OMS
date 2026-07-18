@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, ExternalLink, ReceiptText } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
@@ -48,17 +48,18 @@ interface LineItem {
   unitPrice: number;
 }
 
-export default function InvoiceDetailPage({ params }: { params: { id: string } }) {
+export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const { toast } = useToast();
   const utils = trpc.useUtils();
-  const { data: invoice, isLoading } = trpc.invoices.get.useQuery({ id: params.id });
+  const { data: invoice, isLoading } = trpc.invoices.get.useQuery({ id });
 
   const [payOpen, setPayOpen] = useState(false);
   const [method, setMethod] = useState<Method>("bank_transfer");
   const [paymentRef, setPaymentRef] = useState("");
 
   const refresh = () => {
-    void utils.invoices.get.invalidate({ id: params.id });
+    void utils.invoices.get.invalidate({ id });
     void utils.invoices.list.invalidate();
   };
 
