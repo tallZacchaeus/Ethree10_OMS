@@ -3,6 +3,8 @@ type HealthResponse = {
   checks?: Array<{ name: string; status: string; detail?: string }>;
 };
 
+export {};
+
 function baseUrl() {
   return (
     process.env["SMOKE_BASE_URL"] ??
