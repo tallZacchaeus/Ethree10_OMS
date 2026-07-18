@@ -8,11 +8,13 @@ Use this runbook after launch for incidents, backup checks, restores, and releas
 cd /srv/ethree10/ethree10
 pnpm check:readiness:db
 SMOKE_BASE_URL=https://oms.ethree10.com pnpm check:smoke
+SECURITY_HEADERS_BASE_URL=https://oms.ethree10.com pnpm check:security-headers
+pnpm check:backups
 curl -fsS "https://oms.ethree10.com/api/health?mode=ready"
 supervisorctl status
 ```
 
-Deployment is not complete until the readiness gate, smoke check, health endpoint, and Supervisor status are clean.
+Deployment is not complete until the readiness gate, smoke check, security header check, backup freshness check, health endpoint, and Supervisor status are clean.
 
 ## Health triage
 
@@ -42,6 +44,8 @@ ls -lh /srv/ethree10/backups/db/
 ls -lh /srv/ethree10/backups/minio/
 bash /srv/ethree10/backup-db.sh
 bash /srv/ethree10/backup-minio.sh
+cd /srv/ethree10/ethree10
+pnpm check:backups
 ```
 
 Minimum acceptance:
@@ -50,6 +54,7 @@ Minimum acceptance:
 - Latest MinIO backup exists and is less than 7 days old.
 - Backup logs do not show failed commands.
 - Backup directories have enough disk space for the retention window.
+- `pnpm check:backups` passes against the VPS backup directories.
 
 ## Restore rehearsal
 

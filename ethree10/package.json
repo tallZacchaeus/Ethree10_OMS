@@ -23,6 +23,8 @@
     "check:readiness:db": "tsx scripts/check-readiness.ts --production --with-db",
     "check:smoke": "tsx scripts/check-smoke.ts",
     "check:security-headers": "tsx scripts/check-security-headers.ts",
+    "check:backups": "tsx scripts/check-backups.ts",
+    "check:release-controls": "tsx scripts/check-release-controls.ts",
     "audit:archive": "tsx scripts/archive-audit-logs.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

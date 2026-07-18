@@ -79,6 +79,8 @@ cd /srv/ethree10/ethree10
 pnpm check:readiness       # environment/runtime checks
 pnpm check:readiness:db    # also verifies canonical teams, services, staff, and organizations
 SMOKE_BASE_URL=https://oms.ethree10.com pnpm check:smoke
+SECURITY_HEADERS_BASE_URL=https://oms.ethree10.com pnpm check:security-headers
+pnpm check:backups
 ```
 
 Run this after changing `.env`, after migrations/seeding, and before giving real users access.
@@ -174,6 +176,8 @@ Run manually:
 ```bash
 bash /srv/ethree10/backup-db.sh
 bash /srv/ethree10/backup-minio.sh
+cd /srv/ethree10/ethree10
+pnpm check:backups
 ```
 
 ---
