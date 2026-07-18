@@ -1,0 +1,2 @@
+-- Baseline for the production database schema that existed before Prisma
+-- migration history was introduced on this VPS.
