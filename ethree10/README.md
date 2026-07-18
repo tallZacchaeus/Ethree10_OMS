@@ -278,14 +278,9 @@ Roles defined in the Prisma schema and permission layer:
 
 - `super_admin`
 - `agency_admin`
-- `agency_lead`
-- `department_lead`
-- `subunit_lead`
-- `member`
-- `project_manager`
-- `requester_admin`
-- `requester_member`
-- `requester_observer`
+- `team_head`
+- `team_member`
+- `finance_admin`
 
 Permissions are checked through `AuthorizationService` and the `Action` permission map in `server/auth/permissions.ts`.
 

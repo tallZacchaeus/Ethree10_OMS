@@ -1,31 +1,36 @@
 # Requester guide
 
-You represent a sibling initiative, the master org, or an external client. Here's how to get work done with Ethree10.
+You represent an organization that needs Ethree10 to deliver a solution. You do not need an internal staff account to submit or track a request.
 
 ## Submit a request
-1. Sign in and pick your workspace from the switcher (top left).
-2. Go to **Requests → New request**.
-3. Fill in title, description, project type, and urgency. Add a deadline if you have one.
-4. Submit. You'll get a confirmation and the agency lead is notified within a minute.
+
+1. Open the public request page at `/request`.
+2. Enter your organization, contact details, problem, expected outcome, deliverables, acceptance criteria, urgency, and deadline.
+3. Submit the request.
+4. Keep the confirmation and tracking link sent by Ethree10.
 
 ## Track a request
-- **Requests** lists everything your workspace has submitted, with its current stage.
-- Open any request to see its timeline, leave comments, and watch it move from
-  Submitted → Under review → Scoping → Approved → In progress → Delivered → Closed.
+
+- Use the secure `/track/<token>` link for status updates.
+- The tracking page shows safe public request details, stage history, client-visible deliverables, invoices, receipts, and acceptance controls.
+- The normal path is Submitted -> Under review -> Scoping -> Approved -> In progress -> Delivered -> Closed.
 
 ## After delivery
-- When a project is delivered you'll be notified. Open the project and use the
-  **sign-off** panel to accept the work and leave a **CSAT** rating and comment.
-  Signing off moves the project to Closed; requesting changes sends it back.
+
+- When Ethree10 marks work delivered, use the tracking link to accept it or request changes.
+- Acceptance closes the operational project record.
+- Requesting changes reopens the affected work and creates a traceable revision.
 
 ## Invoices & payment
-- When the agency bills you, the invoice appears under **Invoices**, and you'll
-  receive a shareable link to its public page (`/invoice/<code>`).
+
+- When Ethree10 bills you, you receive a shareable public invoice link (`/invoice/<code>`).
 - For NGN invoices you can **pay online** on that page via Paystack (card or
   transfer). Once payment confirms, the invoice flips to **Paid** automatically.
 - A **receipt** is then issued automatically and is viewable/downloadable at its
   own shareable link (`/receipt/<code>`).
 
 ## Tips
+
 - Keep one request per distinct piece of work — it keeps tracking clean.
-- Use comments on the request to add context instead of email.
+- Put success criteria in plain terms so both sides know what "done" means.
+- Do not forward tracking links outside people who should see the request.
