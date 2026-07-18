@@ -49,9 +49,9 @@ export function LoginForm() {
     setConfirmation(null);
 
     try {
-      await signIn("resend", {
+      await signIn("email", {
         email: values.email,
-        redirectTo: "/dashboard",
+        callbackUrl: "/dashboard",
       });
       setConfirmation(`Magic link sent to ${values.email}. Open your inbox to continue.`);
     } catch {
@@ -64,7 +64,7 @@ export function LoginForm() {
   async function signInWithGoogle() {
     setError(null);
     setConfirmation(null);
-    await signIn("google", { redirectTo: "/dashboard" });
+    await signIn("google", { callbackUrl: "/dashboard" });
   }
 
   async function quickLogin() {
@@ -75,7 +75,7 @@ export function LoginForm() {
     try {
       await signIn("credentials", {
         email: devEmail,
-        redirectTo: "/dashboard",
+        callbackUrl: "/dashboard",
       });
       setDevDialogOpen(false);
     } catch {

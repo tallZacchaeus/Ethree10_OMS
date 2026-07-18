@@ -1,8 +1,9 @@
-import type { NextAuthConfig } from "next-auth";
+import type { NextAuthOptions } from "next-auth";
 import type { Adapter, AdapterUser, AdapterAccount, VerificationToken } from "next-auth/adapters";
-import Resend from "next-auth/providers/resend";
-import Google from "next-auth/providers/google";
-import Credentials from "next-auth/providers/credentials";
+import EmailProvider from "next-auth/providers/email";
+import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { Resend } from "resend";
 import { db } from "@/server/db/client";
 import { env } from "@/lib/env";
 
@@ -14,7 +15,7 @@ import { env } from "@/lib/env";
  */
 function createAdapter(): Adapter {
   return {
-    async createUser(data) {
+    async createUser(data: Omit<AdapterUser, "id">) {
       const user = await db.user.create({
         data: {
           email: data.email,
@@ -57,7 +58,7 @@ function createAdapter(): Adapter {
       return toAdapterUser(user);
     },
 
-    async linkAccount(data) {
+    async linkAccount(data: AdapterAccount) {
       await db.oAuthAccount.create({
         data: {
           userId: data.userId,
@@ -93,7 +94,10 @@ function createAdapter(): Adapter {
       });
     },
 
-    async unlinkAccount({ provider, providerAccountId }) {
+    async unlinkAccount({
+      provider,
+      providerAccountId,
+    }: Pick<AdapterAccount, "provider" | "providerAccountId">) {
       await db.oAuthAccount.delete({
         where: { provider_providerAccountId: { provider, providerAccountId } },
       });
@@ -119,7 +123,8 @@ function toAdapterUser(user: UserRecord): AdapterUser {
   };
 }
 
-export const authConfig: NextAuthConfig = {
+export const authConfig: NextAuthOptions = {
+  secret: env.AUTH_SECRET,
   adapter: createAdapter(),
   session: { strategy: "jwt" },
   pages: {
@@ -128,17 +133,27 @@ export const authConfig: NextAuthConfig = {
     error: "/login",
   },
   providers: [
-    Resend({
-      apiKey: env.RESEND_API_KEY,
+    EmailProvider({
       from: env.EMAIL_FROM,
+      maxAge: 15 * 60,
+      async sendVerificationRequest({ identifier, url, provider }) {
+        const { error } = await new Resend(env.RESEND_API_KEY).emails.send({
+          from: provider.from,
+          to: identifier,
+          subject: "Sign in to Ethree10 OMS",
+          text: `Sign in to Ethree10 OMS: ${url}\n\nThis link expires in 15 minutes.`,
+          html: `<p>Use the secure link below to sign in to Ethree10 OMS.</p><p><a href="${url}">Sign in to Ethree10 OMS</a></p><p>This link expires in 15 minutes.</p>`,
+        });
+        if (error) throw new Error(error.message);
+      },
     }),
-    Google({
+    GoogleProvider({
       clientId: env.AUTH_GOOGLE_ID ?? "",
       clientSecret: env.AUTH_GOOGLE_SECRET ?? "",
     }),
     ...(process.env.NODE_ENV === "development" || process.env["E2E_TEST_AUTH"] === "true"
       ? [
-          Credentials({
+          CredentialsProvider({
             id: "credentials",
             name: "Local Dev Login",
             credentials: {
@@ -179,7 +194,7 @@ export const authConfig: NextAuthConfig = {
       return token;
     },
     async session({ session, token }) {
-      if (token["userId"]) {
+      if (session.user && token["userId"]) {
         session.user.id = token["userId"] as string;
       }
       return session;
