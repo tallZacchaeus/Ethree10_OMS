@@ -26,6 +26,11 @@ You configure the agency operating model and keep the system ready for real clie
 - Keep one fallback service for cross-team or unclear solution requests.
 - Route requests by service first, then by team capacity and expertise.
 
+## Organizations
+
+- Use **Organizations** to keep every requester/client, request, project, invoice, receipt, and report tied to the correct external organization.
+- Confirm organization records are clean before weekly or monthly reporting, because organization context is the anchor for documentation and client-facing history.
+
 ## Governance
 
 - Use **Audit** for accountability.

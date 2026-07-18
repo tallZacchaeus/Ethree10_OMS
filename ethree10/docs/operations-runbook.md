@@ -26,6 +26,31 @@ Deployment is not complete until the readiness gate, smoke check, security heade
 | Public pages work but jobs stall | `supervisorctl status ethree10-worker`, Redis, worker logs | Worker |
 | Invoice payment does not update | Paystack webhook logs, `PAYSTACK_SECRET_KEY`, receipt logs | Payments |
 
+## Monitoring readiness
+
+Run before inviting real pilot users:
+
+```bash
+pnpm check:monitoring
+```
+
+Minimum acceptance:
+
+- Server and browser Sentry DSNs are configured.
+- PostHog project key and host are configured.
+- `UPTIME_MONITOR_URL` targets `/api/health?mode=ready`.
+- Alerts route to `MONITORING_ALERT_EMAIL`.
+
+## Pilot readiness
+
+Run before the first internal pilot:
+
+```bash
+pnpm check:pilot-readiness
+```
+
+Use `docs/pilot-acceptance.md` as the pilot script. Do not onboard external organizations until request intake, team assignment, review, tracking, and weekly reporting have been accepted by the internal pilot users.
+
 ## Logs
 
 ```bash

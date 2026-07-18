@@ -44,6 +44,14 @@ export async function evaluateReleaseControls(): Promise<Check[]> {
       pass: Boolean(scripts["check:backups"]),
     },
     {
+      name: "monitoring script",
+      pass: Boolean(scripts["check:monitoring"]),
+    },
+    {
+      name: "pilot readiness script",
+      pass: Boolean(scripts["check:pilot-readiness"]),
+    },
+    {
       name: "audit retention script",
       pass: Boolean(scripts["audit:archive"]),
     },
@@ -62,11 +70,19 @@ export async function evaluateReleaseControls(): Promise<Check[]> {
     },
     {
       name: "release management guide",
-      pass: await fileExists("docs/release-management.md"),
+      pass: await fileContains("docs/release-management.md", ["check:monitoring", "check:pilot-readiness"]),
     },
     {
       name: "data governance guide",
       pass: await fileExists("docs/data-governance.md"),
+    },
+    {
+      name: "monitoring guide",
+      pass: await fileExists("docs/monitoring.md"),
+    },
+    {
+      name: "pilot acceptance guide",
+      pass: await fileExists("docs/pilot-acceptance.md"),
     },
   ];
 }

@@ -81,6 +81,8 @@ pnpm check:readiness:db    # also verifies canonical teams, services, staff, and
 SMOKE_BASE_URL=https://oms.ethree10.com pnpm check:smoke
 SECURITY_HEADERS_BASE_URL=https://oms.ethree10.com pnpm check:security-headers
 pnpm check:backups
+pnpm check:monitoring       # run before inviting real users
+pnpm check:pilot-readiness  # validates first-user acceptance materials
 ```
 
 Run this after changing `.env`, after migrations/seeding, and before giving real users access.

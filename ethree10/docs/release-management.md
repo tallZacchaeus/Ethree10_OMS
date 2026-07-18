@@ -11,8 +11,11 @@ This app is already deployed, so releases should be treated as production change
    - `SMOKE_BASE_URL=https://oms.ethree10.com pnpm check:smoke`
    - `SECURITY_HEADERS_BASE_URL=https://oms.ethree10.com pnpm check:security-headers`
    - `pnpm check:backups`
-4. Review `/api/health?mode=ready`.
-5. Confirm `supervisorctl status` shows both web and worker processes running.
+4. Confirm launch-readiness gates pass before first-user onboarding:
+   - `pnpm check:monitoring`
+   - `pnpm check:pilot-readiness`
+5. Review `/api/health?mode=ready`.
+6. Confirm `supervisorctl status` shows both web and worker processes running.
 
 ## Pre-release checklist
 
@@ -22,6 +25,7 @@ This app is already deployed, so releases should be treated as production change
 - The rollback commit SHA is known.
 - User-facing workflow impact is documented.
 - Payment, request intake, tracking links, reports, and worker queues have a smoke path.
+- Monitoring and pilot readiness checks have passed before inviting real users.
 
 ## Rollback rule
 
