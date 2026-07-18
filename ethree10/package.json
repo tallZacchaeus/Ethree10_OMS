@@ -2,6 +2,11 @@
   "name": "ethree10",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=11 <12"
+  },
   "scripts": {
     "dev": "concurrently \"next dev\" \"tsx watch workers/index.ts\"",
     "dev:next": "next dev",
@@ -13,6 +18,7 @@
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
+    "e2e:server": "NODE_ENV=production NEXT_PUBLIC_E2E_TEST_AUTH=true E2E_TEST_AUTH=true next build && NODE_ENV=production E2E_TEST_AUTH=true next start --hostname 127.0.0.1 --port 3100",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
@@ -21,11 +27,10 @@
     "worker": "tsx workers/index.ts"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.11.2",
     "@aws-sdk/client-s3": "^3.1058.0",
     "@aws-sdk/s3-request-presigner": "^3.1058.0",
     "@hookform/resolvers": "^3.10.0",
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "6.19.3",
     "@radix-ui/react-accordion": "^1.2.10",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-collapsible": "^1.1.11",
@@ -56,7 +61,7 @@
     "ioredis": "^5.4.2",
     "lucide-react": "^0.483.0",
     "next": "14.2.35",
-    "next-auth": "5.0.0-beta.25",
+    "next-auth": "4.24.14",
     "otplib": "^13.4.0",
     "pino": "^9.6.0",
     "posthog-js": "^1.376.3",
@@ -90,7 +95,7 @@
     "pino-pretty": "^13.0.0",
     "postcss": "^8",
     "prettier": "^3.5.3",
-    "prisma": "^5.22.0",
+    "prisma": "6.19.3",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.19.4",
     "typescript": "^5",

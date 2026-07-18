@@ -36,21 +36,36 @@ export interface CreateTaskInput {
   projectId: string;
   title: string;
   description?: string;
+  acceptanceCriteria?: string;
   subUnitId?: string;
   assigneeUserId?: string;
   priority?: TaskPriority;
   estimatedHours?: number;
   dueDate?: Date;
   dependsOn?: string[];
+  contributors?: Array<{
+    userId: string;
+    contributionRole: string;
+    positionId?: string;
+    isPrimary?: boolean;
+  }>;
 }
 
 export class TaskService {
   static taskInclude = {
-    subUnit: { select: { id: true, name: true, departmentId: true } },
+    subUnit: { select: { id: true, name: true, teamId: true } },
     project: {
-      select: { id: true, code: true, name: true, organizationId: true, agencyDepartmentId: true },
+      select: { id: true, code: true, name: true, organizationId: true, agencyTeamId: true },
     },
     integrationLink: { select: { id: true, externalUrl: true, pendingSync: true } },
+    contributors: {
+      where: { removedAt: null },
+      include: {
+        user: { select: { id: true, name: true, avatarUrl: true } },
+        position: { select: { id: true, name: true } },
+      },
+      orderBy: [{ isPrimary: "desc" as const }, { assignedAt: "asc" as const }],
+    },
   } satisfies Prisma.TaskInclude;
 
   static async getById(id: string) {
@@ -67,6 +82,11 @@ export class TaskService {
             dependsOnTask: { select: { id: true, code: true, title: true, status: true } },
           },
         },
+        deliverables: {
+          orderBy: { updatedAt: "desc" },
+          include: { versions: { orderBy: { revision: "desc" } } },
+        },
+        reviews: { orderBy: { createdAt: "asc" } },
       },
     });
     if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Task not found." });
@@ -89,7 +109,13 @@ export class TaskService {
 
   static async listAssignedTo(userId: string) {
     return db.task.findMany({
-      where: { assigneeUserId: userId, status: { notIn: ["done", "cancelled"] } },
+      where: {
+        status: { notIn: ["done", "cancelled"] },
+        OR: [
+          { assigneeUserId: userId },
+          { contributors: { some: { userId, removedAt: null } } },
+        ],
+      },
       orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }],
       include: TaskService.taskInclude,
     });
@@ -107,7 +133,7 @@ export class TaskService {
   /** Candidate assignees for a sub-unit, ranked by current load (best fit first). */
   static async candidates(subUnitId: string) {
     const memberships = await db.membership.findMany({
-      where: { subUnitId, removedAt: null, role: { in: ["member", "department_lead"] } },
+      where: { subUnitId, removedAt: null, role: { in: ["team_member", "team_head"] } },
       select: {
         user: {
           select: {
@@ -168,6 +194,7 @@ export class TaskService {
         assigneeUserId: args.input.assigneeUserId ?? null,
         title: args.input.title,
         description: args.input.description ?? null,
+        acceptanceCriteria: args.input.acceptanceCriteria ?? null,
         priority: args.input.priority ?? "medium",
         estimatedHours:
           args.input.estimatedHours !== undefined
@@ -176,6 +203,35 @@ export class TaskService {
         dueDate: args.input.dueDate ?? null,
       },
     });
+
+    const contributors = args.input.contributors?.length
+      ? args.input.contributors
+      : args.input.assigneeUserId
+        ? [{
+            userId: args.input.assigneeUserId,
+            contributionRole: "Primary contributor",
+            isPrimary: true,
+          }]
+        : [];
+    if (contributors.length) {
+      await db.taskContributor.createMany({
+        data: contributors.map((contributor) => ({
+          taskId: task.id,
+          userId: contributor.userId,
+          positionId: contributor.positionId ?? null,
+          contributionRole: contributor.contributionRole,
+          isPrimary: contributor.isPrimary ?? false,
+        })),
+        skipDuplicates: true,
+      });
+      const primary = contributors.find((contributor) => contributor.isPrimary) ?? contributors[0];
+      if (primary && primary.userId !== task.assigneeUserId) {
+        await db.task.update({
+          where: { id: task.id },
+          data: { assigneeUserId: primary.userId },
+        });
+      }
+    }
 
     if (args.input.dependsOn?.length) {
       await db.taskDependency.createMany({
@@ -254,9 +310,31 @@ export class TaskService {
   static async assign(args: { actorId: string; taskId: string; assigneeUserId: string }) {
     const before = await db.task.findUnique({ where: { id: args.taskId } });
     if (!before) throw new TRPCError({ code: "NOT_FOUND" });
-    const updated = await db.task.update({
-      where: { id: args.taskId },
-      data: { assigneeUserId: args.assigneeUserId },
+    const updated = await db.$transaction(async (tx) => {
+      await tx.taskContributor.updateMany({
+        where: { taskId: args.taskId, removedAt: null },
+        data: { isPrimary: false },
+      });
+      await tx.taskContributor.upsert({
+        where: {
+          taskId_userId_contributionRole: {
+            taskId: args.taskId,
+            userId: args.assigneeUserId,
+            contributionRole: "Primary contributor",
+          },
+        },
+        update: { isPrimary: true, removedAt: null },
+        create: {
+          taskId: args.taskId,
+          userId: args.assigneeUserId,
+          contributionRole: "Primary contributor",
+          isPrimary: true,
+        },
+      });
+      return tx.task.update({
+        where: { id: args.taskId },
+        data: { assigneeUserId: args.assigneeUserId },
+      });
     });
     await AuditService.log({
       actorId: args.actorId,
@@ -354,36 +432,88 @@ export class TaskService {
   static async review(args: {
     actorId: string;
     taskId: string;
-    decision: "accept" | "request_changes";
+    decision: "accept" | "request_changes" | "reject" | "cancel";
     note?: string;
+    reviewType?: string;
   }) {
-    const before = await db.task.findUnique({ where: { id: args.taskId } });
-    if (!before) throw new TRPCError({ code: "NOT_FOUND" });
-    const accepted = args.decision === "accept";
-    const updated = await db.task.update({
+    const before = await db.task.findUnique({
       where: { id: args.taskId },
-      data: {
-        status: accepted ? "done" : "in_progress",
-        reviewedById: args.actorId,
-        reviewedAt: new Date(),
-        completedAt: accepted ? new Date() : null,
-        reopenedCount: accepted ? before.reopenedCount : before.reopenedCount + 1,
+      include: {
+        project: { include: { request: { include: { service: true } } } },
       },
+    });
+    if (!before) throw new TRPCError({ code: "NOT_FOUND" });
+    if (before.status !== "in_review") {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Only submitted work can be reviewed." });
+    }
+    const accepted = args.decision === "accept";
+    const revisionsRequired = args.decision === "request_changes";
+    const reviewType = args.reviewType ?? "team_head";
+    const requiredReviews = Array.isArray(before.project.request.service?.requiredReviews)
+      ? before.project.request.service.requiredReviews.filter((value): value is string => typeof value === "string")
+      : [];
+    const priorApprovedTypes = await db.taskReview.findMany({
+      where: { taskId: args.taskId, revision: before.revision, decision: "approved" },
+      select: { reviewType: true },
+    });
+    const approvedTypes = new Set(priorApprovedTypes.map((review) => review.reviewType));
+    if (accepted) approvedTypes.add(reviewType);
+    const allRequiredApproved = requiredReviews.every((required) => approvedTypes.has(required));
+    const finalApproval = accepted && approvedTypes.has("team_head") && allRequiredApproved;
+    const now = new Date();
+    const updated = await db.$transaction(async (tx) => {
+      await tx.taskReview.create({
+        data: {
+          taskId: args.taskId,
+          reviewerId: args.actorId,
+          reviewType,
+          decision: accepted
+            ? "approved"
+            : revisionsRequired
+              ? "revisions_required"
+              : args.decision === "reject"
+                ? "rejected"
+                : "cancelled",
+          feedback: args.note ?? null,
+          revision: before.revision,
+        },
+      });
+      return tx.task.update({
+        where: { id: args.taskId },
+        data: {
+          status: finalApproval ? "done" : accepted ? "in_review" : revisionsRequired ? "in_progress" : "cancelled",
+          reviewedById: args.actorId,
+          reviewedAt: now,
+          completedAt: finalApproval ? now : null,
+          reopenedCount: revisionsRequired ? before.reopenedCount + 1 : before.reopenedCount,
+          revision: revisionsRequired ? before.revision + 1 : before.revision,
+        },
+      });
     });
     await AuditService.log({
       actorId: args.actorId,
-      action: accepted ? "task.review_accepted" : "task.review_changes",
+      action: finalApproval
+        ? "task.review_accepted"
+        : accepted
+          ? "task.specialist_review_accepted"
+          : revisionsRequired
+            ? "task.review_changes"
+            : `task.review_${args.decision}`,
       entityType: "Task",
       entityId: args.taskId,
-      after: { status: updated.status, note: args.note },
+      after: { status: updated.status, note: args.note, reviewType, revision: before.revision },
     });
     if (before.assigneeUserId) {
       await NotificationService.create({
         userId: before.assigneeUserId,
-        kind: accepted ? "task_completed" : "task_assigned",
-        title: accepted
+        kind: finalApproval ? "task_completed" : "task_assigned",
+        title: finalApproval
           ? `Task accepted: ${updated.title}`
-          : `Changes requested: ${updated.title}`,
+          : accepted
+            ? `Specialist review passed: ${updated.title}`
+            : revisionsRequired
+              ? `Changes requested: ${updated.title}`
+              : `Task ${args.decision === "reject" ? "rejected" : "cancelled"}: ${updated.title}`,
         body: args.note ?? updated.code,
         link: `/tasks/${updated.id}`,
         entityType: "Task",

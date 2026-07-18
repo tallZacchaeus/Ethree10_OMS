@@ -48,11 +48,11 @@ export const tasksRouter = router({
       await requireAgencyAction(ctx.userId, "task.create");
       const project = await db.project.findUnique({
         where: { id: input.projectId },
-        select: { agencyDepartmentId: true },
+        select: { agencyTeamId: true },
       });
-      if (!project?.agencyDepartmentId) return [];
+      if (!project?.agencyTeamId) return [];
       return db.subUnit.findMany({
-        where: { departmentId: project.agencyDepartmentId, archivedAt: null },
+        where: { teamId: project.agencyTeamId, archivedAt: null },
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       });
@@ -71,15 +71,23 @@ export const tasksRouter = router({
         projectId: z.string(),
         title: z.string().min(2),
         description: z.string().optional(),
+        acceptanceCriteria: z.string().trim().min(2).optional(),
         subUnitId: z.string().optional(),
         assigneeUserId: z.string().optional(),
         priority: z.nativeEnum(TaskPriority).optional(),
         estimatedHours: z.number().nonnegative().optional(),
         dueDate: z.date().optional(),
         dependsOn: z.array(z.string()).optional(),
+        contributors: z.array(z.object({
+          userId: z.string(),
+          contributionRole: z.string().trim().min(2),
+          positionId: z.string().optional(),
+          isPrimary: z.boolean().optional(),
+        })).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      if (!(await ProjectService.canRead(ctx.userId, input.projectId))) throw new TRPCError({ code: "FORBIDDEN" });
       await requireAgencyAction(ctx.userId, "task.create");
       return TaskService.create({ actorId: ctx.userId, input });
     }),
@@ -108,6 +116,7 @@ export const tasksRouter = router({
   assign: protectedProcedure
     .input(z.object({ taskId: z.string(), assigneeUserId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await loadTaskForRead(ctx.userId, input.taskId);
       await requireAgencyAction(ctx.userId, "task.assign");
       const result = await TaskService.assign({
         actorId: ctx.userId,
@@ -182,23 +191,27 @@ export const tasksRouter = router({
     .input(
       z.object({
         taskId: z.string(),
-        decision: z.enum(["accept", "request_changes"]),
+        decision: z.enum(["accept", "request_changes", "reject", "cancel"]),
         note: z.string().optional(),
+        reviewType: z.string().trim().min(2).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await loadTaskForRead(ctx.userId, input.taskId);
       await requireAgencyAction(ctx.userId, "task.review");
       return TaskService.review({
         actorId: ctx.userId,
         taskId: input.taskId,
         decision: input.decision,
         note: input.note,
+        reviewType: input.reviewType,
       });
     }),
 
   reopen: protectedProcedure
     .input(z.object({ taskId: z.string(), reason: z.string().min(2) }))
     .mutation(async ({ ctx, input }) => {
+      await loadTaskForRead(ctx.userId, input.taskId);
       await requireAgencyAction(ctx.userId, "task.review");
       return TaskService.reopen({
         actorId: ctx.userId,

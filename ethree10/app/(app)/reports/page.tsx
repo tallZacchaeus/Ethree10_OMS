@@ -9,13 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { useWorkspace } from "@/components/providers/workspace-provider";
+import { useAgencyContext } from "@/components/providers/agency-provider";
 import { PageHeader } from "@/components/ui-ext/page-header";
 import { StatCard } from "@/components/ui-ext/stat-card";
 import { AnimatedPage, AnimatedSection } from "@/components/ui-ext/animated";
 
 export default function ReportsPage() {
-  const { activeWorkspace: currentWorkspace } = useWorkspace();
+  const { agency, roles, isSuperAdmin } = useAgencyContext();
   const { toast } = useToast();
   const { data: reports, isLoading, refetch } = trpc.reports.list.useQuery();
 
@@ -35,6 +35,13 @@ export default function ReportsPage() {
       });
     },
   });
+  const generateMonthly = trpc.reports.generateMonthly.useMutation({
+    onSuccess: () => {
+      toast({ title: "Monthly reports generated", description: "Draft rollups are ready for review." });
+      void refetch();
+    },
+    onError: (error) => toast({ title: "Could not generate reports", description: error.message, variant: "destructive" }),
+  });
 
   const reportList = reports ?? [];
   const latestReport = reportList[0] ?? null;
@@ -47,15 +54,17 @@ export default function ReportsPage() {
           title="Reports"
           description="Weekly and monthly rollups across the agency."
           actions={
-            currentWorkspace?.type === "agency" ? (
-              <Button onClick={() => generateWeekly.mutate()} disabled={generateWeekly.isPending}>
-                {generateWeekly.isPending ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Play className="h-4 w-4" />
-                )}
-                Force Generate Weekly
-              </Button>
+            agency.type === "agency" && (isSuperAdmin || roles.some((role) => ["agency_admin", "finance_admin", "team_head"].includes(role))) ? (
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => generateWeekly.mutate()} disabled={generateWeekly.isPending}>
+                  {generateWeekly.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                  Generate weekly
+                </Button>
+                <Button variant="outline" onClick={() => generateMonthly.mutate()} disabled={generateMonthly.isPending}>
+                  {generateMonthly.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CalendarRange className="h-4 w-4" />}
+                  Generate monthly
+                </Button>
+              </div>
             ) : undefined
           }
         />
@@ -117,6 +126,7 @@ export default function ReportsPage() {
                   <TableRow>
                     <TableHead>Level</TableHead>
                     <TableHead>Period</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Date Range</TableHead>
                     <TableHead>Generated At</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -131,6 +141,7 @@ export default function ReportsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="capitalize">{report.period}</TableCell>
+                      <TableCell><Badge variant={report.status === "finalized" ? "default" : "outline"} className="capitalize">{report.status}</Badge></TableCell>
                       <TableCell>
                         {format(new Date(report.periodStart), "MMM d, yyyy")} - {format(new Date(report.periodEnd), "MMM d, yyyy")}
                       </TableCell>
@@ -138,16 +149,9 @@ export default function ReportsPage() {
                         {format(new Date(report.createdAt), "MMM d, yyyy HH:mm")}
                       </TableCell>
                       <TableCell className="text-right">
-                        {report.pdfUrl ? (
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={report.pdfUrl} target="_blank" rel="noreferrer">
-                              <FileText className="h-4 w-4" />
-                              View PDF
-                            </Link>
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Pending export</span>
-                        )}
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/reports/${report.id}`}><FileText className="h-4 w-4" /> Review</Link>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

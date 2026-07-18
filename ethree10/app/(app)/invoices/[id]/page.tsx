@@ -106,7 +106,7 @@ export default function InvoiceDetailPage({ params }: { params: { id: string } }
 
       <PageHeader
         title={`Invoice ${invoice.code}`}
-        description={`${invoice.workspace.name}${invoice.project ? ` · ${invoice.project.name}` : ""}`}
+        description={`${invoice.organization.name}${invoice.project ? ` · ${invoice.project.name}` : ""}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill kind="invoice" value={status} />

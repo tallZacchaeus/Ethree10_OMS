@@ -21,8 +21,10 @@ const reportsWorker = new Worker(
   async (job) => {
     logger.info({ jobId: job.id, name: job.name }, "Processing report job");
     if (job.name === "weekly-report") {
-      // The generateWeekly service should ideally handle idempotency or not run if already generated.
-      await ReportService.generateWeekly({ actorId: "system" });
+      await ReportService.generateWeekly({ actorId: "system", anchor: new Date(Date.now() - 24 * 60 * 60 * 1000) });
+    }
+    if (job.name === "monthly-report") {
+      await ReportService.generateMonthly({ actorId: "system", anchor: new Date(Date.now() - 24 * 60 * 60 * 1000) });
     }
     if (job.name === "mark-overdue-invoices") {
       const count = await InvoiceService.markOverdue();
@@ -49,13 +51,21 @@ for (const worker of [notificationsWorker, reportsWorker, integrationsWorker]) {
 
 logger.info("Workers running. Waiting for jobs…");
 
-// Schedule the weekly report job for Saturday 18:00 Africa/Lagos
+// Generate the just-completed Lagos week after its Sunday cutoff.
 queues.reports.add("weekly-report", {}, {
   repeat: {
-    pattern: "0 18 * * 6",
+    pattern: "15 0 * * 1",
     tz: "Africa/Lagos",
   }
 }).catch(err => logger.error({ err }, "Failed to schedule weekly report job"));
+
+// Generate the just-completed Lagos month on the first day of the next month.
+queues.reports.add("monthly-report", {}, {
+  repeat: {
+    pattern: "30 0 1 * *",
+    tz: "Africa/Lagos",
+  }
+}).catch(err => logger.error({ err }, "Failed to schedule monthly report job"));
 
 // Flip overdue invoices daily at 06:00 Africa/Lagos
 queues.reports.add("mark-overdue-invoices", {}, {

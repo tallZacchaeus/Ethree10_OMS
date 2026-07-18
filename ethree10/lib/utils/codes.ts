@@ -1,3 +1,5 @@
+import { randomBytes } from "crypto";
+
 const PREFIXES = {
   request: "REQ",
   project: "PRJ",
@@ -21,6 +23,14 @@ export function generateCode(type: CodeType, sequenceNumber?: number): string {
   const seq = sequenceNumber ?? getCounter(`${prefix}-${year}`);
   const padded = String(seq).padStart(type === "task" ? 5 : 4, "0");
   return `${prefix}-${year}-${padded}`;
+}
+
+/**
+ * Unguessable capability token for public request-tracking links.
+ * 24 random bytes → ~192 bits, URL-safe (no padding/special chars).
+ */
+export function generatePublicToken(): string {
+  return randomBytes(24).toString("base64url");
 }
 
 export function parseCode(code: string): { type: CodeType; year: number; seq: number } | null {

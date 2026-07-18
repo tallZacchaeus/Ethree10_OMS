@@ -24,19 +24,19 @@ async function ensureBucket() {
 }
 
 describe("ReceiptService.issueForInvoice — idempotent auto-issue", () => {
-  let workspaceId: string;
+  let organizationId: string;
   let invoiceId: string;
 
   beforeAll(async () => {
     await ensureBucket();
-    const ws = await db.workspace.create({
-      data: { type: "agency", name: "Receipt IT WS", slug: `receipt-it-${Date.now()}`, defaultCurrency: "NGN" },
+    const ws = await db.organization.create({
+      data: { name: "Receipt IT WS", slug: `receipt-it-${Date.now()}`, defaultCurrency: "NGN" },
     });
-    workspaceId = ws.id;
+    organizationId = ws.id;
     const inv = await db.invoice.create({
       data: {
         code: `INV-IT-${Date.now()}`,
-        workspaceId: ws.id,
+        organizationId: ws.id,
         status: "paid",
         currency: "NGN",
         amount: "150000.00",
@@ -49,9 +49,11 @@ describe("ReceiptService.issueForInvoice — idempotent auto-issue", () => {
   });
 
   afterAll(async () => {
-    await db.receipt.deleteMany({ where: { invoiceId } });
-    await db.invoice.delete({ where: { id: invoiceId } }).catch(() => {});
-    await db.workspace.delete({ where: { id: workspaceId } }).catch(() => {});
+    try {
+      if (invoiceId) await db.receipt.deleteMany({ where: { invoiceId } });
+      if (invoiceId) await db.invoice.delete({ where: { id: invoiceId } });
+      if (organizationId) await db.organization.delete({ where: { id: organizationId } });
+    } catch(e) {}
     await db.$disconnect();
   });
 
@@ -87,20 +89,22 @@ describe("ReceiptService.issueForInvoice — idempotent auto-issue", () => {
 });
 
 describe("ReceiptService.issueForInvoice — offline payment methods", () => {
-  let workspaceId: string;
+  let organizationId: string;
 
   beforeAll(async () => {
     await ensureBucket();
-    const ws = await db.workspace.create({
-      data: { type: "agency", name: "Offline Pay WS", slug: `offline-pay-${Date.now()}`, defaultCurrency: "NGN" },
+    const ws = await db.organization.create({
+      data: { name: "Offline Pay WS", slug: `offline-pay-${Date.now()}`, defaultCurrency: "NGN" },
     });
-    workspaceId = ws.id;
+    organizationId = ws.id;
   });
 
   afterAll(async () => {
-    await db.receipt.deleteMany({ where: { workspaceId } });
-    await db.invoice.deleteMany({ where: { workspaceId } });
-    await db.workspace.delete({ where: { id: workspaceId } }).catch(() => {});
+    try {
+      if (organizationId) await db.receipt.deleteMany({ where: { organizationId } });
+      if (organizationId) await db.invoice.deleteMany({ where: { organizationId } });
+      if (organizationId) await db.organization.delete({ where: { id: organizationId } });
+    } catch (e) {}
   });
 
   // The headline of this feature: cheque/bank-transfer/cash are first-class
@@ -111,7 +115,7 @@ describe("ReceiptService.issueForInvoice — offline payment methods", () => {
       const invoice = await db.invoice.create({
         data: {
           code: `INV-${paymentMethod}-${Date.now()}`,
-          workspaceId,
+          organizationId,
           status: "paid",
           currency: "NGN",
           amount: "90000.00",

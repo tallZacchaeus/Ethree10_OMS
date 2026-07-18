@@ -52,7 +52,7 @@ export default function KnowledgeBasePage() {
                   <StatusPill kind="project" value={project.status} />
                 </div>
                 <div className="text-xs font-medium text-brand-600">
-                  {project.workspace.name} • {project.department?.name}
+                  {project.organization.name} • {project.team?.name}
                 </div>
               </CardHeader>
               <CardContent>

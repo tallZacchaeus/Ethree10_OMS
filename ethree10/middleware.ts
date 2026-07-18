@@ -1,15 +1,15 @@
-import { auth } from "@/server/auth";
-import { NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
+import { NextRequest, NextResponse } from "next/server";
 
-export default auth((req) => {
-  const { nextUrl, auth: session } = req;
+export default async function middleware(req: NextRequest) {
+  const token = await getToken({ req, secret: process.env["AUTH_SECRET"] });
 
   // Only intercept the bare root path
-  if (nextUrl.pathname === "/") {
-    const destination = session?.user ? "/dashboard" : "/login";
-    return NextResponse.redirect(new URL(destination, nextUrl));
+  if (req.nextUrl.pathname === "/") {
+    const destination = token ? "/dashboard" : "/login";
+    return NextResponse.redirect(new URL(destination, req.nextUrl));
   }
-});
+}
 
 export const config = {
   matcher: ["/"],

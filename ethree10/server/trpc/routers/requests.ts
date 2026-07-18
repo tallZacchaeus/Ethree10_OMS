@@ -2,11 +2,10 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { RequestStage, Urgency } from "@prisma/client";
 import { router, publicProcedure } from "../trpc";
-import { protectedProcedure, orgProcedure } from "../procedures";
+import { protectedProcedure } from "../procedures";
 import { db } from "@/server/db/client";
 import { can } from "@/server/auth/permissions";
 import { RequestService } from "@/server/services/request";
-import { LeadService } from "@/server/services/lead";
 import { posthogServer } from "@/lib/posthog";
 import {
   getAgencyAuthContext,
@@ -22,11 +21,17 @@ const createInput = z.object({
   primaryContact: z.string().optional(),
   budgetEstimate: z.number().nonnegative().optional(),
   currency: z.string().optional(),
+  serviceId: z.string().optional(),
+  expectedOutcome: z.string().trim().min(10).optional(),
+  expectedDeliverables: z.string().trim().min(3).optional(),
+  acceptanceCriteria: z.string().trim().min(3).optional(),
+  supportingLinks: z.array(z.string().url()).max(10).optional(),
+  consentToEmail: z.boolean().default(false),
 });
 
 /**
  * A request is readable by agency staff (any request) or by members of the
- * request's own workspace (their own org's requests). Returns the loaded
+ * request's own organization (their own org's requests). Returns the loaded
  * request so callers can avoid a second fetch.
  */
 async function assertCanReadRequest(userId: string, requestId: string) {
@@ -34,57 +39,103 @@ async function assertCanReadRequest(userId: string, requestId: string) {
   if (!request) throw new TRPCError({ code: "NOT_FOUND" });
 
   const agencyCtx = await getAgencyAuthContext(userId);
-  if (can(agencyCtx, "request.read")) return request;
+  if (can(agencyCtx, "request.read")) {
+    if (agencyCtx.isSuperAdmin || agencyCtx.roles.includes("agency_admin") || agencyCtx.roles.includes("finance_admin")) {
+      return request;
+    }
+    if (request.routedTeamId) {
+      const membership = await db.membership.findFirst({
+        where: { userId, teamId: request.routedTeamId, removedAt: null, acceptedAt: { not: null } }
+      });
+      if (membership) return request;
+    }
+  }
 
   if (request.submittedById === userId) return request;
 
-  const membership = await db.membership.findFirst({
-    where: {
-      userId,
-      organizationId: request.organizationId,
-      removedAt: null,
-      acceptedAt: { not: null },
-    },
-    select: { id: true },
+  throw new TRPCError({ code: "FORBIDDEN" });
+}
+
+async function visibleTeamIds(userId: string): Promise<string[] | null> {
+  const auth = await getAgencyAuthContext(userId);
+  if (auth.isSuperAdmin || auth.roles.includes("agency_admin") || auth.roles.includes("finance_admin")) return null;
+  const memberships = await db.membership.findMany({
+    where: { userId, removedAt: null, acceptedAt: { not: null }, teamId: { not: null } },
+    select: { teamId: true },
   });
-  if (!membership) throw new TRPCError({ code: "FORBIDDEN" });
-  return request;
+  return memberships.flatMap((membership) => membership.teamId ? [membership.teamId] : []);
 }
 
 export const requestsRouter = router({
-  // Public marketing-site intake → creates a Lead the agency triages.
+  // Public marketing-site intake → creates a real Request under a lightweight
+  // external client org and returns the tracking token (no login required).
   publicSubmit: publicProcedure
     .input(
       z.object({
-        name: z.string().min(2),
-        email: z.string().email(),
-        phone: z.string().optional(),
-        organization: z.string().optional(),
-        message: z.string().min(10),
-        source: z.string().optional(),
+        requesterName: z.string().min(2),
+        requesterEmail: z.string().email(),
+        requesterPhone: z.string().optional(),
+        organizationName: z.string().optional(),
+        title: z.string().min(3),
+        description: z.string().min(10),
+        projectType: z.string().min(2),
+        serviceId: z.string(),
+        urgency: z.nativeEnum(Urgency).default("medium"),
+        deadline: z.coerce.date().optional(),
+        budgetEstimate: z.number().nonnegative().optional(),
+        expectedOutcome: z.string().trim().min(10),
+        expectedDeliverables: z.string().trim().min(3),
+        acceptanceCriteria: z.string().trim().min(3),
+        supportingLinks: z.array(z.string().url()).max(10).default([]),
+        consentToEmail: z.literal(true),
       }),
     )
     .mutation(async ({ input }) => {
-      await LeadService.create(input);
-      return { ok: true };
+      const result = await RequestService.createPublic({
+        requesterName: input.requesterName,
+        requesterEmail: input.requesterEmail,
+        requesterPhone: input.requesterPhone,
+        organizationName: input.organizationName,
+        input: {
+          title: input.title,
+          description: input.description,
+          projectType: input.projectType,
+          serviceId: input.serviceId,
+          urgency: input.urgency,
+          deadline: input.deadline,
+          budgetEstimate: input.budgetEstimate,
+          primaryContact: input.requesterName,
+          expectedOutcome: input.expectedOutcome,
+          expectedDeliverables: input.expectedDeliverables,
+          acceptanceCriteria: input.acceptanceCriteria,
+          supportingLinks: input.supportingLinks,
+          consentToEmail: input.consentToEmail,
+        },
+      });
+      return { code: result.code, publicToken: result.publicToken };
     }),
 
-  list: orgProcedure
+  list: protectedProcedure
     .input(
       z
         .object({
+          organizationId: z.string().optional(),
           stage: z.nativeEnum(RequestStage).optional(),
-          routedDepartmentId: z.string().optional(),
+          routedTeamId: z.string().optional(),
           limit: z.number().min(1).max(100).default(50),
         })
-        .optional(),
     )
     .query(async ({ ctx, input }) => {
-      await ctx.authorize("request.read");
-      return RequestService.listForWorkspace(ctx.organizationId, {
-        stage: input?.stage,
-        routedDepartmentId: input?.routedDepartmentId,
-        limit: input?.limit,
+      await requireAgencyAction(ctx.userId, "request.read");
+      const teamIds = await visibleTeamIds(ctx.userId);
+      return db.request.findMany({
+        where: {
+          organizationId: input.organizationId,
+          stage: input.stage,
+          routedTeamId: teamIds === null ? input.routedTeamId : { in: teamIds },
+        },
+        take: input.limit,
+        orderBy: { createdAt: "desc" },
       });
     }),
 
@@ -97,22 +148,28 @@ export const requestsRouter = router({
       z
         .object({
           stage: z.nativeEnum(RequestStage).optional(),
-          routedDepartmentId: z.string().optional(),
+          routedTeamId: z.string().optional(),
         })
         .optional(),
     )
     .query(async ({ ctx, input }) => {
       await requireAgencyAction(ctx.userId, "request.read");
-      return RequestService.inbox({
-        stage: input?.stage,
-        routedDepartmentId: input?.routedDepartmentId,
+      const teamIds = await visibleTeamIds(ctx.userId);
+      if (teamIds === null) return RequestService.inbox({ stage: input?.stage, routedTeamId: input?.routedTeamId });
+      return db.request.findMany({
+        where: {
+          stage: input?.stage ?? { in: ["submitted", "needs_clarification", "under_review", "scoping"] },
+          routedTeamId: { in: teamIds },
+        },
+        include: RequestService.requestInclude,
+        orderBy: [{ urgency: "desc" }, { createdAt: "asc" }],
       });
     }),
 
-  /** Agency departments available as routing targets. */
-  agencyDepartments: protectedProcedure.query(async ({ ctx }) => {
+  /** Agency teams available as routing targets. */
+  agencyTeams: protectedProcedure.query(async ({ ctx }) => {
     await requireAgencyAction(ctx.userId, "request.read");
-    return db.department.findMany({
+    return db.team.findMany({
       where: { archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, slug: true, color: true },
@@ -124,7 +181,7 @@ export const requestsRouter = router({
     .query(async ({ ctx, input }) => {
       await assertCanReadRequest(ctx.userId, input.id);
       const request = await RequestService.getById(input.id);
-      
+
       const agencyCtx = await getAgencyAuthContext(ctx.userId);
       if (!can(agencyCtx, "request.read")) {
         request.comments = request.comments.filter((c) => !c.isInternal);
@@ -133,21 +190,38 @@ export const requestsRouter = router({
       return request;
     }),
 
-  create: orgProcedure.input(createInput).mutation(async ({ ctx, input }) => {
-    await ctx.authorize("request.create");
-    const request = await RequestService.create({
-      actorId: ctx.userId,
-      organizationId: ctx.organizationId,
-      input,
-    });
+  rotateTrackingLink: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertCanReadRequest(ctx.userId, input.id);
+      await requireAgencyAction(ctx.userId, "request.update");
+      return RequestService.rotatePublicToken({ actorId: ctx.userId, requestId: input.id });
+    }),
 
-    posthogServer.capture({
-      distinctId: ctx.userId,
-      event: "request_submitted",
-      properties: { requestId: request.id, organizationId: ctx.organizationId },
-    });
-    
-    return request;
+  revokeTrackingLink: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertCanReadRequest(ctx.userId, input.id);
+      await requireAgencyAction(ctx.userId, "request.update");
+      return RequestService.revokePublicToken({ actorId: ctx.userId, requestId: input.id });
+    }),
+
+  create: protectedProcedure.input(createInput.extend({ organizationId: z.string() })).mutation(async ({ ctx, input }) => {
+      await requireAgencyAction(ctx.userId, "request.create");
+      const { organizationId, ...rest } = input;
+      const request = await RequestService.create({
+        actorId: ctx.userId,
+        organizationId: organizationId,
+        input: rest,
+      });
+
+      posthogServer.capture({
+        distinctId: ctx.userId,
+        event: "request_submitted",
+        properties: { requestId: request.id, organizationId: organizationId },
+      });
+
+      return request;
   }),
 
   update: protectedProcedure
@@ -173,20 +247,21 @@ export const requestsRouter = router({
     }),
 
   route: protectedProcedure
-    .input(z.object({ id: z.string(), departmentId: z.string(), note: z.string().optional() }))
+    .input(z.object({ id: z.string(), teamId: z.string(), note: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
+      await assertCanReadRequest(ctx.userId, input.id);
       await requireAgencyAction(ctx.userId, "request.route");
       const result = await RequestService.route({
         actorId: ctx.userId,
         requestId: input.id,
-        departmentId: input.departmentId,
+        teamId: input.teamId,
         note: input.note,
       });
 
       posthogServer.capture({
         distinctId: ctx.userId,
         event: "request_routed",
-        properties: { requestId: input.id, departmentId: input.departmentId },
+        properties: { requestId: input.id, teamId: input.teamId },
       });
 
       return result;
@@ -201,6 +276,7 @@ export const requestsRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertCanReadRequest(ctx.userId, input.id);
       await requireAgencyAction(ctx.userId, "request.transition");
       return RequestService.transition({
         actorId: ctx.userId,
@@ -213,6 +289,7 @@ export const requestsRouter = router({
   approve: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await assertCanReadRequest(ctx.userId, input.id);
       await requireAgencyAction(ctx.userId, "request.approve");
       return RequestService.approve({ actorId: ctx.userId, requestId: input.id });
     }),
@@ -220,6 +297,7 @@ export const requestsRouter = router({
   reject: protectedProcedure
     .input(z.object({ id: z.string(), reason: z.string().min(2) }))
     .mutation(async ({ ctx, input }) => {
+      await assertCanReadRequest(ctx.userId, input.id);
       await requireAgencyAction(ctx.userId, "request.reject");
       return RequestService.reject({
         actorId: ctx.userId,
@@ -256,7 +334,7 @@ export const requestsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const request = await assertCanReadRequest(ctx.userId, input.requestId);
       // Staff need comment.create; the request's own submitter may always comment on it.
-      // Read-only viewers (client_viewer) who aren't the submitter are blocked.
+      // Non-agency callers who are not the submitter are blocked.
       if (request.submittedById !== ctx.userId) {
         const agencyCtx = await getAgencyAuthContext(ctx.userId);
         if (!can(agencyCtx, "comment.create")) {

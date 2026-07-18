@@ -5,41 +5,39 @@ import { test, expect } from "@playwright/test";
  *
  * Tests that the public request / lead form on the marketing site
  * is accessible and renders correctly.  Full conversion (agency lead
- * converts → external workspace created) requires authenticated state
+ * converts → external organization created) requires authenticated state
  * and is covered in integration tests.
  */
 
-const BASE = process.env["PLAYWRIGHT_BASE_URL"] ?? "http://localhost:3000";
-
 test.describe("Marketing site lead flow", () => {
   test("home page renders", async ({ page }) => {
-    await page.goto(`${BASE}/`);
+    await page.goto("/");
     // Root redirects to login when unauthenticated
     await expect(page).toHaveURL(/login/);
   });
 
   test("public request form renders on /request", async ({ page }) => {
-    await page.goto(`${BASE}/request`);
-    await expect(page.getByText(/start a project/i)).toBeVisible();
+    await page.goto("/request");
+    await expect(page.getByText("Start a Project", { exact: true })).toBeVisible();
   });
 
   test("about page renders", async ({ page }) => {
-    await page.goto(`${BASE}/about`);
+    await page.goto("/about");
     await expect(page.getByRole("heading", { name: /about ethree10/i })).toBeVisible();
   });
 
   test("services page renders", async ({ page }) => {
-    await page.goto(`${BASE}/services`);
-    await expect(page.getByRole("heading")).toBeVisible();
+    await page.goto("/services");
+    await expect(page.getByRole("heading", { name: "Services" })).toBeVisible();
   });
 
   test("contact page renders", async ({ page }) => {
-    await page.goto(`${BASE}/contact`);
-    await expect(page.getByRole("heading")).toBeVisible();
+    await page.goto("/contact");
+    await expect(page.getByRole("heading", { name: "Contact Us" })).toBeVisible();
   });
 
   test("leads list is protected", async ({ page }) => {
-    await page.goto(`${BASE}/leads`);
+    await page.goto("/leads");
     await expect(page).toHaveURL(/login/);
   });
 });

@@ -1,6 +1,6 @@
 import { Search } from "lucide-react";
 import type { User } from "next-auth";
-import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
+
 import { AccountMenu } from "@/components/layout/account-menu";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -14,7 +14,7 @@ export function AppTopbar({ user }: AppTopbarProps) {
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-border bg-background/80 px-4 backdrop-blur-md md:px-6">
       <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         <MobileNav />
-        <WorkspaceSwitcher />
+
         <button
           type="button"
           aria-label="Search"

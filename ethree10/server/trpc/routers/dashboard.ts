@@ -4,54 +4,53 @@ import { db } from "@/server/db/client";
 import { getAgencyAuthContext } from "@/server/services/agency";
 import { can } from "@/server/auth/permissions";
 
-const REQUESTER_ROLES = ["client", "client_viewer"] as const;
+
 
 export const dashboardRouter = router({
-  // Sub-unit-lead rollup retired in the role simplification: the subunit_lead role was folded
-  // into department_lead, so sub-unit work now rolls up through the department surfaces below.
+  // Team heads receive a team-scoped operational rollup.
 
-  departmentLead: protectedProcedure.query(async ({ ctx }) => {
+  teamLead: protectedProcedure.query(async ({ ctx }) => {
     const agencyCtx = await getAgencyAuthContext(ctx.userId);
     if (!can(agencyCtx, "project.update")) return null;
 
-    const myDepartments = await db.department.findMany({
+    const myTeams = await db.team.findMany({
       where: { leadId: ctx.userId },
       select: { id: true, name: true },
     });
 
-    if (myDepartments.length === 0) return null;
-    const departmentIds = myDepartments.map((department) => department.id);
+    if (myTeams.length === 0) return null;
+    const teamIds = myTeams.map((team) => team.id);
     const now = new Date();
 
     const incomingRequests = await db.request.findMany({
       where: {
-        routedDepartmentId: { in: departmentIds },
+        routedTeamId: { in: teamIds },
         stage: { in: ["pending_approval", "under_review", "scoping", "proposal"] },
       },
       orderBy: [{ urgency: "desc" }, { createdAt: "desc" }],
       take: 10,
       include: {
-        workspace: { select: { id: true, name: true } },
+        organization: { select: { id: true, name: true } },
       },
     });
 
     const activeProjects = await db.project.count({
       where: {
-        agencyDepartmentId: { in: departmentIds },
+        agencyTeamId: { in: teamIds },
         status: { in: ["active", "in_review", "on_hold"] },
       },
     });
 
     const deliveredAwaitingFeedback = await db.project.count({
       where: {
-        agencyDepartmentId: { in: departmentIds },
+        agencyTeamId: { in: teamIds },
         status: "delivered",
       },
     });
 
     const overdueTasksCount = await db.task.count({
       where: {
-        project: { agencyDepartmentId: { in: departmentIds } },
+        project: { agencyTeamId: { in: teamIds } },
         status: { notIn: ["done", "cancelled"] },
         dueDate: { lt: now },
       },
@@ -59,14 +58,14 @@ export const dashboardRouter = router({
 
     const kpiSnapshot = await db.kpiSnapshot.findFirst({
       where: {
-        level: "department",
-        scopeId: { in: departmentIds },
+        level: "team",
+        scopeId: { in: teamIds },
       },
       orderBy: { periodStart: "desc" },
     });
 
     return {
-      departments: myDepartments,
+      teams: myTeams,
       incomingRequests,
       metrics: {
         activeProjects,
@@ -79,7 +78,7 @@ export const dashboardRouter = router({
 
   agencyLead: protectedProcedure.query(async ({ ctx }) => {
     const agencyCtx = await getAgencyAuthContext(ctx.userId);
-    if (!can(agencyCtx, "workspace.update")) return null;
+    if (!can(agencyCtx, "organization.update")) return null;
 
     const now = new Date();
     const sevenDaysAgo = new Date(now);
@@ -93,8 +92,8 @@ export const dashboardRouter = router({
       orderBy: [{ urgency: "desc" }, { createdAt: "asc" }],
       take: 10,
       include: {
-        routedDepartment: { select: { name: true } },
-        workspace: { select: { name: true } },
+        routedTeam: { select: { name: true } },
+        organization: { select: { name: true } },
       },
     });
 
@@ -103,8 +102,8 @@ export const dashboardRouter = router({
       orderBy: [{ targetDeliveryDate: "asc" }, { updatedAt: "desc" }],
       take: 6,
       include: {
-        department: { select: { name: true } },
-        workspace: { select: { name: true } },
+        team: { select: { name: true } },
+        organization: { select: { name: true } },
       },
     });
 
@@ -158,24 +157,18 @@ export const dashboardRouter = router({
       return sum + Math.max(0, estimate - logged);
     }, 0);
 
-    const agencyWorkspace = await db.workspace.findFirst({ where: { type: "agency" } });
-    let totalWeeklyCapacity = 0;
+    const agencyMemberships = await db.membership.findMany({
+      where: {
+        removedAt: null,
+        acceptedAt: { not: null },
+      },
+      include: { user: { select: { workingHoursPerWeek: true } } },
+    });
 
-    if (agencyWorkspace) {
-      const agencyMemberships = await db.membership.findMany({
-        where: {
-          workspaceId: agencyWorkspace.id,
-          removedAt: null,
-          acceptedAt: { not: null },
-        },
-        include: { user: { select: { workingHoursPerWeek: true } } },
-      });
-
-      totalWeeklyCapacity = agencyMemberships.reduce(
-        (sum, membership) => sum + (membership.user.workingHoursPerWeek || 40),
-        0,
-      );
-    }
+    const totalWeeklyCapacity = agencyMemberships.reduce(
+      (sum, membership) => sum + (membership.user.workingHoursPerWeek || 40),
+      0,
+    );
 
     return {
       crossAgencyInbox,
@@ -198,83 +191,5 @@ export const dashboardRouter = router({
     };
   }),
 
-  requester: protectedProcedure.query(async ({ ctx }) => {
-    const requesterMemberships = await db.membership.findMany({
-      where: {
-        userId: ctx.userId,
-        role: { in: [...REQUESTER_ROLES] },
-        removedAt: null,
-        acceptedAt: { not: null },
-      },
-      select: {
-        workspaceId: true,
-        workspace: { select: { id: true, name: true } },
-      },
-    });
 
-    if (requesterMemberships.length === 0) return null;
-    const workspaceIds = requesterMemberships.map((membership) => membership.workspaceId);
-
-    const [recentRequests, activeProjects, awaitingFeedback, openRequestsCount, activeProjectsCount] =
-      await Promise.all([
-        db.request.findMany({
-          where: { workspaceId: { in: workspaceIds } },
-          orderBy: { updatedAt: "desc" },
-          take: 6,
-          include: {
-            project: { select: { id: true, code: true, status: true } },
-            workspace: { select: { id: true, name: true } },
-          },
-        }),
-        db.project.findMany({
-          where: {
-            workspaceId: { in: workspaceIds },
-            status: { in: ["active", "in_review", "on_hold"] },
-          },
-          orderBy: [{ targetDeliveryDate: "asc" }, { updatedAt: "desc" }],
-          take: 6,
-          include: {
-            workspace: { select: { id: true, name: true } },
-            department: { select: { name: true } },
-            request: { select: { id: true } },
-          },
-        }),
-        db.project.findMany({
-          where: {
-            workspaceId: { in: workspaceIds },
-            status: "delivered",
-          },
-          orderBy: { updatedAt: "desc" },
-          take: 6,
-          include: {
-            workspace: { select: { id: true, name: true } },
-            request: { select: { id: true } },
-          },
-        }),
-        db.request.count({
-          where: {
-            workspaceId: { in: workspaceIds },
-            stage: { notIn: ["closed", "rejected", "cancelled"] },
-          },
-        }),
-        db.project.count({
-          where: {
-            workspaceId: { in: workspaceIds },
-            status: { in: ["active", "in_review", "on_hold"] },
-          },
-        }),
-      ]);
-
-    return {
-      workspaces: requesterMemberships.map((membership) => membership.workspace),
-      recentRequests,
-      activeProjects,
-      awaitingFeedback,
-      metrics: {
-        openRequestsCount,
-        activeProjectsCount,
-        awaitingFeedbackCount: awaitingFeedback.length,
-      },
-    };
-  }),
 });

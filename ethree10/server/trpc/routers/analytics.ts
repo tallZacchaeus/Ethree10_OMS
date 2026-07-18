@@ -9,8 +9,8 @@ import { subMonths, startOfMonth, format } from "date-fns";
 
 export const analyticsRouter = router({
   getAdvancedMetrics: protectedProcedure.query(async ({ ctx }) => {
-    // Requires an agency role with workspace.read (admin/executive/leads) or super_admin
-    await requireAgencyAction(ctx.userId, "workspace.read");
+    // Requires an agency role with organization.read (admin/executive/leads) or super_admin
+    await requireAgencyAction(ctx.userId, "organization.read");
 
     // 1. 6-Month Throughput (Tasks Completed per month)
     const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5));

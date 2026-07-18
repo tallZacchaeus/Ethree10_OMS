@@ -45,7 +45,7 @@ interface LeadRow {
   message: string;
   status: LeadStatus;
   createdAt: Date | string;
-  workspace?: { id: string; name: string; slug: string } | null;
+  org?: { id: string; name: string; slug: string } | null;
 }
 
 function ConvertDialog({
@@ -59,20 +59,21 @@ function ConvertDialog({
 }) {
   const { toast } = useToast();
   const utils = trpc.useUtils();
-  const [workspaceName, setWorkspaceName] = useState(lead.organization ?? "");
+  const [organizationName, setOrganizationName] = useState(lead.organization ?? "");
   const [requesterName, setRequesterName] = useState(lead.name);
   const [requesterEmail, setRequesterEmail] = useState(lead.email);
 
-  const convert = trpc.leads.convertToWorkspace.useMutation({
-    onSuccess: (res) => {
+  const convert = trpc.leads.convertToOrganization.useMutation({
+    onSuccess: (res: { organization: { name: string } }) => {
       toast({
         title: "Lead converted",
-        description: `Workspace "${res.workspace.name}" created and ${requesterEmail} invited.`,
+        description: `Organization "${res.organization.name}" created for link-based request tracking.`,
       });
       void utils.leads.list.invalidate();
       onOpenChange(false);
     },
-    onError: (err) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onError: (err: any) =>
       toast({ title: "Conversion failed", description: err.message, variant: "destructive" }),
   });
 
@@ -80,18 +81,18 @@ function ConvertDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Convert lead to workspace</DialogTitle>
+          <DialogTitle>Convert lead to organization</DialogTitle>
           <DialogDescription>
-            Creates a client workspace and invites the requester as its admin.
+            Creates a client organization record. The requester continues through secure tracking links and does not receive a staff account.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="ws-name">Workspace name</Label>
+            <Label htmlFor="ws-name">Organization name</Label>
             <Input
               id="ws-name"
-              value={workspaceName}
-              onChange={(e) => setWorkspaceName(e.target.value)}
+              value={organizationName}
+              onChange={(e) => setOrganizationName(e.target.value)}
               placeholder="e.g. Lightbearers Foundation"
             />
           </div>
@@ -118,11 +119,11 @@ function ConvertDialog({
             Cancel
           </Button>
           <Button
-            disabled={convert.isPending || !workspaceName || !requesterEmail}
+            disabled={convert.isPending || !organizationName || !requesterEmail}
             onClick={() =>
               convert.mutate({
                 leadId: lead.id,
-                workspaceName,
+                organizationName,
                 requesterName,
                 requesterEmail,
               })

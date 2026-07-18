@@ -26,12 +26,12 @@ function buildAdapterConfig(integration: Integration): AdapterConfig {
  * source of truth — failures degrade the integration but never block local work.
  */
 export class IntegrationService {
-  static async list(filters: { departmentId?: string } = {}) {
+  static async list(filters: { teamId?: string } = {}) {
     return db.integration.findMany({
-      where: { departmentId: filters.departmentId },
+      where: { teamId: filters.teamId },
       orderBy: { createdAt: "desc" },
       include: {
-        department: { select: { id: true, name: true } },
+        team: { select: { id: true, name: true } },
         subUnit: { select: { id: true, name: true } },
         _count: { select: { links: true } },
       },
@@ -48,7 +48,7 @@ export class IntegrationService {
     actorId: string;
     provider: IntegrationProvider;
     name: string;
-    departmentId?: string;
+    teamId?: string;
     subUnitId?: string;
     baseUrl?: string;
     config: Record<string, unknown>;
@@ -70,7 +70,7 @@ export class IntegrationService {
       data: {
         provider: args.provider,
         name: args.name,
-        departmentId: args.departmentId ?? null,
+        teamId: args.teamId ?? null,
         subUnitId: args.subUnitId ?? null,
         baseUrl: args.baseUrl ?? null,
         config: args.config as object,
@@ -128,12 +128,12 @@ export class IntegrationService {
     }
     const project = await db.project.findUnique({
       where: { id: task.projectId },
-      select: { agencyDepartmentId: true },
+      select: { agencyTeamId: true },
     });
-    if (!project?.agencyDepartmentId) return null;
+    if (!project?.agencyTeamId) return null;
     return db.integration.findFirst({
       where: {
-        departmentId: project.agencyDepartmentId,
+        teamId: project.agencyTeamId,
         status: { in: ["active", "degraded"] },
       },
     });

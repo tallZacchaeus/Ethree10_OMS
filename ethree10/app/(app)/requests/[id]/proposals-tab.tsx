@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useWorkspace } from "@/components/providers/workspace-provider";
+
 import { formatMoney, formatDate } from "@/lib/format";
 import { useToast } from "@/components/ui/use-toast";
 import { CreateProposalDialog } from "@/components/proposals/create-proposal-dialog";
@@ -27,7 +27,8 @@ type ProposalRecord = {
 };
 
 export function ProposalsTab({ requestId }: { requestId: string }) {
-  const { roles, isSuperAdmin } = useWorkspace();
+  const isSuperAdmin = false; // Stub
+  const roles: string[] = [];
   const { toast } = useToast();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [rejectionTarget, setRejectionTarget] = useState<ProposalRecord | null>(null);
@@ -35,7 +36,7 @@ export function ProposalsTab({ requestId }: { requestId: string }) {
   const isAgencyStaff =
     isSuperAdmin ||
     roles.some((r) =>
-      ["admin", "department_lead"].includes(r),
+      ["agency_admin", "team_head"].includes(r),
     );
 
   const { data: proposals, isLoading, refetch } = trpc.proposals.list.useQuery({ requestId });

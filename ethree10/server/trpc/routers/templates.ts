@@ -30,7 +30,7 @@ export const templatesRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const agencyCtx = await getAgencyAuthContext(ctx.userId);
-      if (!can(agencyCtx, "workspace.update")) {
+      if (!can(agencyCtx, "organization.update")) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Only agency staff can create templates" });
       }
       return TemplateService.create({ actorId: ctx.userId, ...input });

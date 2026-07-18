@@ -8,11 +8,11 @@ const slugify = (s: string) =>
 
 export const subunitsRouter = router({
   list: protectedProcedure
-    .input(z.object({ departmentId: z.string() }))
+    .input(z.object({ teamId: z.string() }))
     .query(async ({ ctx, input }) => {
       await ctx.authorize("subunit.read");
       return ctx.db.subUnit.findMany({
-        where: { departmentId: input.departmentId, archivedAt: null },
+        where: { teamId: input.teamId, archivedAt: null },
         orderBy: { name: "asc" },
       });
     }),
@@ -20,20 +20,20 @@ export const subunitsRouter = router({
   create: protectedProcedure
     .input(
       z.object({
-        departmentId: z.string(),
+        teamId: z.string(),
         name: z.string().min(2),
         description: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       await ctx.authorize("subunit.create");
-      const dept = await ctx.db.department.findFirst({
-        where: { id: input.departmentId },
+      const dept = await ctx.db.team.findFirst({
+        where: { id: input.teamId },
       });
       if (!dept) throw new TRPCError({ code: "NOT_FOUND" });
       return ctx.db.subUnit.create({
         data: {
-          departmentId: input.departmentId,
+          teamId: input.teamId,
           name: input.name,
           slug: slugify(input.name),
           description: input.description,

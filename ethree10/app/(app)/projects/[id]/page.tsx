@@ -14,7 +14,7 @@ import { KanbanBoard } from "@/components/tasks/kanban-board";
 import { TaskCreateDialog } from "@/components/tasks/task-create-dialog";
 import { TemplateApplyDialog } from "@/components/tasks/template-apply-dialog";
 import { useToast } from "@/components/ui/use-toast";
-import { useWorkspace } from "@/components/providers/workspace-provider";
+
 import { formatDate } from "@/lib/format";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -23,7 +23,8 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const { toast } = useToast();
-  const { roles, isSuperAdmin } = useWorkspace();
+  const isSuperAdmin = false; // Stub until proper auth context is used
+  const roles: string[] = [];
   const utils = trpc.useUtils();
   const [creating, setCreating] = useState(false);
   const [applyingTemplate, setApplyingTemplate] = useState(false);
@@ -33,7 +34,7 @@ export default function ProjectDetailPage() {
   const isAgencyStaff =
     isSuperAdmin ||
     roles.some((r) =>
-      ["admin", "department_lead"].includes(r),
+      ["agency_admin", "team_head"].includes(r),
     );
 
   const deliver = trpc.projects.deliver.useMutation({
@@ -77,7 +78,7 @@ export default function ProjectDetailPage() {
             <span className="font-mono text-xs text-muted-foreground">{project.code}</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            {project.workspace?.name} · {project.department?.name ?? "Unassigned"} · from{" "}
+            {project.organization?.name} · {project.team?.name ?? "Unassigned"} · from{" "}
             <Link
               href={`/requests/${project.request.id}`}
               className="text-brand-600 hover:underline"

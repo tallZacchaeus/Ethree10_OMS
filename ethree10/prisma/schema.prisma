@@ -27,34 +27,41 @@ model VerificationToken {
 // ============================================================
 
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  emailVerified  DateTime?
-  hashedPassword String?
-  name           String
-  avatarUrl      String?
-  phone          String?
-  phoneVerifiedAt DateTime?
+  id                    String    @id @default(cuid())
+  email                 String    @unique
+  emailVerified         DateTime?
+  hashedPassword        String?
+  name                  String
+  avatarUrl             String?
+  phone                 String?
+  phoneVerifiedAt       DateTime?
   phoneVerificationCode String?
-  timezone       String   @default("Africa/Lagos")
-  workingHoursPerWeek Int @default(40)
-  isSuperAdmin   Boolean  @default(false)
-  mfaEnabled     Boolean  @default(false)
-  mfaSecret      String?
-  mfaRecoveryCodes String[]
-  deactivatedAt  DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  timezone              String    @default("Africa/Lagos")
+  workingHoursPerWeek   Int       @default(40)
+  isSuperAdmin          Boolean   @default(false)
+  mfaEnabled            Boolean   @default(false)
+  mfaSecret             String?
+  mfaRecoveryCodes      String[]
+  deactivatedAt         DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  memberships      Membership[]
-  skills           UserSkill[]
-  notifications    Notification[]
+  memberships             Membership[]
+  skills                  UserSkill[]
+  notifications           Notification[]
   notificationPreferences NotificationPreference[]
-  auditLogs        AuditLog[]     @relation("ActorAuditLogs")
-  authoredComments TaskComment[]
-  authoredReports  Report[]       @relation("ReportAuthoredBy")
-  timeLogs         TimeLog[]      @relation("UserTimeLogs")
-  oauthAccounts    OAuthAccount[]
+  auditLogs               AuditLog[]               @relation("ActorAuditLogs")
+  authoredComments        TaskComment[]
+  authoredReports         Report[]                 @relation("ReportAuthoredBy")
+  finalizedReports        Report[]                 @relation("ReportFinalizedBy")
+  reportAmendments        ReportAmendment[]
+  timeLogs                TimeLog[]                @relation("UserTimeLogs")
+  taskContributions       TaskContributor[]        @relation("TaskContributors")
+  staffAvailability       StaffAvailability[]
+  createdDeliverables     Deliverable[]            @relation("DeliverableCreatedBy")
+  deliverableVersions     DeliverableVersion[]     @relation("DeliverableVersionCreatedBy")
+  taskReviews             TaskReview[]             @relation("TaskReviews")
+  oauthAccounts           OAuthAccount[]
 
   @@index([email])
 }
@@ -94,55 +101,62 @@ model Organization {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  memberships Membership[]
-  requests    Request[]
-  projects    Project[]
-  leads       Lead[]
-  invoices    Invoice[]
-  receipts    Receipt[]
+  requests Request[]
+  projects Project[]
+  leads    Lead[]
+  invoices Invoice[]
+  receipts Receipt[]
+  reports  Report[]
+}
+
+model Position {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships       Membership[]
+  taskContributions TaskContributor[]
 }
 
 enum Role {
   super_admin
-  executive
-  admin
-  department_lead
-  member
-  client
-  client_viewer
+  agency_admin
+  team_head
+  team_member
+  finance_admin
 }
 
 model Membership {
-  id          String    @id @default(cuid())
-  userId      String
-  // null = agency staff (global); set = a client member of that organization.
-  organizationId String?
-  role        Role
-  departmentId String?
-  subUnitId   String?
-  title       String?
-  isPrimary   Boolean   @default(false)
+  id                String    @id @default(cuid())
+  userId            String
+  role              Role
+  teamId            String?
+  subUnitId         String?
+  positionId        String?
+  title             String?
+  isPrimary         Boolean   @default(false)
   // Capability toggle: lets a `member` manage projects (create/update projects, create/assign
   // tasks) without granting a separate lead role. Ignored for non-member roles.
-  canManageProjects Boolean @default(false)
-  invitedAt   DateTime?
-  acceptedAt  DateTime?
-  removedAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  canManageProjects Boolean   @default(false)
+  invitedAt         DateTime?
+  acceptedAt        DateTime?
+  removedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  department   Department?   @relation(fields: [departmentId], references: [id])
-  subUnit      SubUnit?      @relation(fields: [subUnitId], references: [id])
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team     Team?     @relation(fields: [teamId], references: [id])
+  subUnit  SubUnit?  @relation(fields: [subUnitId], references: [id])
+  position Position? @relation(fields: [positionId], references: [id])
 
-  @@unique([userId, organizationId, role, departmentId, subUnitId])
-  @@index([organizationId])
+  @@unique([userId, role, teamId, subUnitId])
   @@index([userId])
 }
 
-// Departments belong to the (single, implicit) agency — no workspace/org scoping.
-model Department {
+// Teams belong to the single implicit Ethree10 agency.
+model Team {
   id          String    @id @default(cuid())
   name        String
   slug        String    @unique
@@ -157,28 +171,51 @@ model Department {
   subUnits         SubUnit[]
   memberships      Membership[]
   integrations     Integration[]
-  requestsRoutedTo Request[]     @relation("RequestRoutedDepartment")
+  requestsRoutedTo Request[]     @relation("RequestRoutedTeam")
   projects         Project[]
+  services         Service[]
+}
+
+model Service {
+  id                   String   @id @default(cuid())
+  name                 String
+  slug                 String   @unique
+  description          String?
+  teamId               String?
+  requiredBriefFields  Json     @default("[]")
+  expectedDeliverables Json     @default("[]")
+  defaultUrgency       Urgency  @default(medium)
+  defaultSlaHours      Int?
+  requiredReviews      Json     @default("[]")
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  team     Team?     @relation(fields: [teamId], references: [id])
+  requests Request[]
+
+  @@index([teamId])
+  @@index([isActive])
 }
 
 model SubUnit {
-  id           String    @id @default(cuid())
-  departmentId String
-  name         String
-  slug         String
-  description  String?
-  leadId       String?
-  archivedAt   DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  teamId      String
+  name        String
+  slug        String
+  description String?
+  leadId      String?
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  department   Department    @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  team         Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
   memberships  Membership[]
   tasks        Task[]
   integrations Integration[]
 
-  @@unique([departmentId, slug])
-  @@index([departmentId])
+  @@unique([teamId, slug])
+  @@index([teamId])
 }
 
 // ============================================================
@@ -186,10 +223,10 @@ model SubUnit {
 // ============================================================
 
 model Skill {
-  id        String    @id @default(cuid())
-  name      String    @unique
+  id        String   @id @default(cuid())
+  name      String   @unique
   category  String?
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   users UserSkill[]
 }
@@ -227,17 +264,17 @@ enum LeadStatus {
 }
 
 model Lead {
-  id           String     @id @default(cuid())
-  name         String
-  email        String
-  phone        String?
-  organization String?
-  message      String
-  source       String?
-  status       LeadStatus @default(new)
+  id             String     @id @default(cuid())
+  name           String
+  email          String
+  phone          String?
+  organization   String?
+  message        String
+  source         String?
+  status         LeadStatus @default(new)
   organizationId String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
   org Organization? @relation(fields: [organizationId], references: [id])
 
@@ -253,6 +290,7 @@ enum Urgency {
 
 enum RequestStage {
   submitted
+  needs_clarification
   pending_approval
   under_review
   scoping
@@ -268,44 +306,58 @@ enum RequestStage {
 }
 
 model Request {
-  id                 String       @id @default(cuid())
-  code               String       @unique
-  organizationId     String
-  submittedById      String
-  title              String
-  description        String
-  projectType        String
-  urgency            Urgency      @default(medium)
-  deadline           DateTime?
-  stage              RequestStage @default(submitted)
-  routedDepartmentId String?
-  primaryContact     String?
-  externalRef        String?
-  approvedById       String?
-  rejectedReason     String?
-  budgetEstimate     Decimal?     @db.Decimal(14, 2)
-  currency           String       @default("NGN")
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  id                   String       @id @default(cuid())
+  code                 String       @unique
+  publicToken          String?      @unique
+  publicTokenExpiresAt DateTime?
+  publicTokenRevokedAt DateTime?
+  organizationId       String
+  submittedById        String?
+  requesterName        String?
+  requesterEmail       String?
+  requesterPhone       String?
+  title                String
+  description          String
+  projectType          String
+  serviceId            String?
+  expectedOutcome      String?
+  expectedDeliverables String?
+  acceptanceCriteria   String?
+  supportingLinks      String[]     @default([])
+  consentToEmail       Boolean      @default(false)
+  urgency              Urgency      @default(medium)
+  deadline             DateTime?
+  stage                RequestStage @default(submitted)
+  routedTeamId         String?
+  primaryContact       String?
+  externalRef          String?
+  approvedById         String?
+  rejectedReason       String?
+  budgetEstimate       Decimal?     @db.Decimal(14, 2)
+  currency             String       @default("NGN")
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 
-  organization     Organization       @relation(fields: [organizationId], references: [id])
-  routedDepartment Department?        @relation("RequestRoutedDepartment", fields: [routedDepartmentId], references: [id])
-  project          Project?
-  proposals        Proposal[]         @relation("RequestProposals")
-  stageEvents      RequestStageEvent[]
-  attachments      Attachment[]       @relation("RequestAttachments")
-  comments         TaskComment[]      @relation("RequestComments")
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  service      Service?            @relation(fields: [serviceId], references: [id])
+  routedTeam   Team?               @relation("RequestRoutedTeam", fields: [routedTeamId], references: [id])
+  project      Project?
+  proposals    Proposal[]          @relation("RequestProposals")
+  stageEvents  RequestStageEvent[]
+  attachments  Attachment[]        @relation("RequestAttachments")
+  comments     TaskComment[]       @relation("RequestComments")
 
   @@index([organizationId])
   @@index([stage])
-  @@index([routedDepartmentId])
+  @@index([routedTeamId])
+  @@index([serviceId])
 }
 
 // Agency-global approval rules (the agency is implicit).
 model ApprovalRule {
   id               String   @id @default(cuid())
   name             String
-  triggerCondition Json     // e.g. { isExternal: true, minBudget: 500000 }
+  triggerCondition Json // e.g. { isExternal: true, minBudget: 500000 }
   requiredRole     Role
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
@@ -317,7 +369,7 @@ model RequestStageEvent {
   requestId String
   fromStage RequestStage?
   toStage   RequestStage
-  actorId   String
+  actorId   String?
   note      String?
   createdAt DateTime      @default(now())
 
@@ -340,7 +392,7 @@ model Project {
   code               String        @unique
   requestId          String        @unique
   organizationId     String
-  agencyDepartmentId String?
+  agencyTeamId       String?
   pmUserId           String?
   name               String
   description        String?
@@ -348,23 +400,54 @@ model Project {
   startDate          DateTime?
   targetDeliveryDate DateTime?
   actualDeliveryDate DateTime?
+  clientRevision     Int           @default(1)
   csatScore          Int?
   csatComment        String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  request    Request      @relation(fields: [requestId], references: [id])
-  organization Organization @relation(fields: [organizationId], references: [id])
-  department Department?  @relation(fields: [agencyDepartmentId], references: [id])
-  tasks      Task[]
-  milestones Milestone[]
-  proposals  Proposal[]
-  invoices   Invoice[]
-  sponsorships Sponsorship[]
+  request         Request          @relation(fields: [requestId], references: [id])
+  organization    Organization     @relation(fields: [organizationId], references: [id])
+  team            Team?            @relation(fields: [agencyTeamId], references: [id])
+  tasks           Task[]
+  milestones      Milestone[]
+  proposals       Proposal[]
+  invoices        Invoice[]
+  sponsorships    Sponsorship[]
+  clientDecisions ClientDecision[]
 
   @@index([organizationId])
-  @@index([agencyDepartmentId])
+  @@index([agencyTeamId])
   @@index([status])
+}
+
+enum ClientDecisionType {
+  accepted
+  changes_requested
+}
+
+model ClientDecision {
+  id              String             @id @default(cuid())
+  projectId       String
+  decision        ClientDecisionType
+  projectRevision Int
+  message         String?
+  createdAt       DateTime           @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+}
+
+model PublicRateLimit {
+  key         String
+  action      String
+  windowStart DateTime
+  count       Int      @default(1)
+  expiresAt   DateTime
+
+  @@id([key, action, windowStart])
+  @@index([expiresAt])
 }
 
 enum TaskStatus {
@@ -391,6 +474,7 @@ model Task {
   assigneeUserId     String?
   title              String
   description        String?
+  acceptanceCriteria String?
   status             TaskStatus   @default(todo)
   priority           TaskPriority @default(medium)
   estimatedHours     Decimal?     @db.Decimal(6, 2)
@@ -403,23 +487,141 @@ model Task {
   reopenedCount      Int          @default(0)
   completionSummary  String?
   completionEvidence String?
+  revision           Int          @default(1)
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  subUnit         SubUnit?         @relation(fields: [subUnitId], references: [id])
-  comments        TaskComment[]    @relation("TaskComments")
-  attachments     Attachment[]     @relation("TaskAttachments")
-  timeLogs        TimeLog[]        @relation("TaskTimeLogs")
+  project         Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  subUnit         SubUnit?          @relation(fields: [subUnitId], references: [id])
+  comments        TaskComment[]     @relation("TaskComments")
+  attachments     Attachment[]      @relation("TaskAttachments")
+  timeLogs        TimeLog[]         @relation("TaskTimeLogs")
   integrationLink IntegrationLink?
-  dependencies    TaskDependency[] @relation("TaskDeps")
-  dependents      TaskDependency[] @relation("TaskDependents")
+  dependencies    TaskDependency[]  @relation("TaskDeps")
+  dependents      TaskDependency[]  @relation("TaskDependents")
+  contributors    TaskContributor[]
+  deliverables    Deliverable[]
+  reviews         TaskReview[]
 
   @@index([projectId])
   @@index([subUnitId])
   @@index([assigneeUserId])
   @@index([status])
   @@index([dueDate])
+}
+
+model TaskContributor {
+  id               String    @id @default(cuid())
+  taskId           String
+  userId           String
+  positionId       String?
+  contributionRole String
+  isPrimary        Boolean   @default(false)
+  assignedAt       DateTime  @default(now())
+  removedAt        DateTime?
+
+  task     Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user     User      @relation("TaskContributors", fields: [userId], references: [id], onDelete: Cascade)
+  position Position? @relation(fields: [positionId], references: [id])
+
+  @@unique([taskId, userId, contributionRole])
+  @@index([userId, removedAt])
+  @@index([taskId, removedAt])
+}
+
+enum AvailabilityType {
+  available
+  limited
+  leave
+}
+
+model StaffAvailability {
+  id              String           @id @default(cuid())
+  userId          String
+  type            AvailabilityType
+  startsAt        DateTime
+  endsAt          DateTime
+  capacityPercent Int              @default(100)
+  reason          String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startsAt, endsAt])
+}
+
+enum DeliverableKind {
+  file
+  link
+  document
+  deployment
+  campaign
+  other
+}
+
+enum DeliverableVisibility {
+  internal
+  client
+}
+
+model Deliverable {
+  id              String                @id @default(cuid())
+  taskId          String
+  createdById     String
+  title           String
+  kind            DeliverableKind
+  visibility      DeliverableVisibility @default(internal)
+  currentRevision Int                   @default(1)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  task      Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdBy User                 @relation("DeliverableCreatedBy", fields: [createdById], references: [id])
+  versions  DeliverableVersion[]
+
+  @@index([taskId, visibility])
+}
+
+model DeliverableVersion {
+  id            String   @id @default(cuid())
+  deliverableId String
+  revision      Int
+  createdById   String
+  url           String?
+  content       String?
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  deliverable Deliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  createdBy   User        @relation("DeliverableVersionCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([deliverableId, revision])
+  @@index([createdById])
+}
+
+enum ReviewDecision {
+  approved
+  revisions_required
+  rejected
+  cancelled
+}
+
+model TaskReview {
+  id         String         @id @default(cuid())
+  taskId     String
+  reviewerId String
+  reviewType String         @default("team_head")
+  decision   ReviewDecision
+  feedback   String?
+  revision   Int
+  createdAt  DateTime       @default(now())
+
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  reviewer User @relation("TaskReviews", fields: [reviewerId], references: [id])
+
+  @@index([taskId, revision, createdAt])
+  @@index([reviewerId])
 }
 
 model TaskDependency {
@@ -435,19 +637,21 @@ model TaskDependency {
 }
 
 model TaskComment {
-  id         String   @id @default(cuid())
-  taskId     String?
-  requestId  String?
-  authorId   String
-  body       String
-  mentions   String[]
-  isInternal Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(cuid())
+  taskId      String?
+  requestId   String?
+  authorId    String?
+  authorName  String?
+  authorEmail String?
+  body        String
+  mentions    String[]
+  isInternal  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   task    Task?    @relation("TaskComments", fields: [taskId], references: [id], onDelete: Cascade)
   request Request? @relation("RequestComments", fields: [requestId], references: [id], onDelete: Cascade)
-  author  User     @relation(fields: [authorId], references: [id])
+  author  User?    @relation(fields: [authorId], references: [id])
 
   @@index([taskId])
   @@index([requestId])
@@ -502,8 +706,8 @@ model Proposal {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
-  project      Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  request      Request?       @relation("RequestProposals", fields: [requestId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  request Request? @relation("RequestProposals", fields: [requestId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([requestId])
@@ -533,21 +737,21 @@ enum InvoiceStatus {
 }
 
 model Invoice {
-  id          String        @id @default(cuid())
-  code        String        @unique
-  projectId   String?
+  id             String        @id @default(cuid())
+  code           String        @unique
+  projectId      String?
   organizationId String
-  status      InvoiceStatus @default(draft)
-  currency    String        @default("NGN")
-  amount      Decimal       @db.Decimal(14, 2)
-  lineItems   Json
-  issuedAt    DateTime?
-  dueAt       DateTime?
-  paidAt      DateTime?
-  paymentRef  String?
-  pdfUrl      String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  status         InvoiceStatus @default(draft)
+  currency       String        @default("NGN")
+  amount         Decimal       @db.Decimal(14, 2)
+  lineItems      Json
+  issuedAt       DateTime?
+  dueAt          DateTime?
+  paidAt         DateTime?
+  paymentRef     String?
+  pdfUrl         String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   project      Project?     @relation(fields: [projectId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
@@ -566,17 +770,17 @@ enum PaymentMethod {
 }
 
 model Receipt {
-  id            String        @id @default(cuid())
-  code          String        @unique
-  invoiceId     String?       @unique
+  id             String        @id @default(cuid())
+  code           String        @unique
+  invoiceId      String?       @unique
   organizationId String
-  amount        Decimal       @db.Decimal(14, 2)
-  currency      String        @default("NGN")
-  paymentMethod PaymentMethod @default(paystack)
-  paymentRef    String?
-  issuedAt      DateTime      @default(now())
-  pdfUrl        String?
-  createdAt     DateTime      @default(now())
+  amount         Decimal       @db.Decimal(14, 2)
+  currency       String        @default("NGN")
+  paymentMethod  PaymentMethod @default(paystack)
+  paymentRef     String?
+  issuedAt       DateTime      @default(now())
+  pdfUrl         String?
+  createdAt      DateTime      @default(now())
 
   invoice      Invoice?     @relation(fields: [invoiceId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
@@ -612,7 +816,7 @@ model Integration {
   id               String              @id @default(cuid())
   provider         IntegrationProvider
   status           IntegrationStatus   @default(active)
-  departmentId     String?
+  teamId           String?
   subUnitId        String?
   name             String
   baseUrl          String?
@@ -623,11 +827,11 @@ model Integration {
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
-  department Department? @relation(fields: [departmentId], references: [id])
-  subUnit    SubUnit?    @relation(fields: [subUnitId], references: [id])
-  links      IntegrationLink[]
+  team    Team?             @relation(fields: [teamId], references: [id])
+  subUnit SubUnit?          @relation(fields: [subUnitId], references: [id])
+  links   IntegrationLink[]
 
-  @@index([departmentId])
+  @@index([teamId])
 }
 
 model IntegrationLink {
@@ -671,8 +875,9 @@ model ProjectTemplate {
 enum ReportLevel {
   member
   subunit
-  department
+  team
   agency
+  organization
 }
 
 enum ReportPeriod {
@@ -680,35 +885,105 @@ enum ReportPeriod {
   monthly
 }
 
-model Report {
-  id           String       @id @default(cuid())
-  level        ReportLevel
-  period       ReportPeriod
-  scopeId      String
-  periodStart  DateTime
-  periodEnd    DateTime
-  metrics      Json
-  highlights   String?
-  pdfUrl       String?
-  authoredById String?
-  createdAt    DateTime     @default(now())
+enum ReportStatus {
+  draft
+  finalized
+}
 
-  authoredBy User? @relation("ReportAuthoredBy", fields: [authoredById], references: [id])
+enum ContributionType {
+  assignment
+  completion
+  deliverable
+  time
+  collaboration
+  review
+  revision
+  blocker
+}
+
+model Report {
+  id            String       @id @default(cuid())
+  level         ReportLevel
+  period        ReportPeriod
+  scopeId       String
+  periodStart   DateTime
+  periodEnd     DateTime
+  metrics       Json
+  narrative     Json?
+  highlights    String?
+  pdfUrl        String?
+  authoredById  String?
+  status        ReportStatus @default(draft)
+  timezone      String       @default("Africa/Lagos")
+  cutoffAt      DateTime
+  finalizedAt   DateTime?
+  finalizedById String?
+  version       Int          @default(1)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  authoredBy     User?                @relation("ReportAuthoredBy", fields: [authoredById], references: [id])
+  finalizedBy    User?                @relation("ReportFinalizedBy", fields: [finalizedById], references: [id])
+  organization   Organization?        @relation(fields: [organizationId], references: [id])
+  organizationId String?
+  contributions  ReportContribution[]
+  amendments     ReportAmendment[]
 
   @@unique([level, period, scopeId, periodStart])
   @@index([level, periodStart])
 }
 
+model ReportContribution {
+  id             String           @id @default(cuid())
+  reportId       String
+  sourceKey      String
+  type           ContributionType
+  userId         String?
+  taskId         String?
+  projectId      String?
+  organizationId String?
+  teamId         String?
+  summary        String
+  outcome        String?
+  effortHours    Decimal?         @db.Decimal(8, 2)
+  occurredAt     DateTime
+  metadata       Json?
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, sourceKey])
+  @@index([reportId, userId])
+  @@index([organizationId, occurredAt])
+  @@index([teamId, occurredAt])
+}
+
+model ReportAmendment {
+  id                String   @id @default(cuid())
+  reportId          String
+  amendedById       String
+  reason            String
+  previousMetrics   Json
+  previousNarrative Json?
+  newMetrics        Json
+  newNarrative      Json?
+  createdAt         DateTime @default(now())
+
+  report    Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  amendedBy User   @relation(fields: [amendedById], references: [id])
+
+  @@index([reportId, createdAt])
+}
+
 // Agency-global scorecard configs (the agency is implicit).
 model ScorecardConfig {
-  id          String      @id @default(cuid())
-  level       ReportLevel
-  scopeId     String      // departmentId or member userId
-  name        String
-  items       Json        // array of ScorecardItem objects
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id        String      @id @default(cuid())
+  level     ReportLevel
+  scopeId   String // teamId or member userId
+  name      String
+  items     Json // array of ScorecardItem objects
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
   @@index([level, scopeId])
 }
@@ -733,7 +1008,7 @@ model KpiSnapshot {
 // ============================================================
 
 model Attachment {
-  id           String    @id @default(cuid())
+  id           String   @id @default(cuid())
   taskId       String?
   requestId    String?
   commentId    String?
@@ -744,7 +1019,7 @@ model Attachment {
   storageKey   String
   publicUrl    String?
   uploadedById String
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime @default(now())
 
   task    Task?    @relation("TaskAttachments", fields: [taskId], references: [id], onDelete: Cascade)
   request Request? @relation("RequestAttachments", fields: [requestId], references: [id], onDelete: Cascade)
@@ -789,16 +1064,16 @@ model Notification {
 
 // Agency-global audit trail (no per-tenant scoping).
 model AuditLog {
-  id          String   @id @default(cuid())
-  actorId     String?
-  action      String
-  entityType  String
-  entityId    String
-  before      Json?
-  after       Json?
-  ip          String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  before     Json?
+  after      Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 
   actor User? @relation("ActorAuditLogs", fields: [actorId], references: [id])
 
@@ -847,16 +1122,16 @@ enum SponsorshipStatus {
 }
 
 model Sponsorship {
-  id            String            @id @default(cuid())
-  sponsorName   String
-  amount        Decimal?          @db.Decimal(14, 2)
-  currency      String            @default("USD")
-  status        SponsorshipStatus @default(prospect)
-  projectId     String?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id          String            @id @default(cuid())
+  sponsorName String
+  amount      Decimal?          @db.Decimal(14, 2)
+  currency    String            @default("USD")
+  status      SponsorshipStatus @default(prospect)
+  projectId   String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
-  project       Project?          @relation(fields: [projectId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
 }
 
 // ============================================================
@@ -864,15 +1139,12 @@ model Sponsorship {
 // ============================================================
 
 model ArchivedAuditLog {
-  id           String   @id
-  actorId      String?
-  action       String
-  entityType   String
-  entityId     String
-  changes      Json     @default("{}")
-  createdAt    DateTime
-  archivedAt   DateTime @default(now())
+  id         String   @id
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  changes    Json     @default("{}")
+  createdAt  DateTime
+  archivedAt DateTime @default(now())
 }
-
-
-

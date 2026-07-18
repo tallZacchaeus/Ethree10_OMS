@@ -18,10 +18,10 @@ export const invoicesRouter = router({
   list: protectedProcedure
     .input(z.object({ status: z.nativeEnum(InvoiceStatus).optional() }).optional())
     .query(async ({ ctx, input }) => {
-      // In a real system we'd limit this to the agency admin or the specific client workspace.
+      // In a real system we'd limit this to the agency admin or the specific client organization.
       // For now, if you are an agency admin, you see all.
       const authCtx = await getAgencyAuthContext(ctx.userId);
-      if (!authCtx.isSuperAdmin && !authCtx.roles.includes("admin")) {
+      if (!authCtx.isSuperAdmin && !authCtx.roles.includes("agency_admin") && !authCtx.roles.includes("finance_admin")) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -35,6 +35,10 @@ export const invoicesRouter = router({
   get: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
+      const authCtx = await getAgencyAuthContext(ctx.userId);
+      if (!authCtx.isSuperAdmin && !authCtx.roles.includes("agency_admin") && !authCtx.roles.includes("finance_admin")) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
       const invoice = await db.invoice.findUnique({
         where: { id: input.id },
         include: { organization: true, project: true, receipt: true },
@@ -71,7 +75,7 @@ export const invoicesRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await requireAgencyAction(ctx.userId, "workspace.read");
+      await requireAgencyAction(ctx.userId, "invoice.manage");
 
       const totalAmount = input.lineItems.reduce(
         (acc, item) => acc + item.quantity * item.unitPrice,
@@ -97,7 +101,7 @@ export const invoicesRouter = router({
   markSent: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await requireAgencyAction(ctx.userId, "workspace.read");
+      await requireAgencyAction(ctx.userId, "invoice.manage");
       const invoice = await db.invoice.update({
         where: { id: input.id },
         data: { status: "sent", issuedAt: new Date() },
@@ -113,7 +117,7 @@ export const invoicesRouter = router({
   regeneratePdf: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await requireAgencyAction(ctx.userId, "workspace.read");
+      await requireAgencyAction(ctx.userId, "invoice.manage");
       const url = await InvoiceService.generateInvoicePdf(input.id);
       return { pdfUrl: url };
     }),
@@ -122,7 +126,7 @@ export const invoicesRouter = router({
   send: protectedProcedure
     .input(z.object({ id: z.string(), email: z.string().email() }))
     .mutation(async ({ ctx, input }) => {
-      await requireAgencyAction(ctx.userId, "workspace.read");
+      await requireAgencyAction(ctx.userId, "invoice.manage");
       const invoice = await db.invoice.update({
         where: { id: input.id },
         data: { status: "sent", issuedAt: new Date() },
@@ -158,7 +162,7 @@ export const invoicesRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await requireAgencyAction(ctx.userId, "workspace.read");
+      await requireAgencyAction(ctx.userId, "invoice.manage");
       const invoice = await db.invoice.update({
         where: { id: input.id },
         data: { status: "paid", paidAt: new Date(), paymentRef: input.paymentRef ?? null },
@@ -181,7 +185,7 @@ export const invoicesRouter = router({
   markVoid: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await requireAgencyAction(ctx.userId, "workspace.read");
+      await requireAgencyAction(ctx.userId, "invoice.manage");
       const invoice = await db.invoice.update({
         where: { id: input.id },
         data: { status: "void" },

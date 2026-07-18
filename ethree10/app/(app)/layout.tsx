@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppTopbar } from "@/components/layout/app-topbar";
-import { WorkspaceProvider } from "@/components/providers/workspace-provider";
+
 import { db } from "@/server/db/client";
 import { cookies } from "next/headers";
 import { MfaChallenge } from "@/components/auth/mfa-challenge";
@@ -26,12 +26,15 @@ export default async function AppLayout({
   });
 
   const isMfaEnabled = dbUser?.mfaEnabled;
+  const hasStaffAccess = dbUser?.isSuperAdmin || dbUser?.memberships.some((membership) => !membership.removedAt && membership.acceptedAt);
+  if (!hasStaffAccess) redirect("/unauthorized");
   // MFA is mandatory for admin and all lead roles (spec 13/Phase 2).
-  const MFA_ENFORCED_ROLES = ["admin", "executive", "department_lead"];
+  const MFA_ENFORCED_ROLES = ["agency_admin", "finance_admin", "team_head"];
   const isEnforcedRole =
     dbUser?.isSuperAdmin || dbUser?.memberships.some((m) => MFA_ENFORCED_ROLES.includes(m.role));
   const mfaVerified = cookies().get("mfa-verified")?.value === "true";
-  const skipMfa = process.env.NODE_ENV === "development";
+  const skipMfa =
+    process.env.NODE_ENV === "development" || process.env["E2E_TEST_AUTH"] === "true";
 
   if (!skipMfa && isMfaEnabled && !mfaVerified) {
     return (
@@ -50,16 +53,14 @@ export default async function AppLayout({
   }
 
   return (
-    <WorkspaceProvider>
-      <div className="flex h-screen overflow-hidden">
-        <AppSidebar />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <AppTopbar user={session.user} />
-          <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
-            <div className="mx-auto max-w-[1440px]">{children}</div>
-          </main>
-        </div>
+    <div className="flex h-screen overflow-hidden">
+      <AppSidebar />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <AppTopbar user={session.user} />
+        <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
+          <div className="mx-auto max-w-[1440px]">{children}</div>
+        </main>
       </div>
-    </WorkspaceProvider>
+    </div>
   );
 }

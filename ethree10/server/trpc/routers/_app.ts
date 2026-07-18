@@ -1,7 +1,7 @@
 import { router } from "../trpc";
 import { authRouter } from "./auth";
-import { workspacesRouter } from "./workspaces";
-import { departmentsRouter } from "./departments";
+import { organizationsRouter } from "./organizations";
+import { teamsRouter } from "./teams";
 import { subunitsRouter } from "./subunits";
 import { membersRouter } from "./members";
 import { requestsRouter } from "./requests";
@@ -26,11 +26,14 @@ import { receiptsRouter } from "./receipts";
 import { analyticsRouter } from "./analytics";
 import { sponsorshipsRouter } from "./sponsorships";
 import { setupRouter } from "./setup";
+import { trackRouter } from "./track";
+import { servicesRouter } from "./services";
+import { executionRouter } from "./execution";
 
 export const appRouter = router({
   auth: authRouter,
-  workspaces: workspacesRouter,
-  departments: departmentsRouter,
+  organizations: organizationsRouter,
+  teams: teamsRouter,
   subunits: subunitsRouter,
   members: membersRouter,
   requests: requestsRouter,
@@ -55,6 +58,9 @@ export const appRouter = router({
   analytics: analyticsRouter,
   sponsorships: sponsorshipsRouter,
   setup: setupRouter,
+  track: trackRouter,
+  services: servicesRouter,
+  execution: executionRouter,
 });
 
 export type AppRouter = typeof appRouter;

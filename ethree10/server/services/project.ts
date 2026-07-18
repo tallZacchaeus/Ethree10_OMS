@@ -6,6 +6,7 @@ import { NotificationService } from "@/server/services/notification";
 import { getAgencyAuthContext } from "@/server/services/agency";
 import { can } from "@/server/auth/permissions";
 import { generateCode } from "@/lib/utils/codes";
+import { EmailService } from "@/server/notifications/email";
 
 async function nextProjectSeq(): Promise<number> {
   const year = new Date().getUTCFullYear();
@@ -18,7 +19,7 @@ async function nextProjectSeq(): Promise<number> {
 export class ProjectService {
   static projectInclude = {
     request: { select: { id: true, code: true, urgency: true, submittedById: true } },
-    department: { select: { id: true, name: true, slug: true } },
+    team: { select: { id: true, name: true, slug: true } },
     organization: { select: { id: true, name: true, isExternal: true } },
   } satisfies Prisma.ProjectInclude;
 
@@ -29,7 +30,10 @@ export class ProjectService {
     });
     if (existing) return existing;
 
-    const request = await db.request.findUnique({ where: { id: args.requestId } });
+    const request = await db.request.findUnique({
+      where: { id: args.requestId },
+      include: { routedTeam: { select: { leadId: true } } },
+    });
     if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Request not found." });
 
     const seq = await nextProjectSeq();
@@ -38,7 +42,8 @@ export class ProjectService {
         code: generateCode("project", seq),
         requestId: request.id,
         organizationId: request.organizationId,
-        agencyDepartmentId: request.routedDepartmentId,
+        agencyTeamId: request.routedTeamId,
+        pmUserId: request.routedTeam?.leadId ?? args.actorId,
         name: request.title,
         description: request.description,
         status: "active",
@@ -97,13 +102,13 @@ export class ProjectService {
 
   static async listForWorkspace(
     organizationId: string,
-    filters: { status?: ProjectStatus; departmentId?: string } = {},
+    filters: { status?: ProjectStatus; teamId?: string } = {},
   ) {
     return db.project.findMany({
       where: {
         organizationId,
         status: filters.status,
-        agencyDepartmentId: filters.departmentId,
+        agencyTeamId: filters.teamId,
       },
       orderBy: { createdAt: "desc" },
       include: {
@@ -113,10 +118,10 @@ export class ProjectService {
     });
   }
 
-  /** Agency-wide project list across all client workspaces. */
-  static async listForAgency(filters: { status?: ProjectStatus; departmentId?: string } = {}) {
+  /** Agency-wide project list across all client organizations. */
+  static async listForAgency(filters: { status?: ProjectStatus; teamId?: string } = {}) {
     return db.project.findMany({
-      where: { status: filters.status, agencyDepartmentId: filters.departmentId },
+      where: { status: filters.status, agencyTeamId: filters.teamId },
       orderBy: { createdAt: "desc" },
       include: {
         ...ProjectService.projectInclude,
@@ -127,25 +132,26 @@ export class ProjectService {
 
   /**
    * Projects the caller may see: every project for agency staff, otherwise
-   * projects belonging to workspaces the caller is a member of.
+   * projects belonging to teams the caller belongs to.
    */
   static async listVisibleTo(
     userId: string,
-    filters: { status?: ProjectStatus; departmentId?: string } = {},
+    filters: { status?: ProjectStatus; teamId?: string } = {},
   ) {
     const agencyCtx = await getAgencyAuthContext(userId);
-    if (can(agencyCtx, "project.read")) {
+    if (agencyCtx.isSuperAdmin || agencyCtx.roles.includes("agency_admin") || agencyCtx.roles.includes("finance_admin")) {
       return ProjectService.listForAgency(filters);
     }
     const memberships = await db.membership.findMany({
       where: { userId, removedAt: null, acceptedAt: { not: null } },
-      select: { organizationId: true },
+      select: { teamId: true },
     });
-    const organizationIds = memberships
-      .map((m) => m.organizationId)
-      .filter((id): id is string => id !== null);
+    const teamIds = memberships.map(m => m.teamId).filter(Boolean) as string[];
     return db.project.findMany({
-      where: { organizationId: { in: organizationIds }, status: filters.status },
+      where: {
+        agencyTeamId: { in: teamIds },
+        status: filters.status,
+      },
       orderBy: { createdAt: "desc" },
       include: {
         ...ProjectService.projectInclude,
@@ -156,22 +162,19 @@ export class ProjectService {
 
   static async canRead(userId: string, projectId: string): Promise<boolean> {
     const agencyCtx = await getAgencyAuthContext(userId);
-    if (can(agencyCtx, "project.read")) return true;
-    const project = await db.project.findUnique({
-      where: { id: projectId },
-      select: { organizationId: true },
-    });
-    if (!project) return false;
+    if (!can(agencyCtx, "project.read")) return false;
+
+    if (agencyCtx.isSuperAdmin || agencyCtx.roles.includes("agency_admin") || agencyCtx.roles.includes("finance_admin")) {
+      return true;
+    }
+
+    const project = await db.project.findUnique({ where: { id: projectId }, select: { agencyTeamId: true } });
+    if (!project || !project.agencyTeamId) return false;
+
     const membership = await db.membership.findFirst({
-      where: {
-        userId,
-        organizationId: project.organizationId,
-        removedAt: null,
-        acceptedAt: { not: null },
-      },
-      select: { id: true },
+      where: { userId, teamId: project.agencyTeamId, removedAt: null, acceptedAt: { not: null } }
     });
-    return Boolean(membership);
+    return !!membership;
   }
 
   static async update(args: {
@@ -187,6 +190,9 @@ export class ProjectService {
   }) {
     const before = await db.project.findUnique({ where: { id: args.projectId } });
     if (!before) throw new TRPCError({ code: "NOT_FOUND" });
+    if (args.patch.status === "closed") {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Projects close only when the client accepts delivery." });
+    }
     const updated = await db.project.update({
       where: { id: args.projectId },
       data: args.patch,
@@ -204,28 +210,77 @@ export class ProjectService {
   }
 
   static async deliver(args: { actorId: string; projectId: string }) {
-    const project = await db.project.update({
+    const before = await db.project.findUnique({
       where: { id: args.projectId },
-      data: { status: "delivered", actualDeliveryDate: new Date() },
-      include: { request: { select: { submittedById: true } } },
+      include: {
+        request: { include: { service: true } },
+        tasks: { include: { reviews: true } },
+      },
+    });
+    if (!before) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found." });
+    if (before.tasks.length === 0) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "A project needs reviewed work before delivery." });
+    }
+    const incomplete = before.tasks.filter((task) => !["done", "cancelled"].includes(task.status));
+    if (incomplete.length) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Every active task must pass review before delivery." });
+    }
+    const requiredReviews = Array.isArray(before.request.service?.requiredReviews)
+      ? before.request.service.requiredReviews.filter((value): value is string => typeof value === "string")
+      : [];
+    const missingReview = before.tasks.some((task) => {
+      if (task.status === "cancelled") return false;
+      const approvals = new Set(
+        task.reviews
+          .filter((review) => review.revision === task.revision && review.decision === "approved")
+          .map((review) => review.reviewType),
+      );
+      return !approvals.has("team_head") || requiredReviews.some((reviewType) => !approvals.has(reviewType));
+    });
+    if (missingReview) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Required team-head and specialist reviews must pass before delivery." });
+    }
+    const deliveredAt = new Date();
+    const project = await db.$transaction(async (tx) => {
+      const updated = await tx.project.update({
+        where: { id: args.projectId },
+        data: { status: "delivered", actualDeliveryDate: deliveredAt },
+        include: { request: true },
+      });
+      await tx.request.update({ where: { id: updated.requestId }, data: { stage: "delivered" } });
+      await tx.requestStageEvent.create({
+        data: { requestId: updated.requestId, fromStage: before.request.stage, toStage: "delivered", actorId: args.actorId, note: "Work delivered for client review." },
+      });
+      return updated;
     });
     await AuditService.log({
       actorId: args.actorId,
-      organizationId: project.organizationId,
+
       action: "project.deliver",
       entityType: "Project",
       entityId: project.id,
       after: { status: "delivered" },
     });
-    await NotificationService.create({
-      userId: project.request.submittedById,
-      kind: "request_state_changed",
-      title: "Your project has been delivered — Action Required",
-      body: `Please review and sign off on ${project.name} to close the project.`,
-      link: `/projects/${project.id}`,
-      entityType: "Project",
-      entityId: project.id,
-    });
+    if (project.request.submittedById) {
+      await NotificationService.create({
+        userId: project.request.submittedById,
+        kind: "request_state_changed",
+        title: "Your project has been delivered — Action Required",
+        body: `Please review and sign off on ${project.name} to close the project.`,
+        link: `/projects/${project.id}`,
+        entityType: "Project",
+        entityId: project.id,
+      });
+    }
+    if (project.request.requesterEmail && project.request.publicToken && project.request.consentToEmail) {
+      await EmailService.sendNotification({
+        to: project.request.requesterEmail,
+        title: `Your project is ready for review (${project.request.code})`,
+        body: `The delivered work for "${project.name}" is ready. Use your secure tracking link to accept it or request changes.`,
+        ctaLabel: "Review delivery",
+        ctaPath: `/track/${project.request.publicToken}`,
+      });
+    }
     return project;
   }
 
@@ -237,20 +292,15 @@ export class ProjectService {
   }) {
     const project = await db.project.update({
       where: { id: args.projectId },
-      data: { csatScore: args.score, csatComment: args.comment ?? null, status: "closed" },
-    });
-    // Request must also transition to closed
-    await db.request.update({
-      where: { id: project.requestId },
-      data: { stage: "closed" },
+      data: { csatScore: args.score, csatComment: args.comment ?? null },
     });
     await AuditService.log({
       actorId: args.actorId,
-      organizationId: project.organizationId,
+
       action: "project.csat_received",
       entityType: "Project",
       entityId: project.id,
-      after: { csatScore: args.score, status: "closed" },
+      after: { csatScore: args.score },
     });
     
     // Also notify agency lead/PM about the feedback

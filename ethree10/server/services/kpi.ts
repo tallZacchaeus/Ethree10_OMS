@@ -1,6 +1,6 @@
 import { db } from "@/server/db/client";
 import { type ReportLevel, type ReportPeriod, type ScorecardConfig } from "@prisma/client";
-import { computeDepartmentEvidence, computeAgencyEvidence } from "../reports/evidence";
+import { computeTeamEvidence, computeAgencyEvidence } from "../reports/evidence";
 
 export type ScorecardItem = {
   key: string;
@@ -23,8 +23,8 @@ export class KpiService {
     
     // Fetch evidence based on level
     let evidenceData: Record<string, number> = {};
-    if (config.level === "department") {
-      evidenceData = await computeDepartmentEvidence(config.scopeId, periodStart, periodEnd);
+    if (config.level === "team") {
+      evidenceData = await computeTeamEvidence(config.scopeId, periodStart, periodEnd);
     } else if (config.level === "agency") {
       evidenceData = await computeAgencyEvidence(periodStart, periodEnd);
     }

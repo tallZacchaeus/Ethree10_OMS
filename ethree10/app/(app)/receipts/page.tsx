@@ -58,7 +58,7 @@ export default function ReceiptsPage() {
                       {r.code}
                     </Link>
                   </TableCell>
-                  <TableCell>{r.workspace.name}</TableCell>
+                  <TableCell>{r.organization.name}</TableCell>
                   <TableCell>{formatMoney(Number(r.amount), r.currency)}</TableCell>
                   <TableCell>
                     <Badge variant="secondary">{METHOD_LABELS[r.paymentMethod] ?? r.paymentMethod}</Badge>

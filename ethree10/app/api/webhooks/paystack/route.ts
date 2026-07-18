@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       // Audit the payment state transition (no user actor — Paystack drove it).
       await AuditService.log({
         actorId: null,
-        workspaceId: invoice.workspaceId,
+        organizationId: invoice.organizationId,
         action: "invoice.paid",
         entityType: "Invoice",
         entityId: invoice.id,

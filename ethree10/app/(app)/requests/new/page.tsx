@@ -10,22 +10,21 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { TASK_TYPE_GROUPS, isOtherTaskType } from "@/lib/request-types";
 
 export default function NewRequestPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [projectType, setProjectType] = useState("");
-  const [otherDetail, setOtherDetail] = useState("");
-  const needsOtherDetail = isOtherTaskType(projectType);
+  const [serviceId, setServiceId] = useState("");
+  const [organizationId, setOrganizationId] = useState("");
+  const { data: services = [] } = trpc.services.publicList.useQuery();
+  const { data: organizations = [] } = trpc.organizations.listOrganizations.useQuery();
+  const selectedService = services.find((service) => service.id === serviceId);
   
   const createRequest = trpc.requests.create.useMutation({
     onSuccess: (data) => {
@@ -48,12 +47,8 @@ export default function NewRequestPage() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!projectType) {
-      toast({ title: "Pick a task type", description: "Tell us what you need done.", variant: "destructive" });
-      return;
-    }
-    if (needsOtherDetail && !otherDetail.trim()) {
-      toast({ title: "Describe your request", description: "Add a short note for the “Other” task type.", variant: "destructive" });
+    if (!selectedService || !organizationId) {
+      toast({ title: "Complete routing details", description: "Select an organization and service.", variant: "destructive" });
       return;
     }
 
@@ -68,21 +63,21 @@ export default function NewRequestPage() {
     const budgetStr = formData.get("budgetEstimate") as string;
     const budgetEstimate = budgetStr ? parseFloat(budgetStr) : undefined;
 
-    // For "Other", capture the free-text detail at the top of the description so the team
-    // sees exactly what was requested (the task type itself still drives routing).
-    const baseDescription = formData.get("description") as string;
-    const description = needsOtherDetail
-      ? `Requested (other): ${otherDetail.trim()}\n\n${baseDescription}`
-      : baseDescription;
-
     createRequest.mutate({
+      organizationId,
       title: formData.get("title") as string,
-      description,
-      projectType,
+      description: formData.get("description") as string,
+      projectType: selectedService.slug,
+      serviceId: selectedService.id,
       urgency: formData.get("urgency") as "low" | "medium" | "high" | "critical",
       primaryContact: formData.get("primaryContact") as string,
       deadline,
       budgetEstimate,
+      expectedOutcome: formData.get("expectedOutcome") as string,
+      expectedDeliverables: formData.get("expectedDeliverables") as string,
+      acceptanceCriteria: formData.get("acceptanceCriteria") as string,
+      supportingLinks: String(formData.get("supportingLinks") || "").split(/\s+/).filter(Boolean),
+      consentToEmail: false,
     });
   };
 
@@ -98,6 +93,7 @@ export default function NewRequestPage() {
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="space-y-4 bg-card p-6 rounded-lg border">
           <h2 className="text-xl font-semibold">Core Details</h2>
+          <div className="space-y-2"><Label>Requesting organization *</Label><Select value={organizationId} onValueChange={setOrganizationId}><SelectTrigger><SelectValue placeholder="Select organization" /></SelectTrigger><SelectContent>{organizations.map((organization) => <SelectItem key={organization.id} value={organization.id}>{organization.name}</SelectItem>)}</SelectContent></Select></div>
           
           <div className="space-y-2">
             <Label htmlFor="title">Project Title *</Label>
@@ -117,22 +113,13 @@ export default function NewRequestPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="projectType">What do you need? *</Label>
-              <Select value={projectType} onValueChange={setProjectType}>
+              <Label htmlFor="serviceId">Service *</Label>
+              <Select value={serviceId} onValueChange={setServiceId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a task type" />
+                  <SelectValue placeholder="Select service" />
                 </SelectTrigger>
                 <SelectContent>
-                  {TASK_TYPE_GROUPS.map((group) => (
-                    <SelectGroup key={group.departmentSlug}>
-                      <SelectLabel>{group.department}</SelectLabel>
-                      {group.options.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
+                  {services.map((service) => <SelectItem key={service.id} value={service.id}>{service.name}{service.team ? ` — ${service.team.name}` : " — Agency review"}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -153,17 +140,10 @@ export default function NewRequestPage() {
             </div>
           </div>
 
-          {needsOtherDetail && (
-            <div className="space-y-2">
-              <Label htmlFor="otherDetail">Describe what you need *</Label>
-              <Input
-                id="otherDetail"
-                value={otherDetail}
-                onChange={(e) => setOtherDetail(e.target.value)}
-                placeholder="e.g. A printed event programme booklet"
-              />
-            </div>
-          )}
+          <div className="space-y-2"><Label htmlFor="expectedOutcome">Expected outcome *</Label><Textarea id="expectedOutcome" name="expectedOutcome" required /></div>
+          <div className="space-y-2"><Label htmlFor="expectedDeliverables">Expected deliverables *</Label><Textarea id="expectedDeliverables" name="expectedDeliverables" required /></div>
+          <div className="space-y-2"><Label htmlFor="acceptanceCriteria">Acceptance criteria *</Label><Textarea id="acceptanceCriteria" name="acceptanceCriteria" required /></div>
+          <div className="space-y-2"><Label htmlFor="supportingLinks">Supporting links</Label><Textarea id="supportingLinks" name="supportingLinks" /></div>
         </div>
 
         <div className="space-y-4 bg-card p-6 rounded-lg border">

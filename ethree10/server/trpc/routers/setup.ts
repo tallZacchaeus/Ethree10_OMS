@@ -9,43 +9,40 @@ import { requireAgencyAction } from "@/server/services/agency";
  */
 export const setupRouter = router({
   checklist: protectedProcedure.query(async ({ ctx }) => {
-    // department.create is admin-only — keeps this an admin setup surface.
-    await requireAgencyAction(ctx.userId, "department.create");
+    // team.create is admin-only — keeps this an admin setup surface.
+    await requireAgencyAction(ctx.userId, "team.create");
 
-    const [departments, staffCount, clientCount, invoiceCount] = await Promise.all([
-      db.department.findMany({
+    const [teams, staffCount, clientCount, invoiceCount] = await Promise.all([
+      db.team.findMany({
         where: { archivedAt: null },
         select: { id: true, leadId: true },
       }),
       // Staff = org-null memberships.
       db.membership.count({
         where: {
-          organizationId: null,
-          removedAt: null,
-          role: { in: ["admin", "department_lead", "member"] },
+          role: { in: ["super_admin", "agency_admin", "team_head", "team_member", "finance_admin"] },
+          acceptedAt: { not: null },
         },
       }),
-      // Clients = memberships attached to an organization.
-      db.membership.count({
-        where: { organizationId: { not: null }, removedAt: null, role: { in: ["client", "client_viewer"] } },
-      }),
+      // Clients = represented by organizations now.
+      db.organization.count(),
       db.invoice.count(),
     ]);
 
     const steps = [
       {
-        key: "departments",
-        label: "Departments ready",
+        key: "teams",
+        label: "Teams ready",
         hint: "Creative and Product Development are set up.",
-        done: departments.length >= 2,
-        href: "/departments",
+        done: teams.length >= 2,
+        href: "/teams",
       },
       {
         key: "leads",
-        label: "Assign department leads",
-        hint: "Give each department a lead.",
-        done: departments.length > 0 && departments.every((d) => Boolean(d.leadId)),
-        href: "/departments",
+        label: "Assign team heads",
+        hint: "Give each delivery team a responsible head.",
+        done: teams.length > 0 && teams.every((d) => Boolean(d.leadId)),
+        href: "/teams",
       },
       {
         key: "team",
@@ -56,10 +53,10 @@ export const setupRouter = router({
       },
       {
         key: "client",
-        label: "Add a client",
-        hint: "Invite a client so they can submit requests.",
+        label: "Add a client organization",
+        hint: "Create a client organization so they can submit requests.",
         done: clientCount > 0,
-        href: "/members",
+        href: "/organizations",
       },
       {
         key: "invoice",

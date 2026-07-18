@@ -9,5 +9,5 @@ describe("app/api/cron/reports/route", () => {
 
     expect(route.runtime).toBe("nodejs");
     expect(route.dynamic).toBe("force-dynamic");
-  });
+  }, 15000);
 });

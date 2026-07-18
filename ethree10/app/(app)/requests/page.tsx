@@ -9,16 +9,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { RequestStage } from "@prisma/client";
-import { useWorkspace } from "@/components/providers/workspace-provider";
+import { useAgencyContext } from "@/components/providers/agency-provider";
 
 export default function RequestsPage() {
-  const { roles, isSuperAdmin } = useWorkspace();
+  const { roles, isSuperAdmin } = useAgencyContext();
   const [stageFilter, setStageFilter] = useState<RequestStage | "ALL">("ALL");
   
   const isAgencyStaff =
     isSuperAdmin ||
-    roles.some((r) =>
-      ["admin", "executive", "department_lead", "member"].includes(r),
+    roles.some((r: string) =>
+      ["agency_admin", "finance_admin", "team_head", "member"].includes(r),
     );
 
   
@@ -97,7 +97,7 @@ export default function RequestsPage() {
                 <TableRow>
                   <TableHead>Code</TableHead>
                   <TableHead>Title</TableHead>
-                  {isAgencyStaff && <TableHead>Department</TableHead>}
+                  {isAgencyStaff && <TableHead>Team</TableHead>}
                   <TableHead>Urgency</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
@@ -109,7 +109,7 @@ export default function RequestsPage() {
                   <TableRow key={req.id}>
                     <TableCell className="font-medium">{req.code}</TableCell>
                     <TableCell>{req.title}</TableCell>
-                    {isAgencyStaff && <TableCell>{req.routedDepartment?.name || "Unassigned"}</TableCell>}
+                    {isAgencyStaff && <TableCell>{req.routedTeamId ? "Assigned" : "Unassigned"}</TableCell>}
                     <TableCell>{getUrgencyBadge(req.urgency)}</TableCell>
                     <TableCell>{getStageBadge(req.stage)}</TableCell>
                     <TableCell>{new Date(req.createdAt).toLocaleDateString()}</TableCell>

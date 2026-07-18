@@ -22,8 +22,8 @@ if (env.NODE_ENV !== "production") {
 }
 
 /**
- * Returns a scoped API that automatically injects `workspaceId` into
- * every read operation for workspace-owned models.
+ * Returns a scoped API that automatically injects `organizationId` into
+ * every read operation for organization-owned models.
  *
  * Client (org-scoped) procedures use this so a client can only ever touch their own
  * organization's data. Staff operate globally via raw `db`.

@@ -1,22 +1,25 @@
 import type { Role } from "@prisma/client";
 
 export type Action =
-  | "workspace.read"
-  | "workspace.create"
-  | "workspace.update"
-  | "workspace.archive"
-  | "workspace.invite"
-  | "workspace.removeMember"
-  | "workspace.changeRole"
-  | "department.read"
-  | "department.create"
-  | "department.update"
-  | "department.archive"
+  | "organization.read"
+  | "organization.create"
+  | "organization.update"
+  | "organization.archive"
+  | "organization.invite"
+  | "organization.removeMember"
+  | "organization.changeRole"
+  | "team.read"
+  | "team.create"
+  | "team.update"
+  | "team.archive"
+  | "team.delete"
   | "subunit.read"
   | "subunit.create"
   | "subunit.update"
   | "subunit.archive"
   | "member.read"
+  | "service.read"
+  | "service.manage"
   | "request.read"
   | "request.create"
   | "request.update"
@@ -44,7 +47,11 @@ export type Action =
   | "integration.read"
   | "integration.manage"
   | "report.read"
-  | "report.generate";
+  | "report.generate"
+  | "invoice.read"
+  | "invoice.manage"
+  | "receipt.read"
+  | "receipt.issue";
 
 /**
  * Per-membership capability flags. These grant a small, fixed set of extra actions on top of
@@ -75,11 +82,12 @@ const ROLE_PERMISSIONS: Record<Role, Action[]> = {
 
   // Executive Overview — agency-wide oversight. Reads everything + may comment/flag.
   // No operational write, no approvals.
-  executive: [
-    "workspace.read",
-    "department.read",
+  finance_admin: [
+    "organization.read",
+    "team.read",
     "subunit.read",
     "member.read",
+    "service.read",
     "request.read",
     "project.read",
     "task.read",
@@ -88,15 +96,17 @@ const ROLE_PERMISSIONS: Record<Role, Action[]> = {
     "audit.read",
     "integration.read",
     "report.read", "report.generate",
+    "invoice.read", "invoice.manage", "receipt.read", "receipt.issue",
   ],
 
   // Operational runner — full control of the agency (was agency_admin + agency_lead).
-  admin: [
-    "workspace.read", "workspace.create", "workspace.update", "workspace.archive",
-    "workspace.invite", "workspace.removeMember", "workspace.changeRole",
-    "department.read", "department.create", "department.update", "department.archive",
+  agency_admin: [
+    "organization.read", "organization.create", "organization.update", "organization.archive",
+    "organization.invite", "organization.removeMember", "organization.changeRole",
+    "team.read", "team.create", "team.update", "team.archive",
     "subunit.read", "subunit.create", "subunit.update", "subunit.archive",
     "member.read",
+    "service.read", "service.manage",
     "request.read", "request.create", "request.update", "request.transition",
     "request.route", "request.approve", "request.reject", "request.delete",
     "project.read", "project.create", "project.update", "project.delete",
@@ -106,15 +116,17 @@ const ROLE_PERMISSIONS: Record<Role, Action[]> = {
     "audit.read",
     "integration.read", "integration.manage",
     "report.read", "report.generate",
+    "invoice.read", "invoice.manage", "receipt.read", "receipt.issue",
   ],
 
-  // Department owner — runs a department and its sub-units (was department_lead + subunit_lead).
-  department_lead: [
-    "workspace.read",
-    "department.read", "department.update",
+  // Team owner — runs one delivery team and its optional sub-units.
+  team_head: [
+    "organization.read",
+    "team.read", "team.update",
     "subunit.read", "subunit.create", "subunit.update", "subunit.archive",
     "member.read",
-    "request.read", "request.update", "request.transition", "request.route",
+    "service.read", "service.manage",
+    "request.read", "request.update", "request.transition", "request.route", "request.approve", "request.reject",
     "project.read", "project.create", "project.update",
     "task.read", "task.create", "task.update", "task.assign", "task.review",
     "comment.create",
@@ -123,30 +135,18 @@ const ROLE_PERMISSIONS: Record<Role, Action[]> = {
 
   // Does the work. Project-management actions come from the canManageProjects capability,
   // not from this base role (absorbs the old project_manager via that toggle).
-  member: [
-    "workspace.read",
-    "department.read",
+  team_member: [
+    "organization.read",
+    "team.read",
     "subunit.read",
     "member.read",
+    "service.read",
     "request.read", "request.create",
     "project.read",
     "task.read", "task.update", "task.submitCompletion",
     "comment.create",
   ],
 
-  // Client — submits and tracks their org's requests (was requester_admin + requester_member).
-  client: [
-    "workspace.read", "workspace.invite",
-    "request.read", "request.create", "request.update",
-    "project.read",
-  ],
-
-  // Client viewer — read-only stakeholder (was requester_observer).
-  client_viewer: [
-    "workspace.read",
-    "request.read",
-    "project.read",
-  ],
 };
 
 export function can(ctx: AuthContext, action: Action): boolean {

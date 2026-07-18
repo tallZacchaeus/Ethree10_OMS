@@ -62,7 +62,7 @@ export default function SkillsMarketplacePage() {
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-sm truncate">{m.name}</h3>
                     <p className="text-xs text-muted-foreground truncate">
-                      {m.department || "No department"}
+                      {m.team || "No team"}
                     </p>
                   </div>
                   <div>

@@ -58,16 +58,12 @@ export class LeadService {
     return lead;
   }
 
-  /**
-   * Convert a marketing lead into a client Organization and invite the requester as that
-   * org's client admin. Returns the new organization + pending membership.
-   */
   static async convertToOrganization(args: {
     actorId: string;
     leadId: string;
     organizationName: string;
-    requesterEmail: string;
-    requesterName: string;
+    requesterEmail?: string;
+    requesterName?: string;
     isExternal?: boolean;
   }) {
     const lead = await db.lead.findUnique({ where: { id: args.leadId } });
@@ -86,22 +82,6 @@ export class LeadService {
       },
     });
 
-    const user = await db.user.upsert({
-      where: { email: args.requesterEmail },
-      create: { email: args.requesterEmail, name: args.requesterName },
-      update: {},
-    });
-
-    const membership = await db.membership.create({
-      data: {
-        userId: user.id,
-        organizationId: organization.id,
-        role: "client",
-        isPrimary: true,
-        invitedAt: new Date(),
-      },
-    });
-
     await db.lead.update({
       where: { id: args.leadId },
       data: { status: "converted", organizationId: organization.id },
@@ -115,6 +95,6 @@ export class LeadService {
       after: { organizationId: organization.id, requester: args.requesterEmail },
     });
 
-    return { organization, membership };
+    return { organization };
   }
 }

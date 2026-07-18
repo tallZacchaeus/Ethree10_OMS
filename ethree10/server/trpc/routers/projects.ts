@@ -19,14 +19,14 @@ export const projectsRouter = router({
       z
         .object({
           status: z.nativeEnum(ProjectStatus).optional(),
-          departmentId: z.string().optional(),
+          teamId: z.string().optional(),
         })
         .optional(),
     )
     .query(async ({ ctx, input }) => {
       return ProjectService.listVisibleTo(ctx.userId, {
         status: input?.status,
-        departmentId: input?.departmentId,
+        teamId: input?.teamId,
       });
     }),
 
@@ -49,6 +49,7 @@ export const projectsRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertCanReadProject(ctx.userId, input.id);
       await requireAgencyAction(ctx.userId, "project.update");
       const { id, ...patch } = input;
       return ProjectService.update({ actorId: ctx.userId, projectId: id, patch });
@@ -57,6 +58,7 @@ export const projectsRouter = router({
   deliver: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await assertCanReadProject(ctx.userId, input.id);
       await requireAgencyAction(ctx.userId, "project.update");
       return ProjectService.deliver({ actorId: ctx.userId, projectId: input.id });
     }),
@@ -83,7 +85,7 @@ export const projectsRouter = router({
     .input(z.object({ query: z.string().optional() }).optional())
     .query(async ({ ctx, input }) => {
       // Must have agency access
-      await requireAgencyAction(ctx.userId, "workspace.read");
+      await requireAgencyAction(ctx.userId, "organization.read");
 
       const projects = await db.project.findMany({
         where: {
@@ -96,7 +98,7 @@ export const projectsRouter = router({
             : undefined,
         },
         include: {
-          department: true,
+          team: true,
           organization: true,
           tasks: {
             where: { status: "done" },

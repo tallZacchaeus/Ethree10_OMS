@@ -35,7 +35,7 @@ export class EmailService {
       const { error } = await resend().emails.send({
         from: env.EMAIL_FROM,
         to: args.to,
-        subject: `[Ethree10] ${args.title}`,
+        subject: `[E310] ${args.title}`,
         html,
       });
       if (error) {
