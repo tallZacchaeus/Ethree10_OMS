@@ -38,6 +38,11 @@ jobs:
           set -euo pipefail
           ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" "cd /srv/ethree10/ethree10 && pnpm check:readiness:db"
 
+      - name: Smoke test production app
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" "cd /srv/ethree10/ethree10 && SMOKE_BASE_URL=https://oms.ethree10.com pnpm check:smoke"
+
       - name: Send failure email
         if: failure()
         run: |

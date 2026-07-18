@@ -78,9 +78,17 @@ bash /srv/ethree10/deploy.sh
 cd /srv/ethree10/ethree10
 pnpm check:readiness       # environment/runtime checks
 pnpm check:readiness:db    # also verifies canonical teams, services, staff, and organizations
+SMOKE_BASE_URL=https://oms.ethree10.com pnpm check:smoke
 ```
 
 Run this after changing `.env`, after migrations/seeding, and before giving real users access.
+
+### Health checks
+
+| Endpoint | Purpose |
+|---|---|
+| `/api/health?mode=live` | Confirms the Next.js server is responding. Safe for uptime monitors. |
+| `/api/health?mode=ready` | Confirms the app, database, and Redis are reachable. Use after deploy/restart. |
 
 ### Rollback to a previous commit
 ```bash

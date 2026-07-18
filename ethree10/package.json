@@ -21,6 +21,7 @@
     "e2e:server": "NODE_ENV=production NEXT_PUBLIC_E2E_TEST_AUTH=true E2E_TEST_AUTH=true next build && NODE_ENV=production E2E_TEST_AUTH=true next start --hostname 127.0.0.1 --port 3100",
     "check:readiness": "tsx scripts/check-readiness.ts --production",
     "check:readiness:db": "tsx scripts/check-readiness.ts --production --with-db",
+    "check:smoke": "tsx scripts/check-smoke.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
