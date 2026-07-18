@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
-import { SkillLevel } from "@prisma/client";
+import type { SkillLevel } from "@prisma/client";
 import { requireAgencyAction } from "@/server/services/agency";
 
 const skillLevelOrder: Record<SkillLevel, number> = {

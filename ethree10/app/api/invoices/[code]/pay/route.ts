@@ -12,15 +12,16 @@ export const dynamic = "force-dynamic";
  * (collected on the public invoice page). On completion Paystack redirects back
  * to the invoice page; the webhook does the authoritative status update.
  */
-export async function GET(req: NextRequest, { params }: { params: { code: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
+  const { code } = await params;
   const email = req.nextUrl.searchParams.get("email");
-  const publicUrl = invoicePublicUrl(params.code);
+  const publicUrl = invoicePublicUrl(code);
 
   if (!email) {
     return NextResponse.redirect(`${publicUrl}?error=email-required`);
   }
 
-  const invoice = await db.invoice.findUnique({ where: { code: params.code } });
+  const invoice = await db.invoice.findUnique({ where: { code } });
   if (!invoice) {
     return new NextResponse("Invoice not found", { status: 404 });
   }
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     });
     return NextResponse.redirect(authorization_url);
   } catch (err) {
-    console.error("Paystack init failed for", params.code, err);
+    console.error("Paystack init failed for", code, err);
     return NextResponse.redirect(`${publicUrl}?error=payment-init-failed`);
   }
 }

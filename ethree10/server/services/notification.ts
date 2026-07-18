@@ -22,6 +22,17 @@ const EMAIL_KINDS = new Set<NotificationKind>([
   "csat_received",
 ]);
 
+type DeliveryPreferences = {
+  email: boolean;
+  push: boolean;
+  whatsapp: boolean;
+};
+
+type NotificationDeliveryUpdates = {
+  emailedAt?: Date;
+  whatsappAt?: Date;
+};
+
 export interface CreateNotificationArgs {
   userId: string;
   kind: NotificationKind;
@@ -69,7 +80,7 @@ export class NotificationService {
 
     if (user && !user.deactivatedAt) {
       // Check preferences
-      let prefs = await db.notificationPreference.findUnique({
+      let prefs: DeliveryPreferences | null = await db.notificationPreference.findUnique({
         where: { userId_kind: { userId: args.userId, kind: args.kind } },
       });
 
@@ -79,10 +90,10 @@ export class NotificationService {
           email: EMAIL_KINDS.has(args.kind),
           push: true,
           whatsapp: false, // Default false until they verify
-        } as any;
+        };
       }
 
-      const updates: any = {};
+      const updates: NotificationDeliveryUpdates = {};
 
       if (prefs!.email && user.email) {
         const sent = await EmailService.sendNotification({

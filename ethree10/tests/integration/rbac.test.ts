@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Organization, type Position, type Service, type Team, type User } from '@prisma/client';
+import type { Session } from "next-auth";
 import { AuthorizationService } from '@/server/services/authorization';
 import { can } from '@/server/auth/permissions';
 import { scopedDb } from "@/server/db/client";
@@ -18,11 +19,11 @@ function getCaller(userId: string | null) {
     db,
     scopedDb,
     userId,
-    session: userId ? { user: { id: userId } } as any : null,
+    session: userId ? ({ user: { id: userId } } as Session) : null,
     headers: new Headers(),
     authorize: async (action: string) => {
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
-      return AuthorizationService.require(userId, action as any);
+      return AuthorizationService.require(userId, action as Parameters<typeof AuthorizationService.require>[1]);
     }
   });
 }
@@ -32,11 +33,15 @@ function genCode() {
 }
 
 describe('Phase 1 Verification: RBAC & Link-Only Client Model', () => {
-  let orgA: any;
-  let agencyAdmin: any, teamHead: any, teamMember: any;
-  let team1: any, team2: any;
-  let position: any;
-  let routedService: any, fallbackService: any;
+  let orgA: Organization;
+  let agencyAdmin: User;
+  let teamHead: User;
+  let teamMember: User;
+  let team1: Team;
+  let team2: Team;
+  let position: Position;
+  let routedService: Service;
+  let fallbackService: Service;
 
   beforeAll(async () => {
     vi.spyOn(EmailService, "sendNotification").mockResolvedValue(true);

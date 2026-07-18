@@ -22,7 +22,7 @@
 
 | Component | Technology | Location |
 |---|---|---|
-| App server | Next.js 14 on port 3001 | Supervisor: `ethree10-web` |
+| App server | Next.js 16 on port 3001 | Supervisor: `ethree10-web` |
 | Background worker | BullMQ (tsx) | Supervisor: `ethree10-worker` |
 | Database | PostgreSQL 15 | Docker: `ethree10-postgres-1` |
 | Cache / queue | Redis 7 | Docker: `ethree10-redis-1` |
@@ -73,6 +73,27 @@ supervisorctl status                             # check all
 bash /srv/ethree10/deploy.sh
 ```
 
+### Launch readiness gate
+```bash
+cd /srv/ethree10/ethree10
+pnpm check:readiness       # environment/runtime checks
+pnpm check:readiness:db    # also verifies canonical teams, services, staff, and organizations
+SMOKE_BASE_URL=https://oms.ethree10.com pnpm check:smoke
+SECURITY_HEADERS_BASE_URL=https://oms.ethree10.com pnpm check:security-headers
+pnpm check:backups
+pnpm check:monitoring       # run before inviting real users
+pnpm check:pilot-readiness  # validates first-user acceptance materials
+```
+
+Run this after changing `.env`, after migrations/seeding, and before giving real users access.
+
+### Health checks
+
+| Endpoint | Purpose |
+|---|---|
+| `/api/health?mode=live` | Confirms the Next.js server is responding. Safe for uptime monitors. |
+| `/api/health?mode=ready` | Confirms the app, database, and Redis are reachable. Use after deploy/restart. |
+
 ### Rollback to a previous commit
 ```bash
 cd /srv/ethree10
@@ -95,7 +116,7 @@ File: `/srv/ethree10/ethree10/.env`
 | Variable | Status |
 |---|---|
 | `DATABASE_URL` / `DIRECT_URL` | ✅ Configured (local Postgres) |
-| `AUTH_SECRET` / `AUTH_URL` | ✅ Configured |
+| `AUTH_SECRET` / `AUTH_URL` / `NEXTAUTH_URL` | ✅ Configured |
 | `RESEND_API_KEY` / `EMAIL_FROM` | ✅ Configured |
 | `REDIS_URL` | ✅ Configured (local Redis) |
 | `INTEGRATION_SECRET_KEY` | ✅ Configured |
@@ -157,6 +178,8 @@ Run manually:
 ```bash
 bash /srv/ethree10/backup-db.sh
 bash /srv/ethree10/backup-minio.sh
+cd /srv/ethree10/ethree10
+pnpm check:backups
 ```
 
 ---

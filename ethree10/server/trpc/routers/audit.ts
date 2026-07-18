@@ -2,6 +2,7 @@ import { z } from "zod";
 import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { AuditService } from "@/server/services/audit";
+import { AuditRetentionService } from "@/server/services/audit-retention";
 import { requireAgencyAction } from "@/server/services/agency";
 
 export const auditRouter = router({
@@ -26,39 +27,7 @@ export const auditRouter = router({
 
   archiveStaleLogs: protectedProcedure
     .mutation(async ({ ctx }) => {
-      // Must have agency admin access
       await requireAgencyAction(ctx.userId, "audit.read");
-      const { db } = await import("@/server/db/client");
-      const { subMonths } = await import("date-fns");
-
-      const cutoff = subMonths(new Date(), 24);
-      
-      const staleLogs = await db.auditLog.findMany({
-        where: { createdAt: { lt: cutoff } },
-      });
-
-      if (staleLogs.length === 0) {
-        return { archivedCount: 0 };
-      }
-
-      await db.$transaction(async (tx) => {
-        await tx.archivedAuditLog.createMany({
-          data: staleLogs.map(log => ({
-            id: log.id,
-            actorId: log.actorId,
-            action: log.action,
-            entityType: log.entityType,
-            entityId: log.entityId,
-            changes: { before: log.before, after: log.after },
-            createdAt: log.createdAt,
-          })),
-        });
-
-        await tx.auditLog.deleteMany({
-          where: { id: { in: staleLogs.map(l => l.id) } },
-        });
-      });
-
-      return { archivedCount: staleLogs.length };
+      return AuditRetentionService.archiveStaleLogs({ days: 730, dryRun: false });
     }),
 });

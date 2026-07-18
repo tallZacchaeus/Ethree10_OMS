@@ -33,6 +33,26 @@ jobs:
           set -euo pipefail
           ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" "bash /srv/ethree10/deploy.sh"
 
+      - name: Verify launch readiness on VPS
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" "cd /srv/ethree10/ethree10 && pnpm check:readiness:db"
+
+      - name: Smoke test production app
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" "cd /srv/ethree10/ethree10 && SMOKE_BASE_URL=https://oms.ethree10.com pnpm check:smoke"
+
+      - name: Verify production security headers
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" "cd /srv/ethree10/ethree10 && SECURITY_HEADERS_BASE_URL=https://oms.ethree10.com pnpm check:security-headers"
+
+      - name: Verify production backups
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" "cd /srv/ethree10/ethree10 && pnpm check:backups"
+
       - name: Send failure email
         if: failure()
         run: |

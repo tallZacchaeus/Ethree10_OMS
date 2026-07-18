@@ -4,10 +4,10 @@ You execute assigned work. The platform is here to make your work visible and co
 
 ## Your day
 - **Dashboard** shows your open tasks and what you completed this week.
-- **My Tasks** groups everything assigned to you: Overdue, Due today, This week, In review, Blocked, Backlog.
+- **My work** groups everything assigned to you: overdue, due today, this week, in review, blocked, and backlog.
 
 ## Working a task
-1. Open a task from My Tasks or your dashboard.
+1. Open a task from **My work** or your dashboard.
 2. Move it to **In progress** using the Status control when you start.
 3. If you're stuck, set it to **Blocked** and comment why.
 
@@ -16,5 +16,7 @@ You execute assigned work. The platform is here to make your work visible and co
 2. Submit — the task moves to **In review** and your sub-unit lead is notified.
 3. If they request changes, the task comes back to you with a note.
 
-## Plane sync
-- If your sub-unit is connected to Plane, your tasks mirror there automatically. Update either side; the platform stays the source of truth.
+## Reporting
+
+- Your completions, review outcomes, time logs, and contribution notes feed individual effort reporting.
+- Keep summaries factual and evidence-based so your work is counted accurately.

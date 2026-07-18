@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
-export default function DeliveryAcceptancePage({ params }: { params: { token: string } }) {
-  redirect(`/track/${params.token}`);
+export default async function DeliveryAcceptancePage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+  redirect(`/track/${token}`);
 }

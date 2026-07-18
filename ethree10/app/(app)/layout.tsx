@@ -32,7 +32,8 @@ export default async function AppLayout({
   const MFA_ENFORCED_ROLES = ["agency_admin", "finance_admin", "team_head"];
   const isEnforcedRole =
     dbUser?.isSuperAdmin || dbUser?.memberships.some((m) => MFA_ENFORCED_ROLES.includes(m.role));
-  const mfaVerified = cookies().get("mfa-verified")?.value === "true";
+  const cookieStore = await cookies();
+  const mfaVerified = cookieStore.get("mfa-verified")?.value === "true";
   const skipMfa =
     process.env.NODE_ENV === "development" || process.env["E2E_TEST_AUTH"] === "true";
 

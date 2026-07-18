@@ -55,7 +55,7 @@ export class TimeLogService {
     });
 
     // Update aggregate loggedHours on the Task
-    const newTotal = (task.loggedHours as any).toNumber() + args.hours;
+    const newTotal = task.loggedHours.toNumber() + args.hours;
     await db.task.update({
       where: { id: args.taskId },
       data: { loggedHours: new Prisma.Decimal(newTotal) },

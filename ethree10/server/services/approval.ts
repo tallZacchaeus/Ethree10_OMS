@@ -1,6 +1,11 @@
-import { Request, Organization } from "@prisma/client";
+import type { ApprovalRule, Organization, Request } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { NotificationService } from "@/server/services/notification";
+
+type ApprovalCondition = {
+  isExternal?: boolean;
+  minBudget?: number;
+};
 
 export class ApprovalService {
   /**
@@ -15,7 +20,7 @@ export class ApprovalService {
     for (const rule of rules) {
       // Evaluate triggerCondition
       // Example condition: { "isExternal": true, "minBudget": 500000 }
-      const condition = rule.triggerCondition as any;
+      const condition = rule.triggerCondition as ApprovalCondition | null;
       if (!condition) continue;
 
       let matched = true;
@@ -38,7 +43,7 @@ export class ApprovalService {
     return null;
   }
 
-  static async notifyApprovers(rule: any, request: Request) {
+  static async notifyApprovers(rule: ApprovalRule, request: Request) {
     // Approvers are agency staff (org-null memberships) with the required role.
     const approvers = await db.membership.findMany({
       where: {

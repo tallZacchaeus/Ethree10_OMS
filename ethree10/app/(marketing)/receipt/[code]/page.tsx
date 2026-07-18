@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Building2, CheckCircle2, Download } from "lucide-react";
 
 interface Props {
-  params: { code: string };
+  params: Promise<{ code: string }>;
 }
 
 const METHOD_LABELS: Record<string, string> = {
@@ -18,8 +18,9 @@ const METHOD_LABELS: Record<string, string> = {
 };
 
 export default async function PublicReceiptPage({ params }: Props) {
+  const { code } = await params;
   const receipt = await db.receipt.findUnique({
-    where: { code: params.code },
+    where: { code },
     include: { organization: true, invoice: true },
   });
 

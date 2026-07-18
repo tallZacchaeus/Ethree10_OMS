@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { Prisma, type ProjectStatus } from "@prisma/client";
+import type { Prisma, ProjectStatus } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { AuditService } from "@/server/services/audit";
 import { NotificationService } from "@/server/services/notification";
