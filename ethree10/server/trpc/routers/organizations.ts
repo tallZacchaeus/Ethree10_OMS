@@ -113,6 +113,7 @@ export const organizationsRouter = router({
           subUnitId: input.subUnitId,
           title: input.title,
           invitedAt: new Date(),
+          acceptedAt: new Date(),
         },
       });
     }),
