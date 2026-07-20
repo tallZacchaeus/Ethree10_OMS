@@ -2,22 +2,12 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import { protectedProcedure } from "../procedures";
-import { cookies } from "next/headers";
-import { generateSecret, generateURI, verifySync } from "otplib/functional";
-import { NobleCryptoPlugin, ScureBase32Plugin } from "otplib";
 
-const plugins = { crypto: new NobleCryptoPlugin(), base32: new ScureBase32Plugin() };
-
-function totpGenerateSecret(): string {
-  return generateSecret();
-}
-
-function totpKeyuri(email: string, issuer: string, secret: string): string {
-  return generateURI({ strategy: "totp", label: email, issuer, secret });
-}
-
-function totpVerify(token: string, secret: string): boolean {
-  return Boolean(verifySync({ strategy: "totp", token, secret, ...plugins }));
+function mfaDisabledError(): never {
+  throw new TRPCError({
+    code: "BAD_REQUEST",
+    message: "Two-factor authentication has been removed from this app.",
+  });
 }
 
 export const authRouter = router({
@@ -73,115 +63,26 @@ export const authRouter = router({
       });
     }),
 
-  generateMfaSecret: protectedProcedure.mutation(async ({ ctx }) => {
-    const secret = totpGenerateSecret();
-    const uri = totpKeyuri(ctx.session?.user?.email || "user@ethree10.app", "Ethree10 OMS", secret);
-    
-    // Store temporarily until verified
-    await ctx.db.user.update({
-      where: { id: ctx.userId },
-      data: { mfaSecret: secret },
-    });
-
-    return { secret, uri };
+  generateMfaSecret: protectedProcedure.mutation(() => {
+    return mfaDisabledError();
   }),
 
   verifyAndEnableMfa: protectedProcedure
     .input(z.object({ code: z.string().length(6) }))
-    .mutation(async ({ ctx, input }) => {
-      const user = await ctx.db.user.findUnique({
-        where: { id: ctx.userId },
-        select: { mfaSecret: true },
-      });
-
-      if (!user?.mfaSecret) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "MFA not initiated." });
-      }
-
-      const isValid = totpVerify(input.code, user.mfaSecret);
-
-      if (!isValid) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid code." });
-      }
-
-      // Generate recovery codes
-      const recoveryCodes = Array.from({ length: 8 }, () => 
-        Math.random().toString(36).substring(2, 8).toUpperCase() + "-" + 
-        Math.random().toString(36).substring(2, 8).toUpperCase()
-      );
-
-      await ctx.db.user.update({
-        where: { id: ctx.userId },
-        data: {
-          mfaEnabled: true,
-          mfaRecoveryCodes: recoveryCodes,
-        },
-      });
-
-      return { recoveryCodes };
+    .mutation(() => {
+      return mfaDisabledError();
     }),
 
   disableMfa: protectedProcedure
     .input(z.object({ code: z.string().length(6) }))
-    .mutation(async ({ ctx, input }) => {
-      const user = await ctx.db.user.findUnique({
-        where: { id: ctx.userId },
-        select: { mfaSecret: true, mfaEnabled: true },
-      });
-
-      if (!user?.mfaEnabled || !user?.mfaSecret) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "MFA not enabled." });
-      }
-
-      const isValid = totpVerify(input.code, user.mfaSecret);
-
-      if (!isValid) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid code." });
-      }
-
-      await ctx.db.user.update({
-        where: { id: ctx.userId },
-        data: {
-          mfaEnabled: false,
-          mfaSecret: null,
-          mfaRecoveryCodes: [],
-        },
-      });
-
-      const cookieStore = await cookies();
-      cookieStore.delete("mfa-verified");
-
-      return { ok: true };
+    .mutation(() => {
+      return mfaDisabledError();
     }),
 
   verifyMfaSession: protectedProcedure
     .input(z.object({ code: z.string().length(6) }))
-    .mutation(async ({ ctx, input }) => {
-      const user = await ctx.db.user.findUnique({
-        where: { id: ctx.userId },
-        select: { mfaSecret: true, mfaEnabled: true },
-      });
-
-      if (!user?.mfaEnabled || !user?.mfaSecret) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "MFA not enabled." });
-      }
-
-      const isValid = totpVerify(input.code, user.mfaSecret);
-
-      if (!isValid) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid code." });
-      }
-
-      // Set cookie to remember MFA verified state for this session
-      const cookieStore = await cookies();
-      cookieStore.set("mfa-verified", ctx.userId, {
-        httpOnly: true, 
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: 60 * 60 * 24 // 1 day
-      });
-
-      return { ok: true };
+    .mutation(() => {
+      return mfaDisabledError();
     }),
 
   /**
