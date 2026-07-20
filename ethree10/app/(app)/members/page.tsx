@@ -24,6 +24,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -35,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UserPlus } from "lucide-react";
+import { Pencil, Trash2, UserPlus } from "lucide-react";
 import { initials } from "@/lib/format";
 import { humanize } from "@/lib/constants";
 import type { Role } from "@prisma/client";
@@ -60,6 +61,13 @@ export default function MembersPage() {
   const [title, setTitle]         = useState("");
   const [teamId, setDeptId] = useState<string>("");
   const [subUnitId, setSubUnitId] = useState<string>("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editRole, setEditRole] = useState<Role>("team_member");
+  const [editTitle, setEditTitle] = useState("");
+  const [editTeamId, setEditTeamId] = useState("");
+  const [editSubUnitId, setEditSubUnitId] = useState("");
 
   const canInvite = isSuperAdmin || roles.some((r: string) =>
     ["agency_admin"].includes(r)
@@ -71,10 +79,11 @@ export default function MembersPage() {
   });
 
   const { data: teams } = trpc.teams.list.useQuery(undefined, {
-    enabled: open,
+    enabled: open || Boolean(editingId),
   });
 
   const selectedDept = teams?.find(d => d.id === teamId);
+  const selectedEditTeam = teams?.find(d => d.id === editTeamId);
 
   const invite = trpc.organizations.inviteUser.useMutation({
     onSuccess: () => {
@@ -84,6 +93,24 @@ export default function MembersPage() {
       void refetch();
     },
     onError: (e) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateMember = trpc.members.updateMembership.useMutation({
+    onSuccess: () => {
+      toast({ title: "Member updated" });
+      setEditingId(null);
+      void refetch();
+    },
+    onError: (e) => toast({ title: "Could not update member", description: e.message, variant: "destructive" }),
+  });
+
+  const removeMember = trpc.members.removeMembership.useMutation({
+    onSuccess: () => {
+      toast({ title: "Member removed" });
+      setRemovingId(null);
+      void refetch();
+    },
+    onError: (e) => toast({ title: "Could not remove member", description: e.message, variant: "destructive" }),
   });
 
   function handleInvite(e: React.FormEvent) {
@@ -98,10 +125,33 @@ export default function MembersPage() {
     });
   }
 
+  function openEdit(member: NonNullable<typeof data>[number]) {
+    setEditingId(member.membershipId);
+    setEditName(member.user.name);
+    setEditRole(member.role);
+    setEditTitle(member.title ?? "");
+    setEditTeamId(member.team?.id ?? "");
+    setEditSubUnitId(member.subUnit?.id ?? "");
+  }
+
+  function handleEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingId) return;
+    updateMember.mutate({
+      membershipId: editingId,
+      name: editName,
+      role: editRole,
+      title: editTitle || null,
+      teamId: editTeamId || null,
+      subUnitId: editSubUnitId || null,
+    });
+  }
+
   const filtered = (data ?? []).filter((m) =>
     m.user.name.toLowerCase().includes(query.toLowerCase()) ||
     m.user.email.toLowerCase().includes(query.toLowerCase())
   );
+  const removingMember = data?.find((m) => m.membershipId === removingId);
 
   return (
     <div className="space-y-6">
@@ -225,6 +275,122 @@ export default function MembersPage() {
         )}
       </div>
 
+      {canInvite && (
+        <>
+          <Dialog open={Boolean(editingId)} onOpenChange={(nextOpen) => !nextOpen && setEditingId(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Edit member</DialogTitle>
+                <DialogDescription>
+                  Update this member&apos;s profile, role, title, and team assignment.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleEdit} className="space-y-4 pt-2">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-name">Full name *</Label>
+                  <Input
+                    id="edit-name"
+                    value={editName}
+                    onChange={(event) => setEditName(event.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="edit-role">Role *</Label>
+                  <Select value={editRole} onValueChange={(value) => setEditRole(value as Role)}>
+                    <SelectTrigger id="edit-role"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ROLE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="edit-title">Job title (optional)</Label>
+                  <Input
+                    id="edit-title"
+                    value={editTitle}
+                    onChange={(event) => setEditTitle(event.target.value)}
+                    placeholder="e.g. Backend Engineer"
+                  />
+                </div>
+
+                {teams && teams.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-team">Team (optional)</Label>
+                      <Select value={editTeamId || "__none__"} onValueChange={(value) => { setEditTeamId(value === "__none__" ? "" : value); setEditSubUnitId(""); }}>
+                        <SelectTrigger id="edit-team">
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {teams.map((team) => (
+                            <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {selectedEditTeam && selectedEditTeam.subUnits.length > 0 && (
+                      <div className="space-y-1">
+                        <Label htmlFor="edit-subunit">Sub-unit (optional)</Label>
+                        <Select value={editSubUnitId || "__none__"} onValueChange={(value) => setEditSubUnitId(value === "__none__" ? "" : value)}>
+                          <SelectTrigger id="edit-subunit">
+                            <SelectValue placeholder="None" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">None</SelectItem>
+                            {selectedEditTeam.subUnits.map((subUnit) => (
+                              <SelectItem key={subUnit.id} value={subUnit.id}>{subUnit.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setEditingId(null)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={updateMember.isPending || editName.trim().length < 1}>
+                    {updateMember.isPending ? "Saving..." : "Save changes"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={Boolean(removingId)} onOpenChange={(nextOpen) => !nextOpen && setRemovingId(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Remove member</DialogTitle>
+                <DialogDescription>
+                  Remove {removingMember?.user.name ?? "this member"} from active access. Historical records remain attached to their account.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setRemovingId(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={!removingId || removeMember.isPending}
+                  onClick={() => removingId && removeMember.mutate({ membershipId: removingId })}
+                >
+                  {removeMember.isPending ? "Removing..." : "Remove member"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
+
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading members…</p>
       ) : filtered.length === 0 ? (
@@ -243,6 +409,7 @@ export default function MembersPage() {
                 <TableHead>Sub-unit</TableHead>
                 <TableHead>Skills</TableHead>
                 <TableHead>Open tasks</TableHead>
+                {canInvite && <TableHead className="w-24 text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -274,6 +441,30 @@ export default function MembersPage() {
                       {m.openTaskCount}
                     </Badge>
                   </TableCell>
+                  {canInvite && (
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Edit ${m.user.name}`}
+                          onClick={() => openEdit(m)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Remove ${m.user.name}`}
+                          onClick={() => setRemovingId(m.membershipId)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
