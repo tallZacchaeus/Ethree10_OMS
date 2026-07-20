@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
-import type { SkillLevel } from "@prisma/client";
+import { Role, type SkillLevel } from "@prisma/client";
 import { requireAgencyAction } from "@/server/services/agency";
 
 const skillLevelOrder: Record<SkillLevel, number> = {
@@ -83,6 +84,99 @@ export const membersRouter = router({
             include: { team: true, subUnit: true },
           },
         },
+      });
+    }),
+
+  updateMembership: protectedProcedure
+    .input(
+      z.object({
+        membershipId: z.string(),
+        name: z.string().trim().min(1).max(120),
+        role: z.nativeEnum(Role),
+        title: z.string().trim().max(120).nullable(),
+        teamId: z.string().nullable(),
+        subUnitId: z.string().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireAgencyAction(ctx.userId, "organization.changeRole");
+
+      const membership = await ctx.db.membership.findFirst({
+        where: { id: input.membershipId, removedAt: null },
+        select: { userId: true },
+      });
+      if (!membership) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found." });
+      }
+
+      if (input.subUnitId) {
+        const subUnit = await ctx.db.subUnit.findFirst({
+          where: {
+            id: input.subUnitId,
+            teamId: input.teamId ?? undefined,
+            archivedAt: null,
+          },
+          select: { id: true },
+        });
+        if (!subUnit) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Choose a valid sub-unit for the selected team.",
+          });
+        }
+      }
+
+      return ctx.db.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: membership.userId },
+          data: { name: input.name },
+        });
+        return tx.membership.update({
+          where: { id: input.membershipId },
+          data: {
+            role: input.role,
+            title: input.title || null,
+            teamId: input.teamId,
+            subUnitId: input.subUnitId,
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                avatarUrl: true,
+                timezone: true,
+                skills: { include: { skill: true } },
+              },
+            },
+            team: { select: { id: true, name: true } },
+            subUnit: { select: { id: true, name: true } },
+          },
+        });
+      });
+    }),
+
+  removeMembership: protectedProcedure
+    .input(z.object({ membershipId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAgencyAction(ctx.userId, "organization.removeMember");
+      const membership = await ctx.db.membership.findFirst({
+        where: { id: input.membershipId, removedAt: null },
+        select: { userId: true },
+      });
+      if (!membership) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found." });
+      }
+      if (membership.userId === ctx.userId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "You cannot remove your own member access.",
+        });
+      }
+      return ctx.db.membership.update({
+        where: { id: input.membershipId },
+        data: { removedAt: new Date() },
       });
     }),
 
