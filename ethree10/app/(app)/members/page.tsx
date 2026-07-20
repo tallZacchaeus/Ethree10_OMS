@@ -23,6 +23,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -125,6 +126,9 @@ export default function MembersPage() {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Invite member</DialogTitle>
+                <DialogDescription>
+                  Add a staff member with a role, team, and optional job title.
+                </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleInvite} className="space-y-4 pt-2">
                 <div className="grid grid-cols-2 gap-3">
