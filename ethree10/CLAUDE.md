@@ -27,12 +27,26 @@ pnpm test -- tests/unit/authorization.test.ts
 pnpm test:e2e
 
 # Database
-pnpm db:migrate      # run pending migrations
-pnpm db:push         # push schema without migration (dev shortcut)
+pnpm db:deploy       # PRODUCTION: apply pending migrations (prisma migrate deploy)
+pnpm db:migrate      # dev: create + apply a migration from schema changes
+pnpm db:push         # local prototyping ONLY — never against a shared or production DB
 pnpm db:seed         # seed demo data
 pnpm db:generate     # regenerate Prisma client after schema changes
 pnpm db:studio       # open Prisma Studio UI
 ```
+
+### Schema changes
+
+The migration history was baselined on 2026-08-09 (`20260809000000_baseline`)
+after a long period of `db push` development left it unusable. From here:
+
+- **Never run `db push` against a shared or production database.** It is for local
+  prototyping only, and `--force-reset` destroys data.
+- Change `schema.prisma`, then `pnpm db:migrate` to generate a migration.
+- Deploys run `pnpm db:deploy` (`prisma migrate deploy`), which applies pending
+  migrations and never resets.
+- `prisma/migrations/migration_lock.toml` must stay committed; without it Prisma
+  cannot read the folder as a history.
 
 Env validation runs on every server boot. Copy `.env.example` to `.env.local` and fill in all required keys before running anything. Set `SKIP_ENV_VALIDATION=true` to bypass (CI only).
 

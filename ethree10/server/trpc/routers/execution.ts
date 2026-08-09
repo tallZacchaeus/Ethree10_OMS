@@ -2,7 +2,8 @@ import { z } from "zod";
 import { AvailabilityType, DeliverableKind, DeliverableVisibility } from "@prisma/client";
 import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
-import { requireAgencyAction } from "@/server/services/agency";
+import { requireAgencyAction, getAgencyAuthContext } from "@/server/services/agency";
+import { hasAgencyWideScope } from "@/server/auth/role-groups";
 import { ProjectService } from "@/server/services/project";
 import { ExecutionService } from "@/server/services/execution";
 import { db } from "@/server/db/client";
@@ -65,6 +66,53 @@ export const executionRouter = router({
       await requireTeamAccess(ctx.userId, input.teamId);
       return ExecutionService.workload(input.teamId);
     }),
+
+  /**
+   * Live counts for the branch dashboard.
+   *
+   * This page used to be four link cards with no data — a menu wearing the word
+   * "dashboard". These are the five numbers a branch head actually acts on, each
+   * one a link to the queue that clears it.
+   */
+  branchSummary: protectedProcedure.query(async ({ ctx }) => {
+    await requireAgencyAction(ctx.userId, "task.read");
+
+    // Branches the caller leads or belongs to; agency-wide roles see all.
+    const auth = await getAgencyAuthContext(ctx.userId);
+    const memberships = await db.membership.findMany({
+      where: { userId: ctx.userId, removedAt: null, acceptedAt: { not: null }, teamId: { not: null } },
+      select: { teamId: true },
+    });
+    const scopedTeamIds = memberships.flatMap((m) => (m.teamId ? [m.teamId] : []));
+    const agencyWide = hasAgencyWideScope(auth);
+    const teams = await db.team.findMany({
+      where: { archivedAt: null, ...(agencyWide ? {} : { id: { in: scopedTeamIds } }) },
+      select: { id: true, name: true },
+    });
+    const teamIds = teams.map((team) => team.id);
+    const now = new Date();
+
+    const [unrouted, awaitingBrief, inReview, overdue, blocked, activeProjects] = await Promise.all([
+      // Unrouted requests are everyone's problem until someone claims them.
+      db.request.count({ where: { routedTeamId: null, stage: { in: ["submitted", "needs_clarification"] } } }),
+      db.request.count({ where: { routedTeamId: { in: teamIds }, stage: { in: ["submitted", "under_review", "needs_clarification"] } } }),
+      db.task.count({ where: { status: "in_review", project: { agencyTeamId: { in: teamIds } } } }),
+      db.task.count({
+        where: {
+          status: { notIn: ["done", "cancelled"] },
+          dueDate: { lt: now },
+          project: { agencyTeamId: { in: teamIds } },
+        },
+      }),
+      db.task.count({ where: { isBlocked: true, status: { notIn: ["done", "cancelled"] }, project: { agencyTeamId: { in: teamIds } } } }),
+      db.project.count({ where: { status: { in: ["active", "in_review"] }, agencyTeamId: { in: teamIds } } }),
+    ]);
+
+    return {
+      teams,
+      metrics: { unrouted, awaitingBrief, inReview, overdue, blocked, activeProjects },
+    };
+  }),
 
   createDeliverable: protectedProcedure
     .input(z.object({

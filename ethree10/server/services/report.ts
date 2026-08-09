@@ -6,6 +6,7 @@ import { EmailService } from "@/server/notifications/email";
 import { generatePdfBuffer } from "@/server/reports/pdf";
 import { uploadFile } from "@/lib/storage";
 import { KpiService } from "@/server/services/kpi";
+import { captureCriticalFailure } from "@/lib/observability";
 
 export const REPORT_TIMEZONE = "Africa/Lagos";
 const HOUR = 60 * 60 * 1000;
@@ -101,6 +102,21 @@ function requestScopeWhere(scope: Scope): Prisma.RequestWhereInput {
   if (scope.level === "member") return { project: { tasks: { some: taskScopeWhere(scope) } } };
   if (scope.level === "subunit") return { project: { tasks: { some: { subUnitId: scope.scopeId } } } };
   return {};
+}
+
+
+/**
+ * How many report snapshots to build concurrently. Each one runs a heavy nested
+ * read and a transaction, so this trades wall-clock against connection pressure.
+ * At 8 staff a cycle is invisible either way; this is what keeps it viable at 50.
+ */
+const CYCLE_BATCH_SIZE = 5;
+
+/** Run `fn` over `items` in fixed-size concurrent batches, preserving failures. */
+async function runBatched<T>(items: T[], size: number, fn: (item: T) => Promise<unknown>): Promise<void> {
+  for (let i = 0; i < items.length; i += size) {
+    await Promise.all(items.slice(i, i + size).map(fn));
+  }
 }
 
 export class ReportService {
@@ -262,8 +278,16 @@ export class ReportService {
       if (department.leadId) await NotificationService.create({ userId: department.leadId, kind: "report_ready", title: `${args.period === "weekly" ? "Weekly" : "Monthly"} department report ready`, body: `${department.name}'s draft report is ready for review.`, link: `/reports/${report.id}`, entityType: "Report", entityId: report.id });
     }
 
-    for (const member of members) await this.generateMemberReport(member.userId, args.period, periodStart, periodEnd, args.actorId);
-    for (const organization of organizations) await this.generate({ level: "organization", scopeId: organization.id }, args.period, periodStart, periodEnd, args.actorId);
+    // Member and client reports are the bulk of a cycle and are independent of
+    // each other, so they run in bounded batches rather than strictly one at a
+    // time. Bounded, not unbounded: each `generate` opens a transaction and a
+    // heavy nested read, and firing 50+ at once would exhaust the pool.
+    await runBatched(members, CYCLE_BATCH_SIZE, (member) =>
+      this.generateMemberReport(member.userId, args.period, periodStart, periodEnd, args.actorId),
+    );
+    await runBatched(organizations, CYCLE_BATCH_SIZE, (organization) =>
+      this.generate({ level: "organization", scopeId: organization.id }, args.period, periodStart, periodEnd, args.actorId),
+    );
 
     // Scorecards are computed from the same window. Nothing called KpiService
     // before, so `KpiSnapshot` was only ever read and the dashboard's KPI widget
@@ -288,7 +312,7 @@ export class ReportService {
         await KpiService.computeSnapshot({ config, periodStart, periodEnd, period });
         computed += 1;
       } catch (error) {
-        console.error("Scorecard computation failed", config.id, error);
+        captureCriticalFailure("report-cycle", error, { scorecardId: config.id });
       }
     }
     return computed;
@@ -328,26 +352,38 @@ export class ReportService {
     return db.report.update({ where: { id: report.id }, data: { narrative: args.narrative, authoredById: args.actorId } });
   }
 
-  static async finalize(args: { reportId: string; actorId: string }) {
+  static async finalize(args: { reportId: string; actorId: string; humanSummary?: string }) {
     const report = await db.report.findUnique({ where: { id: args.reportId } });
     if (!report) throw new TRPCError({ code: "NOT_FOUND" });
     if (report.status === "finalized") return report;
 
+    // A human sentence beats any generated paragraph. Captured at finalisation
+    // because that is the moment someone has actually read the numbers.
+    const narrative = {
+      ...((report.narrative as Record<string, unknown>) ?? {}),
+      ...(args.humanSummary ? { humanSummary: args.humanSummary } : {}),
+    } as Prisma.InputJsonValue;
+
     const finalized = await db.report.update({
       where: { id: report.id },
-      data: { status: "finalized", finalizedAt: new Date(), finalizedById: args.actorId },
+      data: {
+        status: "finalized",
+        finalizedAt: new Date(),
+        finalizedById: args.actorId,
+        narrative,
+      },
     });
 
     // Render and store the PDF at finalisation, not on every draft regeneration.
     // Until now `pdfUrl` was written as null and nothing ever set it, so the
     // "PDF exports ready" tile on /reports counted a field no code populated.
     const pdfUrl = await ReportService.storePdf(finalized.id).catch((error) => {
-      console.error("Report PDF generation failed", finalized.id, error);
+      captureCriticalFailure("report-delivery", error, { reportId: finalized.id, stage: "pdf" });
       return null;
     });
 
     await ReportService.deliverFinalized(finalized.id).catch((error) =>
-      console.error("Report delivery failed", finalized.id, error),
+      captureCriticalFailure("report-delivery", error, { reportId: finalized.id, stage: "notify" }),
     );
 
     return pdfUrl ? { ...finalized, pdfUrl } : finalized;
@@ -462,7 +498,7 @@ export class ReportService {
           .join("\n"),
         ctaLabel: "Open the report",
         ctaPath: `/reports/${report.id}`,
-      }).catch((error) => console.error("Report email failed", report.id, recipient.email, error));
+      }).catch((error) => captureCriticalFailure("report-delivery", error, { reportId: report.id, stage: "email" }));
     }
 
     return { sentTo: recipients.length };

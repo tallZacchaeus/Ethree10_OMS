@@ -208,6 +208,7 @@ export function CreateProposalDialog({
                   variant="ghost"
                   size="icon"
                   className="text-muted-foreground hover:text-destructive mb-0.5"
+                  aria-label={`Remove line item ${idx + 1}`}
                   onClick={() => removeLineItem(idx)}
                   disabled={lineItems.length === 1}
                 >

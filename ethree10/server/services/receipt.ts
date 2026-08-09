@@ -4,6 +4,7 @@ import { Prisma, type PaymentMethod, type Receipt } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { uploadFile } from "@/lib/storage";
 import { ReceiptDocument } from "@/server/documents/receipt-pdf";
+import { captureCriticalFailure } from "@/lib/observability";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -73,7 +74,7 @@ export class ReceiptService {
     // a rendering of it. A storage outage must not roll back a confirmed payment
     // or leave an invoice paid with no receipt — the PDF can be regenerated.
     await ReceiptService.generateReceiptPdf(receipt.id).catch((error) =>
-      console.error("Receipt PDF generation failed", receipt.code, error),
+      captureCriticalFailure("receipt-issuance", error, { receiptCode: receipt.code }),
     );
     return (await db.receipt.findUnique({ where: { id: receipt.id } })) ?? receipt;
   }
@@ -101,7 +102,7 @@ export class ReceiptService {
     // a rendering of it. A storage outage must not roll back a confirmed payment
     // or leave an invoice paid with no receipt — the PDF can be regenerated.
     await ReceiptService.generateReceiptPdf(receipt.id).catch((error) =>
-      console.error("Receipt PDF generation failed", receipt.code, error),
+      captureCriticalFailure("receipt-issuance", error, { receiptCode: receipt.code }),
     );
     return (await db.receipt.findUnique({ where: { id: receipt.id } })) ?? receipt;
   }

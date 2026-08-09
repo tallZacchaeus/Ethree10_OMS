@@ -6,6 +6,7 @@ import { router, publicProcedure } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { db } from "@/server/db/client";
 import { can } from "@/server/auth/permissions";
+import { enforcePublicRateLimit } from "@/server/security/public-rate-limit";
 import { RequestService } from "@/server/services/request";
 import { posthogServer } from "@/lib/posthog";
 import {
@@ -91,7 +92,26 @@ export const requestsRouter = router({
         consentToEmail: z.literal(true),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // The only unauthenticated write endpoint in the system: it creates a
+      // Request, may create an Organization, and notifies staff. Spec §19.9
+      // requires it to be throttled. Limited on two axes so neither a single
+      // network nor a single address can flood intake.
+      const forwardedFor = ctx.headers.get("x-forwarded-for") ?? "";
+      const clientIp = forwardedFor.split(",")[0]?.trim() || ctx.headers.get("x-real-ip") || "unknown";
+      await enforcePublicRateLimit({
+        action: "request-submit-ip",
+        secret: clientIp,
+        limit: 5,
+        windowSeconds: 600,
+      });
+      await enforcePublicRateLimit({
+        action: "request-submit-email",
+        secret: input.requesterEmail.toLowerCase(),
+        limit: 3,
+        windowSeconds: 3600,
+      });
+
       const result = await RequestService.createPublic({
         requesterName: input.requesterName,
         requesterEmail: input.requesterEmail,

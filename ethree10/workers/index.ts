@@ -3,8 +3,13 @@ import { redisConnection, queues } from "./queues";
 import { ReportService } from "../server/services/report";
 import { InvoiceService } from "../server/services/invoice";
 import pino from "pino";
+import { captureCriticalFailure, initMonitoring, recordJobSuccess } from "../lib/observability";
 
 const logger = pino({ name: "worker" });
+
+// The worker is a separate process from Next.js, so it needs its own
+// monitoring init — the instrumentation hook does not run here.
+initMonitoring("server");
 
 // ── Notifications worker ────────────────────────────────────────────────
 const notificationsWorker = new Worker(
@@ -46,6 +51,19 @@ const integrationsWorker = new Worker(
 for (const worker of [notificationsWorker, reportsWorker, integrationsWorker]) {
   worker.on("failed", (job, err) => {
     logger.error({ jobId: job?.id, err }, "Job failed");
+    // A silently failing worker is the whole reason monitoring exists: nobody
+    // notices a report cycle that stopped running until someone asks for a report.
+    captureCriticalFailure(
+      worker.name === "reports" ? "report-cycle" : worker.name === "integrations" ? "integration-sync" : "notification-worker",
+      err,
+      { jobId: job?.id, jobName: job?.name, queue: worker.name },
+    );
+  });
+
+  worker.on("completed", (job) => {
+    if (job.name.endsWith("-report")) {
+      recordJobSuccess("report-cycle", { jobName: job.name });
+    }
   });
 }
 

@@ -110,8 +110,6 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/organizations", label: "Clients", icon: Layers, allow: AGENCY_WIDE },
       { href: "/members", label: "People", icon: Users, allow: [...AGENCY_WIDE, "branch_head"] },
       { href: "/teams", label: "Branches", icon: Building2, allow: AGENCY_WIDE },
-      { href: "/positions", label: "Positions", icon: UserCircle, allow: AGENCY_ADMIN },
-      { href: "/agency/skills", label: "Skills", icon: Sparkles, allow: [...AGENCY_ADMIN, "branch_head"] },
       { href: "/reports", label: "Reports", icon: BarChart3, allow: [...AGENCY_WIDE, "branch_head", "department_lead"] },
       { href: "/admin/analytics", label: "Analytics", icon: Activity, allow: AGENCY_WIDE },
       { href: "/audit", label: "Audit", icon: ScrollText, allow: AGENCY_WIDE },
@@ -130,10 +128,21 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
+interface RoleProps {
+  /** Resolved on the server so the correct nav renders on first paint. */
+  roles?: Role[];
+  isSuperAdmin?: boolean;
+}
+
 /** Shared sidebar inner content — used by the desktop rail and the mobile drawer. */
-export function SidebarContent() {
+export function SidebarContent({ roles: serverRoles, isSuperAdmin: serverIsSuperAdmin }: RoleProps = {}) {
   const pathname = usePathname();
-  const { isSuperAdmin, roles } = useAgencyContext();
+  const client = useAgencyContext();
+  // Prefer roles resolved on the server. Without them the first paint showed only
+  // the always-visible items and the real nav popped in once the auth query
+  // resolved — very visible on a slow connection.
+  const roles = serverRoles ?? client.roles;
+  const isSuperAdmin = serverIsSuperAdmin ?? client.isSuperAdmin;
   const sections = NAV_SECTIONS;
 
   const canSee = (item: NavItem) =>
@@ -150,16 +159,22 @@ export function SidebarContent() {
         </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-5">
+      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-3 py-5">
         {sections.map((section) => {
           const items = section.items.filter(canSee);
           if (items.length === 0) return null;
           return (
             <div key={section.title} className="mb-6 last:mb-0">
-              <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/65">
+              <p
+                id={`nav-section-${section.title.replace(/\s+/g, "-").toLowerCase()}`}
+                className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/65"
+              >
                 {section.title}
               </p>
-              <ul className="space-y-0.5">
+              <ul
+                aria-labelledby={`nav-section-${section.title.replace(/\s+/g, "-").toLowerCase()}`}
+                className="space-y-0.5"
+              >
                 {items.map(({ href, icon: Icon, label }) => {
                   const active = pathname === href || pathname.startsWith(`${href}/`);
                   return (
@@ -206,10 +221,10 @@ export function SidebarContent() {
 }
 
 /** Desktop sidebar rail — hidden below `lg`, where the mobile drawer takes over. */
-export function AppSidebar() {
+export function AppSidebar({ roles, isSuperAdmin }: RoleProps = {}) {
   return (
     <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
-      <SidebarContent />
+      <SidebarContent roles={roles} isSuperAdmin={isSuperAdmin} />
     </aside>
   );
 }

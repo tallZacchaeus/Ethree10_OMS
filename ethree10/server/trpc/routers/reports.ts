@@ -77,9 +77,9 @@ export const reportsRouter = router({
     return ReportService.updateNarrative({ reportId: input.id, actorId: ctx.userId, narrative: input.narrative });
   }),
 
-  finalize: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+  finalize: protectedProcedure.input(z.object({ id: z.string(), humanSummary: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => {
     await assertCanManage(ctx.userId, input.id);
-    return ReportService.finalize({ reportId: input.id, actorId: ctx.userId });
+    return ReportService.finalize({ reportId: input.id, actorId: ctx.userId, humanSummary: input.humanSummary });
   }),
 
   amend: protectedProcedure.input(z.object({ id: z.string(), reason: z.string().trim().min(5).max(1000), metrics: flatJson, narrative })).mutation(async ({ ctx, input }) => {

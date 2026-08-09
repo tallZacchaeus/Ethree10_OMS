@@ -6,6 +6,7 @@ import { NotificationService } from "@/server/services/notification";
 import { EmailService } from "@/server/notifications/email";
 import { IntegrationService } from "@/server/integrations/core/service";
 import { generateCode } from "@/lib/utils/codes";
+import { captureCriticalFailure } from "@/lib/observability";
 
 /** Outbound integration sync is best-effort: it must never break local work. */
 async function syncOutbound(fn: () => Promise<void>): Promise<void> {
@@ -326,7 +327,7 @@ export class TaskService {
       body: lines.join("\n"),
       ctaLabel: "Open task",
       ctaPath: `/tasks/${task.id}`,
-    }).catch((error) => console.error("Task assignment email failed", task.code, error));
+    }).catch((error) => captureCriticalFailure("notification-worker", error, { taskCode: task.code, kind: "assignment" }));
   }
 
   static async update(args: {
@@ -772,7 +773,7 @@ export class TaskService {
           body: `${asker?.name ?? "A team member"} asked about "${task.title}" (${task.project.name}):\n\n${args.question}`,
           ctaLabel: "Answer on the task",
           ctaPath: `/tasks/${args.taskId}`,
-        }).catch((error) => console.error("Clarification email failed", task.code, error));
+        }).catch((error) => captureCriticalFailure("notification-worker", error, { taskCode: task.code, kind: "clarification" }));
       }
       return { routedTo: "internal" as const, notified: audience.length };
     }
@@ -801,7 +802,7 @@ export class TaskService {
         body: `The team working on "${task.project.name}" has a question:\n\n${args.question}\n\nReply on your tracking link and they will pick it up.`,
         ctaLabel: "Reply to the team",
         ctaPath: request.publicToken ? `/track/${request.publicToken}` : `/`,
-      }).catch((error) => console.error("Client clarification email failed", request.code, error));
+      }).catch((error) => captureCriticalFailure("notification-worker", error, { requestCode: request.code, kind: "client-clarification" }));
     }
     return { routedTo: "client" as const, notified: request.requesterEmail ? 1 : 0 };
   }

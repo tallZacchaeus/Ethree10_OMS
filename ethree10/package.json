@@ -33,7 +33,11 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "worker": "tsx workers/index.ts"
+    "worker": "tsx workers/index.ts",
+    "db:deploy": "prisma migrate deploy",
+    "test:integration:prepare": "prisma migrate deploy",
+    "test:all": "vitest run && vitest run --config vitest.docs.config.ts && vitest run --config vitest.integration.config.ts",
+    "test:docs": "vitest run --config vitest.docs.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1058.0",
@@ -83,7 +87,6 @@
     "react-markdown": "^10.1.0",
     "recharts": "^2.15.3",
     "resend": "6.17.2",
-    "stripe": "^22.1.1",
     "superjson": "^2.2.2",
     "tailwind-merge": "^2.6.0",
     "zod": "^3.24.4"

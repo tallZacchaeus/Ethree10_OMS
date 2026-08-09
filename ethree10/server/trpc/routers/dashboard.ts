@@ -174,9 +174,48 @@ export const dashboardRouter = router({
       0,
     );
 
+    // The three success measures from the vision document (§1.7), computed from
+    // real data rather than left in a document nobody opens:
+    //   · every request flows through the platform
+    //   · average triage time under 48 hours
+    //   · client satisfaction 4+ out of 5
+    const [triaged, csatScores, unroutedCount] = await Promise.all([
+      db.request.findMany({
+        where: { routedTeamId: { not: null }, createdAt: { gte: thirtyDaysAgo } },
+        select: { createdAt: true, stageEvents: { where: { toStage: "under_review" }, orderBy: { createdAt: "asc" }, take: 1, select: { createdAt: true } } },
+        take: 200,
+      }),
+      db.project.findMany({
+        where: { csatScore: { not: null }, updatedAt: { gte: thirtyDaysAgo } },
+        select: { csatScore: true },
+      }),
+      db.request.count({ where: { routedTeamId: null, stage: { in: ["submitted", "needs_clarification"] } } }),
+    ]);
+
+    const triageHours = triaged.flatMap((request) => {
+      const first = request.stageEvents[0];
+      if (!first) return [];
+      return [(first.createdAt.getTime() - request.createdAt.getTime()) / 3_600_000];
+    });
+    const averageTriageHours = triageHours.length
+      ? Number((triageHours.reduce((a, b) => a + b, 0) / triageHours.length).toFixed(1))
+      : null;
+    const averageCsat = csatScores.length
+      ? Number(
+          (csatScores.reduce((sum, p) => sum + (p.csatScore ?? 0), 0) / csatScores.length).toFixed(1),
+        )
+      : null;
+
     return {
       crossAgencyInbox,
       topProjects,
+      successMetrics: {
+        averageTriageHours,
+        triageTargetHours: 48,
+        averageCsat,
+        csatTarget: 4,
+        awaitingTriage: unroutedCount,
+      },
       metrics: {
         pendingApprovals,
         overdueTasksCount,

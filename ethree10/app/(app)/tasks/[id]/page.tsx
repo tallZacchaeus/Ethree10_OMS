@@ -338,7 +338,50 @@ export default function TaskDetailPage() {
           <Card>
             <CardHeader><CardTitle>Deliverables and review history</CardTitle></CardHeader>
             <CardContent className="space-y-5">
-              {task.deliverables.length === 0 ? <p className="text-sm text-muted-foreground">No versioned deliverables yet.</p> : task.deliverables.map((deliverable) => <div key={deliverable.id} className="rounded-lg border p-3 text-sm"><div className="flex items-center justify-between gap-2"><strong>{deliverable.title}</strong><span className="text-xs text-muted-foreground">{deliverable.kind} · {deliverable.visibility} · v{deliverable.currentRevision}</span></div><div className="mt-2 space-y-1">{deliverable.versions.map((version) => <p key={version.id} className="text-muted-foreground">v{version.revision} · {version.url ? <a href={version.url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">Open</a> : "Document"}{version.notes ? ` · ${version.notes}` : ""}</p>)}</div></div>)}
+              {task.deliverables.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No versioned deliverables yet.</p>
+              ) : (
+                task.deliverables.map((deliverable) => (
+                  <div key={deliverable.id} className="rounded-lg border p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <strong>{deliverable.title}</strong>
+                      <span className="text-xs text-muted-foreground">
+                        {deliverable.kind} · {deliverable.visibility} · v{deliverable.currentRevision}
+                      </span>
+                    </div>
+                    {deliverable.visibility === "client" && (
+                      <p className="mt-1 text-xs text-brand-700">
+                        Client-visible — files attached here appear on the requester&apos;s tracking link.
+                      </p>
+                    )}
+                    <div className="mt-3 space-y-4">
+                      {deliverable.versions.map((version) => (
+                        <div key={version.id} className="rounded-md bg-muted/40 p-3">
+                          <p className="text-muted-foreground">
+                            v{version.revision} ·{" "}
+                            {version.url ? (
+                              <a href={version.url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
+                                Open link
+                              </a>
+                            ) : (
+                              "No link"
+                            )}
+                            {version.notes ? ` · ${version.notes}` : ""}
+                          </p>
+                          {/* Files attach to the *version*, which is what makes a
+                              deliverable a real artefact rather than a pasted URL. */}
+                          <div className="mt-2">
+                            <FileUpload
+                              parent={{ deliverableVersionId: version.id }}
+                              label={`Attach to v${version.revision}`}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
               <Separator />
               {task.reviews.length === 0 ? <p className="text-sm text-muted-foreground">No review decisions recorded.</p> : task.reviews.map((item) => <div key={item.id} className="text-sm"><strong>{humanize(item.decision)}</strong> · {humanize(item.reviewType)} · revision {item.revision}<p className="text-muted-foreground">{item.feedback || "No feedback supplied"} · {formatDateTime(item.createdAt)}</p></div>)}
             </CardContent>

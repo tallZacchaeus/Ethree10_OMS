@@ -5,6 +5,7 @@ import { AuditService } from "@/server/services/audit";
 import { ReceiptService } from "@/server/services/receipt";
 import { requireAgencyAction } from "@/server/services/agency";
 import { NotificationService } from "@/server/services/notification";
+import { captureCriticalFailure } from "@/lib/observability";
 
 /**
  * Money governance.
@@ -288,10 +289,22 @@ export class BudgetService {
     });
 
     // Receipt is issued only after confirmation — internal record and audit proof.
-    const receipt = await ReceiptService.issueForInvoice(invoice.id, {
-      paymentMethod: args.paymentMethod,
-      paymentRef: args.paymentRef ?? invoice.paymentRef,
-    });
+    // If this throws, the invoice is already marked paid, so the mismatch has to
+    // be visible rather than swallowed.
+    let receipt;
+    try {
+      receipt = await ReceiptService.issueForInvoice(invoice.id, {
+        paymentMethod: args.paymentMethod,
+        paymentRef: args.paymentRef ?? invoice.paymentRef,
+      });
+    } catch (error) {
+      captureCriticalFailure("payment-confirmation", error, {
+        invoiceId: invoice.id,
+        invoiceCode: invoice.code,
+        note: "Invoice marked paid but receipt issuance failed",
+      });
+      throw error;
+    }
 
     await AuditService.log({
       actorId,

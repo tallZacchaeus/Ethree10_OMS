@@ -24,13 +24,13 @@ import { cmsRouter } from "./cms";
 import { invoicesRouter } from "./invoices";
 import { receiptsRouter } from "./receipts";
 import { analyticsRouter } from "./analytics";
-import { sponsorshipsRouter } from "./sponsorships";
 import { setupRouter } from "./setup";
 import { trackRouter } from "./track";
 import { servicesRouter } from "./services";
 import { executionRouter } from "./execution";
 import { budgetsRouter } from "./budgets";
 import { attachmentsRouter } from "./attachments";
+import { searchRouter } from "./search";
 
 export const appRouter = router({
   auth: authRouter,
@@ -58,10 +58,10 @@ export const appRouter = router({
   invoices: invoicesRouter,
   receipts: receiptsRouter,
   analytics: analyticsRouter,
-  sponsorships: sponsorshipsRouter,
   setup: setupRouter,
   budgets: budgetsRouter,
   attachments: attachmentsRouter,
+  search: searchRouter,
   track: trackRouter,
   services: servicesRouter,
   execution: executionRouter,

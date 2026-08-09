@@ -55,10 +55,29 @@ export default async function AppLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <AppSidebar />
+      {/* Keyboard users land here first; without it, reaching page content means
+          tabbing through the whole sidebar on every navigation. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        Skip to main content
+      </a>
+      {/* Roles come from the session on the server, so the correct navigation is
+          present on first paint rather than flashing in after an auth query. */}
+      <AppSidebar
+        roles={(dbUser?.memberships ?? [])
+          .filter((membership) => !membership.removedAt && membership.acceptedAt)
+          .map((membership) => membership.role)}
+        isSuperAdmin={dbUser?.isSuperAdmin ?? false}
+      />
       <div className="flex flex-1 flex-col overflow-hidden">
         <AppTopbar user={session.user} />
-        <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto bg-background p-4 focus:outline-none md:p-6"
+        >
           <div className="mx-auto max-w-[1440px]">{children}</div>
         </main>
       </div>

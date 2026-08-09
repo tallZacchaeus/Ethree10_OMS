@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ReportService } from "@/server/services/report";
+import { captureCriticalFailure, recordJobSuccess } from "@/lib/observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,10 +16,11 @@ export async function GET(request: Request) {
     const result = period === "monthly"
       ? await ReportService.generateMonthly({ actorId: "system", anchor })
       : await ReportService.generateWeekly({ actorId: "system", anchor });
+    recordJobSuccess("report-cycle", { period, generated: result.generated });
     return NextResponse.json({ success: true, period, result });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("Cron / reports error:", error);
+    captureCriticalFailure("report-cycle", error, { route: "/api/cron/reports" });
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

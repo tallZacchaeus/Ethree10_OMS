@@ -434,7 +434,6 @@ model Project {
   milestones      Milestone[]
   proposals       Proposal[]
   invoices        Invoice[]
-  sponsorships    Sponsorship[]
   clientDecisions ClientDecision[]
   budget          Budget?
   expenses        Expense[]
@@ -1260,27 +1259,6 @@ model MarketingContent {
 // ============================================================
 // PHASE 3: SPONSORSHIPS & GRANTS
 // ============================================================
-
-enum SponsorshipStatus {
-  prospect
-  applied
-  approved
-  funded
-  rejected
-}
-
-model Sponsorship {
-  id          String            @id @default(cuid())
-  sponsorName String
-  amount      Decimal?          @db.Decimal(14, 2)
-  currency    String            @default("USD")
-  status      SponsorshipStatus @default(prospect)
-  projectId   String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-
-  project Project? @relation(fields: [projectId], references: [id])
-}
 
 // ============================================================
 // PHASE 3: AUDIT LOG ARCHIVAL
