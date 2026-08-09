@@ -150,6 +150,34 @@ async function main() {
     },
   });
 
+  // ── KPI scorecards ──────────────────────────────────────────────────────
+  // One per branch, so `KpiService.computeSnapshot` has something to run during
+  // each reporting cycle and the dashboard's KPI widget has data to show.
+  // Evidence keys must match what `computeTeamEvidence` returns.
+  const BRANCH_SCORECARD = [
+    { key: "delivery", label: "Milestones delivered on time", weight: 30, evidence: "milestoneDelivery", target: 0.9, scoringFn: "linearAboveTarget" },
+    { key: "completion", label: "Task completion rate", weight: 30, evidence: "taskCompletionRate", target: 0.85, scoringFn: "linearAboveTarget" },
+    { key: "throughput", label: "Requests delivered", weight: 25, evidence: "requestsDelivered", target: 4, scoringFn: "linearAboveTarget" },
+    { key: "quality", label: "QA review adoption", weight: 15, evidence: "qaAdoption", target: 0.8, scoringFn: "linearAboveTarget" },
+  ];
+
+  for (const [slug, branch] of Object.entries(teamsBySlug)) {
+    const existingScorecard = await prisma.scorecardConfig.findFirst({
+      where: { level: "team", scopeId: branch.id },
+    });
+    if (!existingScorecard) {
+      await prisma.scorecardConfig.create({
+        data: {
+          level: "team",
+          scopeId: branch.id,
+          name: `${slug === TEAM_SLUGS.productDevelopment ? "Tech & Product" : "Digital Media"} delivery scorecard`,
+          items: BRANCH_SCORECARD,
+          isActive: true,
+        },
+      });
+    }
+  }
+
   // ── Departments (SubUnits) inside each branch ───────────────────────────
   const departmentsBySlug: Record<string, { id: string }> = {};
   for (const department of DEFAULT_DEPARTMENTS) {

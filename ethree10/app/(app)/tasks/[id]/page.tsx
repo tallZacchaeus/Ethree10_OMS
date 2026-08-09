@@ -25,6 +25,7 @@ import { UrgencyTag } from "@/components/ui-ext/urgency-tag";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { humanize } from "@/lib/constants";
 import { TimeLogDialog } from "@/components/tasks/time-log-dialog";
+import { FileUpload } from "@/components/files/file-upload";
 import { Clock, HelpCircle, Send } from "lucide-react";
 
 const MEMBER_STATUSES: TaskStatus[] = ["todo", "in_progress", "blocked"];
@@ -340,6 +341,19 @@ export default function TaskDetailPage() {
               {task.deliverables.length === 0 ? <p className="text-sm text-muted-foreground">No versioned deliverables yet.</p> : task.deliverables.map((deliverable) => <div key={deliverable.id} className="rounded-lg border p-3 text-sm"><div className="flex items-center justify-between gap-2"><strong>{deliverable.title}</strong><span className="text-xs text-muted-foreground">{deliverable.kind} · {deliverable.visibility} · v{deliverable.currentRevision}</span></div><div className="mt-2 space-y-1">{deliverable.versions.map((version) => <p key={version.id} className="text-muted-foreground">v{version.revision} · {version.url ? <a href={version.url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">Open</a> : "Document"}{version.notes ? ` · ${version.notes}` : ""}</p>)}</div></div>)}
               <Separator />
               {task.reviews.length === 0 ? <p className="text-sm text-muted-foreground">No review decisions recorded.</p> : task.reviews.map((item) => <div key={item.id} className="text-sm"><strong>{humanize(item.decision)}</strong> · {humanize(item.reviewType)} · revision {item.revision}<p className="text-muted-foreground">{item.feedback || "No feedback supplied"} · {formatDateTime(item.createdAt)}</p></div>)}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Files</CardTitle>
+              <CardDescription>
+                Work files, references and evidence. Uploaded straight to secure storage — large
+                video and design files are fine.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FileUpload parent={{ taskId: id }} label="Attach files" />
             </CardContent>
           </Card>
 

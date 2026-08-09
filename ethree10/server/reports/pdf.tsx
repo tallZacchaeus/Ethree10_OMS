@@ -1,5 +1,5 @@
 import React from "react";
-import { Document, Page, Text, View, StyleSheet, renderToStream } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, renderToStream, renderToBuffer } from "@react-pdf/renderer";
 import { format } from "date-fns";
 
 const styles = StyleSheet.create({
@@ -65,4 +65,9 @@ export const ReportDocument = ({ type, period, scopeName, periodStart, periodEnd
 
 export async function generatePdfStream(props: ReportProps) {
   return renderToStream(<ReportDocument {...props} />);
+}
+
+/** Buffer variant, for storing the PDF rather than streaming it to a response. */
+export async function generatePdfBuffer(props: ReportProps): Promise<Buffer> {
+  return renderToBuffer(<ReportDocument {...props} />);
 }

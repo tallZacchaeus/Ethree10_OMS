@@ -2,6 +2,10 @@ import { TRPCError } from "@trpc/server";
 import { Prisma, type ReportLevel, type ReportPeriod } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { NotificationService } from "@/server/services/notification";
+import { EmailService } from "@/server/notifications/email";
+import { generatePdfBuffer } from "@/server/reports/pdf";
+import { uploadFile } from "@/lib/storage";
+import { KpiService } from "@/server/services/kpi";
 
 export const REPORT_TIMEZONE = "Africa/Lagos";
 const HOUR = 60 * 60 * 1000;
@@ -195,10 +199,20 @@ export class ReportService {
     });
     if (existing?.status === "finalized") return existing;
     const { metrics, contributions } = await this.buildSnapshot(scope, start, end);
+    const prior = await this.previousMetrics(scope.level, scope.scopeId, period, start);
+
+    /** "12 (up from 8)" — movement, not a bare number. */
+    const withTrend = (current: number, previous: number | undefined, unit = "") => {
+      if (previous === undefined || previous === null) return `${current}${unit}`;
+      const delta = current - previous;
+      if (delta === 0) return `${current}${unit} (unchanged)`;
+      return `${current}${unit} (${delta > 0 ? "up" : "down"} from ${previous}${unit})`;
+    };
+
     const narrative = {
-      executiveSummary: `${metrics.tasksCompleted} tasks completed and ${metrics.projectsDelivered} projects delivered during this period.`,
+      executiveSummary: `${withTrend(metrics.tasksCompleted, prior?.tasksCompleted)} tasks completed and ${withTrend(metrics.projectsDelivered, prior?.projectsDelivered)} projects delivered during this period.`,
       outcomes: `${metrics.projectsAccepted} client deliveries accepted; ${metrics.deliverablesCreated} deliverable revisions produced.`,
-      qualityAndTimeliness: `${Math.round(metrics.onTimeRate * 100)}% of completed tasks met their due date; ${metrics.revisionsRequested} revisions were requested.`,
+      qualityAndTimeliness: `${withTrend(Math.round(metrics.onTimeRate * 100), prior ? Math.round(prior.onTimeRate * 100) : undefined, "%")} of completed tasks met their due date; ${withTrend(metrics.revisionsRequested, prior?.revisionsRequested)} revisions were requested.`,
       collaborationAndEffort: `${metrics.contributorCount} contributors recorded ${metrics.hoursLogged} hours alongside ${metrics.collaborationNotes} collaboration notes. Hours are context, not a performance score.`,
       risksAndNextSteps: metrics.blockers ? `${metrics.blockers} blocker records require follow-up.` : "No blockers were recorded in this period.",
     };
@@ -226,19 +240,77 @@ export class ReportService {
 
   static async generateCycle(args: { period: ReportPeriod; actorId?: string; anchor?: Date }) {
     const { periodStart, periodEnd } = reportPeriodBounds(args.period, args.anchor);
-    const [teams, members, organizations] = await Promise.all([
+    const [teams, departments, members, organizations] = await Promise.all([
       db.team.findMany({ where: { archivedAt: null }, select: { id: true, leadId: true, name: true } }),
+      // Departments are real org units with leads and members, so they get their
+      // own rollup. This level existed in the enum and in every scope helper but
+      // had been dropped from generation, leaving department leads with nothing.
+      db.subUnit.findMany({ where: { archivedAt: null }, select: { id: true, leadId: true, name: true } }),
       db.membership.findMany({ where: { removedAt: null, acceptedAt: { not: null } }, distinct: ["userId"], select: { userId: true } }),
       db.organization.findMany({ where: { archivedAt: null, OR: [{ projects: { some: {} } }, { requests: { some: {} } }] }, select: { id: true } }),
     ]);
+
     await this.generate({ level: "agency", scopeId: "agency" }, args.period, periodStart, periodEnd, args.actorId);
+
     for (const team of teams) {
       const report = await this.generateTeamReport(team.id, args.period, periodStart, periodEnd, args.actorId);
-      if (team.leadId) await NotificationService.create({ userId: team.leadId, kind: "report_ready", title: `${args.period === "weekly" ? "Weekly" : "Monthly"} team report ready`, body: `${team.name}'s draft report is ready for review.`, link: `/reports/${report.id}`, entityType: "Report", entityId: report.id });
+      if (team.leadId) await NotificationService.create({ userId: team.leadId, kind: "report_ready", title: `${args.period === "weekly" ? "Weekly" : "Monthly"} branch report ready`, body: `${team.name}'s draft report is ready for review.`, link: `/reports/${report.id}`, entityType: "Report", entityId: report.id });
     }
+
+    for (const department of departments) {
+      const report = await this.generate({ level: "subunit", scopeId: department.id }, args.period, periodStart, periodEnd, args.actorId);
+      if (department.leadId) await NotificationService.create({ userId: department.leadId, kind: "report_ready", title: `${args.period === "weekly" ? "Weekly" : "Monthly"} department report ready`, body: `${department.name}'s draft report is ready for review.`, link: `/reports/${report.id}`, entityType: "Report", entityId: report.id });
+    }
+
     for (const member of members) await this.generateMemberReport(member.userId, args.period, periodStart, periodEnd, args.actorId);
     for (const organization of organizations) await this.generate({ level: "organization", scopeId: organization.id }, args.period, periodStart, periodEnd, args.actorId);
-    return { ok: true, periodStart, periodEnd, generated: 1 + teams.length + members.length + organizations.length };
+
+    // Scorecards are computed from the same window. Nothing called KpiService
+    // before, so `KpiSnapshot` was only ever read and the dashboard's KPI widget
+    // could never show anything.
+    const snapshots = await this.computeScorecards(args.period, periodStart, periodEnd);
+
+    return {
+      ok: true,
+      periodStart,
+      periodEnd,
+      generated: 1 + teams.length + departments.length + members.length + organizations.length,
+      scorecards: snapshots,
+    };
+  }
+
+  /** Run every configured scorecard for the period and persist its snapshot. */
+  static async computeScorecards(period: ReportPeriod, periodStart: Date, periodEnd: Date): Promise<number> {
+    const configs = await db.scorecardConfig.findMany({ where: { isActive: true } });
+    let computed = 0;
+    for (const config of configs) {
+      try {
+        await KpiService.computeSnapshot({ config, periodStart, periodEnd, period });
+        computed += 1;
+      } catch (error) {
+        console.error("Scorecard computation failed", config.id, error);
+      }
+    }
+    return computed;
+  }
+
+  /**
+   * Metrics for the period immediately before this one, so a report can show
+   * movement rather than a bare number. "12 tasks completed" says nothing;
+   * "12, down from 18" says everything.
+   */
+  static async previousMetrics(
+    level: ReportLevel,
+    scopeId: string,
+    period: ReportPeriod,
+    periodStart: Date,
+  ): Promise<ReportMetrics | null> {
+    const previous = await db.report.findFirst({
+      where: { level, scopeId, period, periodStart: { lt: periodStart } },
+      orderBy: { periodStart: "desc" },
+      select: { metrics: true },
+    });
+    return (previous?.metrics as unknown as ReportMetrics) ?? null;
   }
 
   static generateWeekly(args: { actorId: string; anchor?: Date }) {
@@ -260,7 +332,140 @@ export class ReportService {
     const report = await db.report.findUnique({ where: { id: args.reportId } });
     if (!report) throw new TRPCError({ code: "NOT_FOUND" });
     if (report.status === "finalized") return report;
-    return db.report.update({ where: { id: report.id }, data: { status: "finalized", finalizedAt: new Date(), finalizedById: args.actorId } });
+
+    const finalized = await db.report.update({
+      where: { id: report.id },
+      data: { status: "finalized", finalizedAt: new Date(), finalizedById: args.actorId },
+    });
+
+    // Render and store the PDF at finalisation, not on every draft regeneration.
+    // Until now `pdfUrl` was written as null and nothing ever set it, so the
+    // "PDF exports ready" tile on /reports counted a field no code populated.
+    const pdfUrl = await ReportService.storePdf(finalized.id).catch((error) => {
+      console.error("Report PDF generation failed", finalized.id, error);
+      return null;
+    });
+
+    await ReportService.deliverFinalized(finalized.id).catch((error) =>
+      console.error("Report delivery failed", finalized.id, error),
+    );
+
+    return pdfUrl ? { ...finalized, pdfUrl } : finalized;
+  }
+
+  /** Human name for whatever a report is scoped to. */
+  static async scopeName(level: ReportLevel, scopeId: string): Promise<string> {
+    if (level === "agency") return "Ethree10 Agency";
+    if (level === "member") return (await db.user.findUnique({ where: { id: scopeId }, select: { name: true } }))?.name ?? "Member";
+    if (level === "team") return (await db.team.findUnique({ where: { id: scopeId }, select: { name: true } }))?.name ?? "Branch";
+    if (level === "subunit") return (await db.subUnit.findUnique({ where: { id: scopeId }, select: { name: true } }))?.name ?? "Department";
+    if (level === "organization") return (await db.organization.findUnique({ where: { id: scopeId }, select: { name: true } }))?.name ?? "Client";
+    return "Report";
+  }
+
+  /** Render the report to PDF, store it, and record the URL. */
+  static async storePdf(reportId: string): Promise<string> {
+    const report = await db.report.findUnique({ where: { id: reportId } });
+    if (!report) throw new TRPCError({ code: "NOT_FOUND" });
+
+    const buffer = await generatePdfBuffer({
+      type: report.level,
+      period: report.period,
+      scopeName: await ReportService.scopeName(report.level, report.scopeId),
+      periodStart: report.periodStart,
+      periodEnd: report.periodEnd,
+      metrics: report.metrics as Record<string, unknown>,
+      narrative:
+        report.narrative && typeof report.narrative === "object" && !Array.isArray(report.narrative)
+          ? (report.narrative as Record<string, unknown>)
+          : undefined,
+      version: report.version,
+    });
+
+    const url = await uploadFile(
+      `reports/${report.level}/${report.id}-v${report.version}.pdf`,
+      buffer,
+      "application/pdf",
+    );
+    await db.report.update({ where: { id: report.id }, data: { pdfUrl: url } });
+    return url;
+  }
+
+  /**
+   * Email a finalized report to the people accountable for it.
+   *
+   * Generation without delivery is why reports were being produced every week
+   * and read by nobody. Branch reports go to the branch head; every report also
+   * goes to the Chief Executive, who is accountable for the whole agency.
+   */
+  static async deliverFinalized(reportId: string): Promise<{ sentTo: number }> {
+    const report = await db.report.findUnique({ where: { id: reportId } });
+    if (!report || report.status !== "finalized") return { sentTo: 0 };
+
+    const recipientIds = new Set<string>();
+
+    if (report.level === "member") {
+      recipientIds.add(report.scopeId);
+    }
+    if (report.level === "team") {
+      const team = await db.team.findUnique({ where: { id: report.scopeId }, select: { leadId: true } });
+      if (team?.leadId) recipientIds.add(team.leadId);
+    }
+    if (report.level === "subunit") {
+      const dept = await db.subUnit.findUnique({ where: { id: report.scopeId }, select: { leadId: true } });
+      if (dept?.leadId) recipientIds.add(dept.leadId);
+    }
+    // The Chief Executive sees every finalized report.
+    const executives = await db.membership.findMany({
+      where: { role: "chief_executive", removedAt: null, acceptedAt: { not: null } },
+      select: { userId: true },
+    });
+    for (const executive of executives) recipientIds.add(executive.userId);
+
+    if (recipientIds.size === 0) return { sentTo: 0 };
+
+    const scopeName = await ReportService.scopeName(report.level, report.scopeId);
+    const metrics = report.metrics as unknown as ReportMetrics;
+    const narrative = (report.narrative ?? {}) as Record<string, string>;
+    const periodLabel = `${report.periodStart.toDateString()} – ${report.periodEnd.toDateString()}`;
+
+    const recipients = await db.user.findMany({
+      where: { id: { in: Array.from(recipientIds) }, deactivatedAt: null },
+      select: { id: true, email: true },
+    });
+
+    for (const recipient of recipients) {
+      await NotificationService.create({
+        userId: recipient.id,
+        kind: "report_ready",
+        title: `${report.period === "weekly" ? "Weekly" : "Monthly"} report finalized: ${scopeName}`,
+        body: periodLabel,
+        link: `/reports/${report.id}`,
+        entityType: "Report",
+        entityId: report.id,
+      });
+
+      await EmailService.sendNotification({
+        to: recipient.email,
+        title: `${scopeName} — ${report.period} report (${periodLabel})`,
+        body: [
+          narrative["executiveSummary"] ?? "",
+          "",
+          `Tasks completed: ${metrics.tasksCompleted}`,
+          `Projects delivered: ${metrics.projectsDelivered}`,
+          `On-time rate: ${Math.round((metrics.onTimeRate ?? 0) * 100)}%`,
+          `Hours logged: ${metrics.hoursLogged}`,
+          "",
+          narrative["risksAndNextSteps"] ?? "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        ctaLabel: "Open the report",
+        ctaPath: `/reports/${report.id}`,
+      }).catch((error) => console.error("Report email failed", report.id, recipient.email, error));
+    }
+
+    return { sentTo: recipients.length };
   }
 
   static async amend(args: { reportId: string; actorId: string; reason: string; metrics: Prisma.InputJsonValue; narrative: Prisma.InputJsonValue }) {

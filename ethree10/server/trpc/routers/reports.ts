@@ -53,7 +53,13 @@ export const reportsRouter = router({
       include: { contributions: { orderBy: { occurredAt: "desc" } }, amendments: { orderBy: { createdAt: "desc" } } },
     });
     if (!report) throw new TRPCError({ code: "NOT_FOUND" });
-    return report;
+    // Ship the previous period alongside, so the UI can show movement instead of
+    // a bare number, and the scope's human name for headings and PDFs.
+    const [previousMetrics, scopeName] = await Promise.all([
+      ReportService.previousMetrics(report.level, report.scopeId, report.period, report.periodStart),
+      ReportService.scopeName(report.level, report.scopeId),
+    ]);
+    return { ...report, previousMetrics, scopeName };
   }),
 
   generateWeekly: protectedProcedure.mutation(async ({ ctx }) => {

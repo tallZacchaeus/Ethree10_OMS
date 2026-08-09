@@ -58,6 +58,16 @@ export const UNIVERSAL_RULES: HelpSection[] = [
       "The public form deliberately does not ask the client to pick a service, set an urgency, or write acceptance criteria — that is the agency's job, not theirs. Every request therefore lands unrouted in the Intake Queue and needs a human to classify it. This makes triage a daily habit rather than an exception.",
   },
   {
+    heading: "Attaching files",
+    body:
+      "You can attach files to a task, a request, or a deliverable. Uploads go straight to secure storage, so large video and design files are fine — images up to 25MB, documents up to 50MB, zip archives up to 500MB, and video up to 2GB. Executables are refused. Files are private: they can only be opened by someone who can already see the task or request they belong to. A client only ever sees a file if it is attached to a deliverable marked client-visible, and then only through their own tracking link.",
+  },
+  {
+    heading: "Reports write themselves, but somebody still has to finalize them",
+    body:
+      "Every week and month the system generates reports for the agency, each branch, each department, each person and each client — built from real activity, not from anyone filling in a form. They arrive as drafts. Finalizing one is the moment it becomes real: the PDF is produced and stored, and it is emailed to whoever is accountable for it, always including the Chief Executive. Once finalized a report can only be changed by recording an amendment, which keeps the original visible.",
+  },
+  {
     heading: "If a button is missing, the server would have refused anyway",
     body:
       "Screens hide actions you do not have permission for, but hiding is only a convenience. Every action is checked again on the server. If you think you should be able to do something and cannot, it is a role question for your Agency Admin, not a bug.",
@@ -351,6 +361,7 @@ export const ROLE_GUIDES: RoleGuide[] = [
       "Create projects, create and assign tasks",
       "Review delivered work and request revisions",
       "Submit project budgets and request spend",
+      "Finalize your branch's weekly and monthly reports",
       "Manage the service catalogue",
     ],
     cannot: [
@@ -433,6 +444,7 @@ export const ROLE_GUIDES: RoleGuide[] = [
       "Create and update projects your department owns",
       "Move requests along their lifecycle",
       "Request spend against approved budgets",
+      "Finalize your department's reports",
       "Update your department's details",
     ],
     cannot: [
@@ -479,7 +491,7 @@ export const ROLE_GUIDES: RoleGuide[] = [
     home: "My Work",
     can: [
       "See and work the tasks assigned to you",
-      "Log time and attach deliverables",
+      "Log time, attach files, and add deliverable versions",
       "Submit completed work for review",
       "Ask your lead or the client for clarification",
       "Comment on tasks and requests",

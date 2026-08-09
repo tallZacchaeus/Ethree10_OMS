@@ -30,6 +30,7 @@ import { trackRouter } from "./track";
 import { servicesRouter } from "./services";
 import { executionRouter } from "./execution";
 import { budgetsRouter } from "./budgets";
+import { attachmentsRouter } from "./attachments";
 
 export const appRouter = router({
   auth: authRouter,
@@ -60,6 +61,7 @@ export const appRouter = router({
   sponsorships: sponsorshipsRouter,
   setup: setupRouter,
   budgets: budgetsRouter,
+  attachments: attachmentsRouter,
   track: trackRouter,
   services: servicesRouter,
   execution: executionRouter,

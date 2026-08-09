@@ -61,6 +61,7 @@ model User {
   createdDeliverables     Deliverable[]            @relation("DeliverableCreatedBy")
   deliverableVersions     DeliverableVersion[]     @relation("DeliverableVersionCreatedBy")
   taskReviews             TaskReview[]             @relation("TaskReviews")
+  uploadedAttachments     Attachment[]             @relation("AttachmentUploadedBy")
   oauthAccounts           OAuthAccount[]
   budgetsSubmitted        Budget[]                 @relation("BudgetSubmittedBy")
   budgetsDecided          Budget[]                 @relation("BudgetDecidedBy")
@@ -622,6 +623,7 @@ model DeliverableVersion {
 
   deliverable Deliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
   createdBy   User        @relation("DeliverableVersionCreatedBy", fields: [createdById], references: [id])
+  attachments Attachment[]
 
   @@unique([deliverableId, revision])
   @@index([createdById])
@@ -1140,22 +1142,35 @@ model KpiSnapshot {
 // ATTACHMENTS, NOTIFICATIONS, AUDIT
 // ============================================================
 
+/// An uploaded file.
+///
+/// Written only by the two-phase upload flow in `AttachmentService`: the row is
+/// created after the object is confirmed present in storage, never before.
+/// Files are served exclusively through `/api/files/[...key]`.
 model Attachment {
-  id           String   @id @default(cuid())
-  taskId       String?
-  requestId    String?
-  commentId    String?
-  proposalId   String?
-  fileName     String
-  mimeType     String
-  size         Int
-  storageKey   String
-  publicUrl    String?
+  id         String  @id @default(cuid())
+  taskId     String?
+  requestId  String?
+  /// Delivery evidence. Attaching here is what makes a deliverable revision a
+  /// real artefact rather than a pasted link.
+  deliverableVersionId String?
+  fileName   String
+  mimeType   String
+  size       Int
+  /// Key in the private bucket. Never exposed directly to a browser.
+  storageKey String  @unique
+  publicUrl  String?
   uploadedById String
   createdAt    DateTime @default(now())
 
-  task    Task?    @relation("TaskAttachments", fields: [taskId], references: [id], onDelete: Cascade)
-  request Request? @relation("RequestAttachments", fields: [requestId], references: [id], onDelete: Cascade)
+  task               Task?               @relation("TaskAttachments", fields: [taskId], references: [id], onDelete: Cascade)
+  request            Request?            @relation("RequestAttachments", fields: [requestId], references: [id], onDelete: Cascade)
+  deliverableVersion DeliverableVersion? @relation(fields: [deliverableVersionId], references: [id], onDelete: Cascade)
+  uploadedBy         User                @relation("AttachmentUploadedBy", fields: [uploadedById], references: [id])
+
+  @@index([taskId])
+  @@index([requestId])
+  @@index([deliverableVersionId])
 }
 
 enum NotificationKind {
