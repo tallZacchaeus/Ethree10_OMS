@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hasAgencyWideScope } from "@/server/auth/role-groups";
 import { TRPCError } from "@trpc/server";
 import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
@@ -12,12 +13,12 @@ const flatJson = z.record(z.string(), z.union([z.string(), z.number(), z.boolean
 
 async function visibleReportWhere(userId: string) {
   const auth = await getAgencyAuthContext(userId);
-  if (auth.isSuperAdmin || auth.roles.includes("agency_admin") || auth.roles.includes("finance_admin")) return {};
+  if (hasAgencyWideScope(auth)) return {};
   const memberships = await db.membership.findMany({
     where: { userId, removedAt: null, acceptedAt: { not: null } },
     select: { role: true, teamId: true },
   });
-  const headedTeamIds = memberships.filter((item) => item.role === "team_head").flatMap((item) => item.teamId ? [item.teamId] : []);
+  const headedTeamIds = memberships.filter((item) => item.role === "branch_head").flatMap((item) => item.teamId ? [item.teamId] : []);
   return { OR: [{ level: "member" as const, scopeId: userId }, { level: "team" as const, scopeId: { in: headedTeamIds } }] };
 }
 
@@ -27,7 +28,7 @@ async function assertCanManage(userId: string, reportId: string) {
   const report = await db.report.findUnique({ where: { id: reportId }, select: { level: true, scopeId: true } });
   if (!report) throw new TRPCError({ code: "NOT_FOUND" });
   if (report.level === "team") {
-    const membership = await db.membership.findFirst({ where: { userId, role: "team_head", teamId: report.scopeId, removedAt: null, acceptedAt: { not: null } } });
+    const membership = await db.membership.findFirst({ where: { userId, role: "branch_head", teamId: report.scopeId, removedAt: null, acceptedAt: { not: null } } });
     if (membership) return;
   }
   throw new TRPCError({ code: "FORBIDDEN" });
@@ -52,7 +53,13 @@ export const reportsRouter = router({
       include: { contributions: { orderBy: { occurredAt: "desc" } }, amendments: { orderBy: { createdAt: "desc" } } },
     });
     if (!report) throw new TRPCError({ code: "NOT_FOUND" });
-    return report;
+    // Ship the previous period alongside, so the UI can show movement instead of
+    // a bare number, and the scope's human name for headings and PDFs.
+    const [previousMetrics, scopeName] = await Promise.all([
+      ReportService.previousMetrics(report.level, report.scopeId, report.period, report.periodStart),
+      ReportService.scopeName(report.level, report.scopeId),
+    ]);
+    return { ...report, previousMetrics, scopeName };
   }),
 
   generateWeekly: protectedProcedure.mutation(async ({ ctx }) => {
@@ -70,9 +77,9 @@ export const reportsRouter = router({
     return ReportService.updateNarrative({ reportId: input.id, actorId: ctx.userId, narrative: input.narrative });
   }),
 
-  finalize: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+  finalize: protectedProcedure.input(z.object({ id: z.string(), humanSummary: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => {
     await assertCanManage(ctx.userId, input.id);
-    return ReportService.finalize({ reportId: input.id, actorId: ctx.userId });
+    return ReportService.finalize({ reportId: input.id, actorId: ctx.userId, humanSummary: input.humanSummary });
   }),
 
   amend: protectedProcedure.input(z.object({ id: z.string(), reason: z.string().trim().min(5).max(1000), metrics: flatJson, narrative })).mutation(async ({ ctx, input }) => {

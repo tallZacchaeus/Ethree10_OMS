@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { hasAgencyWideScope } from "@/server/auth/role-groups";
 import { db } from "@/server/db/client";
 import { generatePdfStream } from "@/server/reports/pdf";
 import { auth } from "@/server/auth";
@@ -21,10 +22,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return new NextResponse("Report not found", { status: 404 });
     }
     const agencyContext = await getAgencyAuthContext(session.user.id);
-    const agencyWide = agencyContext.isSuperAdmin || agencyContext.roles.includes("agency_admin") || agencyContext.roles.includes("finance_admin");
+    const agencyWide = hasAgencyWideScope(agencyContext);
     if (!agencyWide) {
       const canReadOwn = report.level === "member" && report.scopeId === session.user.id;
-      const canReadTeam = report.level === "team" && Boolean(await db.membership.findFirst({ where: { userId: session.user.id, role: "team_head", teamId: report.scopeId, removedAt: null, acceptedAt: { not: null } } }));
+      const canReadTeam = report.level === "team" && Boolean(await db.membership.findFirst({ where: { userId: session.user.id, role: "branch_head", teamId: report.scopeId, removedAt: null, acceptedAt: { not: null } } }));
       if (!canReadOwn && !canReadTeam) return new NextResponse("Forbidden", { status: 403 });
     }
 

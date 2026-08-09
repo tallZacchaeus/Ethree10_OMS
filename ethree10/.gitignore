@@ -43,3 +43,6 @@ next-env.d.ts
 # Playwright artifacts
 /test-results/
 /playwright-report/
+
+# Local pnpm content-addressable store — never belongs in git
+.pnpm-store/

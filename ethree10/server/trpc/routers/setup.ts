@@ -20,7 +20,7 @@ export const setupRouter = router({
       // Staff = org-null memberships.
       db.membership.count({
         where: {
-          role: { in: ["super_admin", "agency_admin", "team_head", "team_member", "finance_admin"] },
+          role: { in: ["super_admin", "chief_executive", "agency_admin", "finance_manager", "branch_head", "department_lead", "team_member"] },
           acceptedAt: { not: null },
         },
       }),

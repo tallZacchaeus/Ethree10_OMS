@@ -54,7 +54,7 @@ export default function ReportsPage() {
           title="Reports"
           description="Weekly and monthly rollups across the agency."
           actions={
-            agency.type === "agency" && (isSuperAdmin || roles.some((role) => ["agency_admin", "finance_admin", "team_head"].includes(role))) ? (
+            agency.type === "agency" && (isSuperAdmin || roles.some((role) => ["agency_admin", "finance_manager", "branch_head"].includes(role))) ? (
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => generateWeekly.mutate()} disabled={generateWeekly.isPending}>
                   {generateWeekly.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}

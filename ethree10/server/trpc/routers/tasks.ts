@@ -244,4 +244,42 @@ export const tasksRouter = router({
         mentions: input.mentions,
       });
     }),
+
+  /**
+   * Ask a question about a task and guarantee it reaches someone — either the
+   * internal lead chain, or the client via their tracking link.
+   */
+  askClarification: protectedProcedure
+    .input(
+      z.object({
+        taskId: z.string(),
+        question: z.string().min(5).max(2000),
+        audience: z.enum(["internal", "client"]).default("internal"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await loadTaskForRead(ctx.userId, input.taskId);
+      const agencyCtx = await getAgencyAuthContext(ctx.userId);
+      if (!can(agencyCtx, "comment.create")) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Missing permission: comment.create" });
+      }
+      return TaskService.askClarification({
+        actorId: ctx.userId,
+        taskId: input.taskId,
+        question: input.question,
+        audience: input.audience,
+      });
+    }),
+
+  /** Clear the blocked flag once the question has been answered. */
+  resolveBlocker: protectedProcedure
+    .input(z.object({ taskId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await loadTaskForRead(ctx.userId, input.taskId);
+      const agencyCtx = await getAgencyAuthContext(ctx.userId);
+      if (!can(agencyCtx, "comment.create")) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Missing permission: comment.create" });
+      }
+      return TaskService.resolveBlocker({ actorId: ctx.userId, taskId: input.taskId });
+    }),
 });

@@ -15,16 +15,52 @@ describe("dashboard helpers", () => {
     expect(experience.isMember).toBe(true);
   });
 
-  it("gives the executive a focused agency-wide overview only", () => {
-    const experience = getDashboardExperience(["finance_admin"], false);
+  it("gives the Chief Executive a focused agency-wide overview only", () => {
+    const experience = getDashboardExperience(["chief_executive"], false);
 
     // Agency-wide read surface...
     expect(experience.isAgencyLead).toBe(true);
     expect(experience.isExecutive).toBe(true);
-    // ...but not the operational/personal surfaces (read-only oversight).
+    // ...but not the operational/personal surfaces. The Chief Executive does not
+    // deliver work, so stacking those panels would only add noise.
     expect(experience.isTeamHead).toBe(false);
     expect(experience.isMember).toBe(false);
+  });
+
+  it("gives Finance the agency overview but no delivery surfaces", () => {
+    const experience = getDashboardExperience(["finance_manager"], false);
+
+    expect(experience.isAgencyLead).toBe(true);
+    expect(experience.isFinance).toBe(true);
+    expect(experience.isExecutive).toBe(false);
+    expect(experience.isTeamHead).toBe(false);
     expect(experience.isMember).toBe(false);
+  });
+
+  it("gives a branch head their team surfaces but not the agency overview", () => {
+    const experience = getDashboardExperience(["branch_head"], false);
+
+    expect(experience.isAgencyLead).toBe(false);
+    expect(experience.isBranchHead).toBe(true);
+    expect(experience.isTeamHead).toBe(true);
+    expect(experience.isMember).toBe(true);
+  });
+
+  it("gives a department lead delivery-lead surfaces only", () => {
+    const experience = getDashboardExperience(["department_lead"], false);
+
+    expect(experience.isAgencyLead).toBe(false);
+    expect(experience.isBranchHead).toBe(false);
+    expect(experience.isTeamHead).toBe(true);
+    expect(experience.isMember).toBe(true);
+  });
+
+  it("gives a team member only their personal surface", () => {
+    const experience = getDashboardExperience(["team_member"], false);
+
+    expect(experience.isAgencyLead).toBe(false);
+    expect(experience.isTeamHead).toBe(false);
+    expect(experience.isMember).toBe(true);
   });
 
   it("summarizes throughput from real completed work signals", () => {

@@ -5,13 +5,17 @@
  */
 
 export const TEAM_SLUGS = {
-  brandsCommunications: "brands-communications",
-  productDevelopment: "product-development",
+  brandsCommunications: "digital-media",
+  productDevelopment: "tech-product",
 } as const;
 
 export type TeamSlug = (typeof TEAM_SLUGS)[keyof typeof TEAM_SLUGS];
 
-/** The two fixed teams seeded into the agency. */
+/**
+ * The agency's two **branches**. Each is a `Team` row led by a `branch_head`,
+ * and each contains **departments** (`SubUnit` rows) led by a `department_lead`.
+ * Both branches report to the Chief Executive.
+ */
 export const DEFAULT_TEAMS: Array<{
   name: string;
   slug: TeamSlug;
@@ -19,16 +23,84 @@ export const DEFAULT_TEAMS: Array<{
   color: string;
 }> = [
   {
-    name: "Brands & Communications",
+    name: "Digital Media",
     slug: TEAM_SLUGS.brandsCommunications,
     description: "Media, content, video, graphics, social, and branding.",
     color: "#22D3A5",
   },
   {
-    name: "Product Development",
+    name: "Tech & Product",
     slug: TEAM_SLUGS.productDevelopment,
-    description: "Websites, apps, and software tools.",
+    description: "Websites, apps, software, and product design.",
     color: "#6366F1",
+  },
+];
+
+/**
+ * Client-facing category names for each branch.
+ *
+ * Clients must never see internal org structure — they pick what they want done
+ * and it lands with the right team. Branch names ("Digital Media", "Tech &
+ * Product") are how *we* are organised; these are how the *work* is described.
+ * Use these on every public surface.
+ */
+export const PUBLIC_CATEGORY_LABELS: Record<TeamSlug, string> = {
+  [TEAM_SLUGS.brandsCommunications]: "Design, Content & Media",
+  [TEAM_SLUGS.productDevelopment]: "Websites, Apps & Software",
+};
+
+/** Public label for a branch, falling back to a neutral catch-all. */
+export function publicCategoryLabel(slug: string | null | undefined): string {
+  if (!slug) return "Something else";
+  return PUBLIC_CATEGORY_LABELS[slug as TeamSlug] ?? "Something else";
+}
+
+/**
+ * Starter departments inside each branch. These are seeded so a new agency is
+ * usable immediately; branch heads and admins can create, rename and archive
+ * departments freely, and assign a lead and members to each.
+ */
+export const DEFAULT_DEPARTMENTS: Array<{
+  branchSlug: TeamSlug;
+  name: string;
+  slug: string;
+  description: string;
+}> = [
+  {
+    branchSlug: TEAM_SLUGS.brandsCommunications,
+    name: "Video & Photography",
+    slug: "video-photography",
+    description: "Shoots, edits, motion graphics and photography.",
+  },
+  {
+    branchSlug: TEAM_SLUGS.brandsCommunications,
+    name: "Design & Brand",
+    slug: "design-brand",
+    description: "Graphic design, brand identity and print collateral.",
+  },
+  {
+    branchSlug: TEAM_SLUGS.brandsCommunications,
+    name: "Content & Social",
+    slug: "content-social",
+    description: "Copywriting, newsletters and social media management.",
+  },
+  {
+    branchSlug: TEAM_SLUGS.productDevelopment,
+    name: "Engineering",
+    slug: "engineering",
+    description: "Web, mobile and backend build.",
+  },
+  {
+    branchSlug: TEAM_SLUGS.productDevelopment,
+    name: "Product Design",
+    slug: "product-design",
+    description: "UI/UX, prototyping and design systems.",
+  },
+  {
+    branchSlug: TEAM_SLUGS.productDevelopment,
+    name: "Automation & Tools",
+    slug: "automation-tools",
+    description: "Internal tools, forms, integrations and automation.",
   },
 ];
 

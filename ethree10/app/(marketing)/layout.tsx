@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { ClientMarketingNav } from "@/components/ClientMarketingNav";
+import { E310Logo } from "@/components/brand/e310-logo";
 
 export default function MarketingLayout({
   children,
@@ -12,8 +13,14 @@ export default function MarketingLayout({
     <div className="flex min-h-screen flex-col">
       <header className="border-b">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="text-xl font-bold text-brand-600">
-            Ethree10
+          {/* Same brand mark as the app sidebar, with an "AGENCY" suffix in
+              place of the sidebar's "OPS". Dark variant here because the
+              marketing header sits on a light surface. */}
+          <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80">
+            <E310Logo variant="dark" className="h-6 w-auto" />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Agency
+            </span>
           </Link>
           <ClientMarketingNav />
         </div>
@@ -23,8 +30,8 @@ export default function MarketingLayout({
 
       <footer className="border-t bg-neutral-50">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-brand-600">Ethree10</p>
+          <div className="space-y-2">
+            <E310Logo variant="dark" className="h-5 w-auto" />
             <p className="text-xs text-muted-foreground">
               A Reach4Christ Global initiative. Excellence through People, Process, Product.
             </p>

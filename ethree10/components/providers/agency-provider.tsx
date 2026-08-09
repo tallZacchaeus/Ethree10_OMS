@@ -10,5 +10,8 @@ export function useAgencyContext() {
   const memberships = user?.memberships ?? [];
   const roles = memberships.map((membership: { role: string }) => membership.role as Role);
   const teamIds = memberships.flatMap((membership: { teamId?: string | null }) => membership.teamId ? [membership.teamId] : []);
-  return { isSuperAdmin, roles, teamIds, agency: { id: "agency", name: "Ethree10", type: "agency" as const } };
+  // Exposed so screens can hide self-service actions that the server would
+  // reject anyway — e.g. paying an expense you raised yourself.
+  const userId = user?.id ?? null;
+  return { isSuperAdmin, roles, teamIds, userId, agency: { id: "agency", name: "Ethree10", type: "agency" as const } };
 }

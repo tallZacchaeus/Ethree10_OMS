@@ -224,6 +224,7 @@ export function CreateTemplateDialog({
                     variant="ghost"
                     size="icon"
                     className="ml-auto h-6 w-6 text-muted-foreground hover:text-destructive"
+                    aria-label={`Remove task ${idx + 1}`}
                     onClick={() => removeTask(idx)}
                     disabled={tasks.length === 1}
                   >

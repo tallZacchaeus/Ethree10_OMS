@@ -29,7 +29,20 @@ export class ClientTrackingService {
                 id: true,
                 deliverables: {
                   where: { visibility: "client" },
-                  include: { versions: { orderBy: { revision: "desc" }, take: 1 } },
+                  include: {
+                    versions: {
+                      orderBy: { revision: "desc" },
+                      take: 1,
+                      // Files attached to the current client-visible revision.
+                      // Only whitelisted fields are projected below; the storage
+                      // key never leaves the server.
+                      include: {
+                        attachments: {
+                          select: { id: true, fileName: true, mimeType: true, size: true, storageKey: true },
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -69,6 +82,14 @@ export class ClientTrackingService {
           content: current.content,
           notes: current.notes,
           deliveredAt: current.createdAt,
+          // Download links carry the tracking token: `/api/files` re-checks it
+          // against this request before redirecting to a short-lived URL.
+          files: current.attachments.map((attachment) => ({
+            id: attachment.id,
+            fileName: attachment.fileName,
+            size: attachment.size,
+            downloadUrl: `/api/files/${attachment.storageKey}?token=${encodeURIComponent(request.publicToken ?? "")}`,
+          })),
         }] : [];
       }),
     ) ?? [];

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hasAgencyWideScope } from "@/server/auth/role-groups";
 import { TRPCError } from "@trpc/server";
 import { PaymentMethod } from "@prisma/client";
 import { router } from "../trpc";
@@ -11,7 +12,7 @@ import { AuditService } from "@/server/services/audit";
 
 async function requireAgencyView(userId: string) {
   const authCtx = await getAgencyAuthContext(userId);
-  if (!authCtx.isSuperAdmin && !authCtx.roles.includes("agency_admin") && !authCtx.roles.includes("finance_admin")) {
+  if (!hasAgencyWideScope(authCtx)) {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
 }

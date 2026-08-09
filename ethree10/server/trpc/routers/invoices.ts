@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hasAgencyWideScope } from "@/server/auth/role-groups";
 import { TRPCError } from "@trpc/server";
 import { InvoiceStatus, PaymentMethod } from "@prisma/client";
 import { router } from "../trpc";
@@ -8,6 +9,7 @@ import { db } from "@/server/db/client";
 import { getAgencyAuthContext, requireAgencyAction } from "@/server/services/agency";
 import { InvoiceService, invoicePublicUrl } from "@/server/services/invoice";
 import { ReceiptService } from "@/server/services/receipt";
+import { BudgetService } from "@/server/services/budget";
 import { EmailService } from "@/server/notifications/email";
 import { AuditService } from "@/server/services/audit";
 function generateCode() {
@@ -21,7 +23,7 @@ export const invoicesRouter = router({
       // In a real system we'd limit this to the agency admin or the specific client organization.
       // For now, if you are an agency admin, you see all.
       const authCtx = await getAgencyAuthContext(ctx.userId);
-      if (!authCtx.isSuperAdmin && !authCtx.roles.includes("agency_admin") && !authCtx.roles.includes("finance_admin")) {
+      if (!hasAgencyWideScope(authCtx)) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -36,7 +38,7 @@ export const invoicesRouter = router({
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const authCtx = await getAgencyAuthContext(ctx.userId);
-      if (!authCtx.isSuperAdmin && !authCtx.roles.includes("agency_admin") && !authCtx.roles.includes("finance_admin")) {
+      if (!hasAgencyWideScope(authCtx)) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
       const invoice = await db.invoice.findUnique({
@@ -102,6 +104,10 @@ export const invoicesRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await requireAgencyAction(ctx.userId, "invoice.manage");
+      // Spending gate: nothing goes to a client until the Chief Executive has
+      // approved the project's budget.
+      const existing = await db.invoice.findUnique({ where: { id: input.id }, select: { projectId: true } });
+      await BudgetService.assertApproved(existing?.projectId);
       const invoice = await db.invoice.update({
         where: { id: input.id },
         data: { status: "sent", issuedAt: new Date() },
@@ -127,6 +133,8 @@ export const invoicesRouter = router({
     .input(z.object({ id: z.string(), email: z.string().email() }))
     .mutation(async ({ ctx, input }) => {
       await requireAgencyAction(ctx.userId, "invoice.manage");
+      const existing = await db.invoice.findUnique({ where: { id: input.id }, select: { projectId: true } });
+      await BudgetService.assertApproved(existing?.projectId);
       const invoice = await db.invoice.update({
         where: { id: input.id },
         data: { status: "sent", issuedAt: new Date() },
@@ -152,7 +160,15 @@ export const invoicesRouter = router({
       return { emailed: sent, publicUrl: invoicePublicUrl(invoice.code) };
     }),
 
-  // Manually mark an invoice paid (offline bank transfer / cash) and issue a receipt.
+  /**
+   * Confirm funds received for an invoice, which issues the receipt.
+   *
+   * Delegates to `BudgetService.confirmInvoicePayment`, which requires the
+   * `payment.confirm` permission (Finance only), asserts the project's budget
+   * was approved, and refuses if the confirmer is the person who approved that
+   * budget. Previously this endpoint issued receipts on `invoice.manage` alone,
+   * which bypassed both controls.
+   */
   markPaid: protectedProcedure
     .input(
       z.object({
@@ -162,22 +178,10 @@ export const invoicesRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await requireAgencyAction(ctx.userId, "invoice.manage");
-      const invoice = await db.invoice.update({
-        where: { id: input.id },
-        data: { status: "paid", paidAt: new Date(), paymentRef: input.paymentRef ?? null },
-      });
-      const receipt = await ReceiptService.issueForInvoice(invoice.id, {
+      const { invoice, receipt } = await BudgetService.confirmInvoicePayment(ctx.userId, {
+        invoiceId: input.id,
         paymentMethod: input.paymentMethod,
         paymentRef: input.paymentRef ?? null,
-      });
-      await AuditService.log({
-        actorId: ctx.userId,
-        organizationId: invoice.organizationId,
-        action: "invoice.markPaid",
-        entityType: "Invoice",
-        entityId: invoice.id,
-        after: { paymentMethod: input.paymentMethod, receiptCode: receipt.code },
       });
       return { invoice, receiptCode: receipt.code };
     }),

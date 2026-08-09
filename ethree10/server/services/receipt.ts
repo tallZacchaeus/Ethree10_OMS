@@ -4,6 +4,7 @@ import { Prisma, type PaymentMethod, type Receipt } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { uploadFile } from "@/lib/storage";
 import { ReceiptDocument } from "@/server/documents/receipt-pdf";
+import { captureCriticalFailure } from "@/lib/observability";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -69,7 +70,12 @@ export class ReceiptService {
       throw err;
     }
 
-    await ReceiptService.generateReceiptPdf(receipt.id);
+    // Best-effort. The receipt ROW is the financial record of account; the PDF is
+    // a rendering of it. A storage outage must not roll back a confirmed payment
+    // or leave an invoice paid with no receipt — the PDF can be regenerated.
+    await ReceiptService.generateReceiptPdf(receipt.id).catch((error) =>
+      captureCriticalFailure("receipt-issuance", error, { receiptCode: receipt.code }),
+    );
     return (await db.receipt.findUnique({ where: { id: receipt.id } })) ?? receipt;
   }
 
@@ -92,7 +98,12 @@ export class ReceiptService {
         paymentRef: input.paymentRef ?? null,
       },
     });
-    await ReceiptService.generateReceiptPdf(receipt.id);
+    // Best-effort. The receipt ROW is the financial record of account; the PDF is
+    // a rendering of it. A storage outage must not roll back a confirmed payment
+    // or leave an invoice paid with no receipt — the PDF can be regenerated.
+    await ReceiptService.generateReceiptPdf(receipt.id).catch((error) =>
+      captureCriticalFailure("receipt-issuance", error, { receiptCode: receipt.code }),
+    );
     return (await db.receipt.findUnique({ where: { id: receipt.id } })) ?? receipt;
   }
 

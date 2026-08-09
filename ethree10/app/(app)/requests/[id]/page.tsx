@@ -7,6 +7,7 @@ import type { RequestStage } from "@prisma/client";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { FileUpload } from "@/components/files/file-upload";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,7 +57,7 @@ export default function RequestDetailPage() {
 
   const isAgencyStaff =
     isSuperAdmin ||
-    roles.some((r: string) => ["agency_admin", "team_head"].includes(r));
+    roles.some((r: string) => ["agency_admin", "branch_head"].includes(r));
 
   const { data: teams } = trpc.requests.agencyTeams.useQuery(undefined, {
     retry: false,
@@ -153,6 +154,18 @@ export default function RequestDetailPage() {
           </Card>
 
           <Card><CardHeader><CardTitle>Requested outcome</CardTitle></CardHeader><CardContent className="space-y-4 text-sm"><div><strong>Outcome</strong><p className="whitespace-pre-wrap text-muted-foreground">{request.expectedOutcome || "Not supplied"}</p></div><div><strong>Deliverables</strong><p className="whitespace-pre-wrap text-muted-foreground">{request.expectedDeliverables || "Not supplied"}</p></div><div><strong>Acceptance criteria</strong><p className="whitespace-pre-wrap text-muted-foreground">{request.acceptanceCriteria || "Not supplied"}</p></div>{request.supportingLinks.length > 0 && <div><strong>Supporting links</strong><ul className="list-disc pl-5">{request.supportingLinks.map((link) => <li key={link}><a className="text-brand-600 hover:underline" href={link} target="_blank" rel="noreferrer">{link}</a></li>)}</ul></div>}</CardContent></Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Files</CardTitle>
+              <CardDescription>
+                Briefs, brand assets and references for this request.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FileUpload parent={{ requestId: id }} label="Attach files" />
+            </CardContent>
+          </Card>
 
           <Tabs defaultValue="comments">
             <TabsList>

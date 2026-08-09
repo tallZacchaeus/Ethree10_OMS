@@ -4,7 +4,7 @@ import type { AuthContext } from "@/server/auth/permissions";
 
 const memberCtx: AuthContext = { isSuperAdmin: false, roles: ["team_member"] };
 const adminCtx: AuthContext = { isSuperAdmin: false, roles: ["agency_admin"] };
-const executiveCtx: AuthContext = { isSuperAdmin: false, roles: ["finance_admin"] };
+const executiveCtx: AuthContext = { isSuperAdmin: false, roles: ["finance_manager"] };
 const superAdminCtx: AuthContext = { isSuperAdmin: true, roles: [] };
 
 describe("permissions.can", () => {
@@ -28,12 +28,12 @@ describe("permissions.can", () => {
     expect(can(memberCtx, "request.approve")).toBe(false);
   });
 
-  it("finance_admin is read-only for operations", () => {
+  it("finance_manager is read-only for operations", () => {
     expect(can(executiveCtx, "request.read")).toBe(true);
     expect(can(executiveCtx, "request.create")).toBe(false);
   });
 
-  describe("finance_admin (Executive Overview)", () => {
+  describe("finance_manager (Executive Overview)", () => {
     it("reads agency-wide and may comment, but cannot act operationally", () => {
       expect(can(executiveCtx, "request.read")).toBe(true);
       expect(can(executiveCtx, "project.read")).toBe(true);

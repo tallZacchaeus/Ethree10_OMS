@@ -48,6 +48,7 @@ export default function InboxPage() {
                   <TableHead>Code</TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Requester</TableHead>
+                  <TableHead>Routing</TableHead>
                   <TableHead>Urgency</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Age</TableHead>
@@ -61,7 +62,23 @@ export default function InboxPage() {
                     <TableRow key={req.id}>
                       <TableCell className="font-medium">{req.code}</TableCell>
                       <TableCell>{req.title}</TableCell>
-                      <TableCell>{req.submittedById}</TableCell>
+                      {/* Never render `submittedById` — it is a raw internal id, and
+                          it is null for every public client submission. */}
+                      <TableCell>
+                        <span className="block">{req.requesterName ?? "Internal request"}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {req.organization?.name ?? "No organization"}
+                        </span>
+                      </TableCell>
+                      {/* Requests now arrive unclassified — routing is the decision
+                          this queue exists to make, so surface it directly. */}
+                      <TableCell>
+                        {req.routedTeam ? (
+                          <Badge variant="outline">{req.routedTeam.name}</Badge>
+                        ) : (
+                          <Badge variant="default" className="bg-amber-500">Needs routing</Badge>
+                        )}
+                      </TableCell>
                       <TableCell>{getUrgencyBadge(req.urgency)}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="uppercase">{req.stage.replace("_", " ")}</Badge>
