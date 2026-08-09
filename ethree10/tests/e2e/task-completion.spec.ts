@@ -28,7 +28,8 @@ test.describe("Task assign and complete flow", () => {
   test("team execution area exposes assignments, workload, and reviews", async ({ page }) => {
     await signInAsSeededUser(page);
     for (const [route, heading] of [
-      ["/team/dashboard", "Team dashboard"],
+      // Renamed when the page became a real control surface with live counts.
+      ["/team/dashboard", "Branch dashboard"],
       ["/team/assignments", "Assignments"],
       ["/team/workload", "Team workload"],
       ["/team/reviews", "Review queue"],
