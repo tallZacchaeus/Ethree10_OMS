@@ -29,7 +29,7 @@ export default async function AppLayout({
   const hasStaffAccess = dbUser?.isSuperAdmin || dbUser?.memberships.some((membership) => !membership.removedAt && membership.acceptedAt);
   if (!hasStaffAccess) redirect("/unauthorized");
   // MFA is mandatory for admin and all lead roles (spec 13/Phase 2).
-  const MFA_ENFORCED_ROLES = ["agency_admin", "finance_admin", "team_head"];
+  const MFA_ENFORCED_ROLES = ["chief_executive", "agency_admin", "finance_manager", "branch_head"];
   const isEnforcedRole =
     dbUser?.isSuperAdmin || dbUser?.memberships.some((m) => MFA_ENFORCED_ROLES.includes(m.role));
   const cookieStore = await cookies();

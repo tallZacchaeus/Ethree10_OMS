@@ -26,6 +26,9 @@ import {
   Bell,
   UserCircle,
   TrendingUp,
+  BadgeCheck,
+  BookOpen,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@prisma/client";
@@ -45,70 +48,84 @@ interface NavSection {
   items: NavItem[];
 }
 
-const STAFF: Role[] = ["agency_admin", "finance_admin", "team_head", "team_member"];
-const TEAM_LEADS: Role[] = ["agency_admin", "team_head"];
-const AGENCY_LEADS: Role[] = ["agency_admin", "finance_admin"];
+// Everyone who delivers work. The Chief Executive is deliberately excluded —
+// it has no personal queue, so "My Work" would always be empty for it.
+const DELIVERY_STAFF: Role[] = ["agency_admin", "branch_head", "department_lead", "team_member"];
+// Runs delivery for a branch or department: routing, assignment, review.
+const DELIVERY_LEADS: Role[] = ["agency_admin", "branch_head", "department_lead"];
+// May restructure a branch and manage the service catalogue.
+const BRANCH_LEADS: Role[] = ["agency_admin", "branch_head"];
+// Sees the whole agency across every branch.
+const AGENCY_WIDE: Role[] = ["chief_executive", "agency_admin", "finance_manager"];
 const AGENCY_ADMIN: Role[] = ["agency_admin"];
-const FINANCE: Role[] = ["agency_admin", "finance_admin"];
+// Money. The Chief Executive approves budgets; Finance moves the money.
+const FINANCE: Role[] = ["finance_manager"];
+const BUDGET_APPROVER: Role[] = ["chief_executive"];
 
 const NAV_SECTIONS: NavSection[] = [
   {
     title: "Overview",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, allow: "all" },
-      { href: "/my-work", label: "My Work", icon: CheckSquare, allow: STAFF },
-      { href: "/my-contributions", label: "My Contributions", icon: TrendingUp, allow: STAFF },
-      { href: "/inbox", label: "Inbox", icon: Inbox, allow: "all" },
+      // "My Work" used to be a second link to /tasks. There is now one entry.
+      { href: "/tasks", label: "My Work", icon: CheckSquare, allow: DELIVERY_STAFF },
+      { href: "/my-contributions", label: "My Contributions", icon: TrendingUp, allow: DELIVERY_STAFF },
+      { href: "/notifications", label: "Notifications", icon: Bell, allow: "all" },
     ],
   },
   {
     title: "Operations",
     items: [
+      // Triage queue — only people who can actually route work should see it.
+      { href: "/inbox", label: "Intake Queue", icon: Inbox, allow: DELIVERY_LEADS },
       { href: "/requests", label: "Requests", icon: FileText, allow: "all" },
       { href: "/projects", label: "Projects", icon: FolderKanban, allow: "all" },
-      { href: "/tasks", label: "Tasks", icon: CheckSquare, allow: STAFF },
     ],
   },
   {
-    title: "Team Leadership",
+    title: "Delivery Leadership",
     items: [
-      { href: "/team/dashboard", label: "Team Dashboard", icon: LayoutDashboard, allow: TEAM_LEADS },
-      { href: "/team/intake", label: "Intake", icon: FileText, allow: TEAM_LEADS },
-      { href: "/team/assignments", label: "Assignments", icon: Briefcase, allow: TEAM_LEADS },
-      { href: "/team/workload", label: "Workload", icon: Activity, allow: TEAM_LEADS },
-      { href: "/team/reviews", label: "Reviews", icon: ClipboardCheck, allow: TEAM_LEADS },
-      { href: "/team/reports", label: "Team Reports", icon: BarChart3, allow: TEAM_LEADS },
-      { href: "/team/members", label: "Team Members", icon: Users, allow: TEAM_LEADS },
+      { href: "/team/dashboard", label: "Branch Dashboard", icon: LayoutDashboard, allow: DELIVERY_LEADS },
+      { href: "/team/intake", label: "Brief Review", icon: FileText, allow: DELIVERY_LEADS },
+      { href: "/team/assignments", label: "Assignments", icon: Briefcase, allow: DELIVERY_LEADS },
+      { href: "/team/workload", label: "Workload", icon: Activity, allow: DELIVERY_LEADS },
+      { href: "/team/reviews", label: "Reviews", icon: ClipboardCheck, allow: DELIVERY_LEADS },
+    ],
+  },
+  {
+    title: "Money",
+    items: [
+      // The approval side — the Chief Executive's primary action surface.
+      { href: "/budgets", label: "Budget Approvals", icon: BadgeCheck, allow: BUDGET_APPROVER },
+      // The execution side — Finance only.
+      { href: "/invoices", label: "Invoices", icon: FileSpreadsheet, allow: FINANCE },
+      { href: "/receipts", label: "Receipts", icon: ReceiptText, allow: FINANCE },
+      { href: "/expenses", label: "Expenses", icon: Wallet, allow: [...FINANCE, ...DELIVERY_LEADS] },
+      { href: "/leads", label: "Enquiries", icon: Sparkles, allow: [...FINANCE, "agency_admin"] },
     ],
   },
   {
     title: "Agency",
     items: [
-      { href: "/agency/dashboard", label: "Agency Dashboard", icon: Briefcase, allow: AGENCY_LEADS },
-      { href: "/organizations", label: "Organizations", icon: Layers, allow: AGENCY_LEADS },
-      { href: "/members", label: "People", icon: Users, allow: [...AGENCY_LEADS, "team_head"] },
-      { href: "/teams", label: "Teams", icon: Building2, allow: AGENCY_LEADS },
-      { href: "/agency/skills", label: "Skills", icon: Sparkles, allow: AGENCY_ADMIN },
-      { href: "/reports", label: "Reports", icon: BarChart3, allow: [...AGENCY_LEADS, "team_head"] },
-      { href: "/audit", label: "Audit", icon: ScrollText, allow: AGENCY_LEADS },
-    ],
-  },
-  {
-    title: "Commercial",
-    items: [
-      { href: "/leads", label: "Enquiries", icon: Sparkles, allow: FINANCE },
-      { href: "/invoices", label: "Invoices", icon: FileSpreadsheet, allow: FINANCE },
-      { href: "/receipts", label: "Receipts", icon: ReceiptText, allow: FINANCE },
+      { href: "/organizations", label: "Clients", icon: Layers, allow: AGENCY_WIDE },
+      { href: "/members", label: "People", icon: Users, allow: [...AGENCY_WIDE, "branch_head"] },
+      { href: "/teams", label: "Branches", icon: Building2, allow: AGENCY_WIDE },
+      { href: "/positions", label: "Positions", icon: UserCircle, allow: AGENCY_ADMIN },
+      { href: "/agency/skills", label: "Skills", icon: Sparkles, allow: [...AGENCY_ADMIN, "branch_head"] },
+      { href: "/reports", label: "Reports", icon: BarChart3, allow: [...AGENCY_WIDE, "branch_head", "department_lead"] },
+      { href: "/admin/analytics", label: "Analytics", icon: Activity, allow: AGENCY_WIDE },
+      { href: "/audit", label: "Audit", icon: ScrollText, allow: AGENCY_WIDE },
     ],
   },
   {
     title: "Administration",
     items: [
-      { href: "/notifications", label: "Notifications", icon: Bell, allow: "all" },
-      { href: "/profile", label: "Profile", icon: UserCircle, allow: "all" },
+      { href: "/settings/services", label: "Service Catalog", icon: Briefcase, allow: BRANCH_LEADS },
       { href: "/integrations", label: "Integrations", icon: Plug, allow: AGENCY_ADMIN },
+      { href: "/admin/cms", label: "Marketing Site", icon: FileText, allow: AGENCY_ADMIN },
       { href: "/settings", label: "Settings", icon: Settings, allow: "all" },
-      { href: "/settings/services", label: "Services", icon: Briefcase, allow: TEAM_LEADS },
+      { href: "/profile", label: "My Profile", icon: UserCircle, allow: "all" },
+      { href: "/help", label: "How to use E310", icon: BookOpen, allow: "all" },
     ],
   },
 ];

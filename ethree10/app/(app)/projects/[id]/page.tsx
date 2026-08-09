@@ -34,7 +34,7 @@ export default function ProjectDetailPage() {
   const isAgencyStaff =
     isSuperAdmin ||
     roles.some((r) =>
-      ["agency_admin", "team_head"].includes(r),
+      ["agency_admin", "branch_head"].includes(r),
     );
 
   const deliver = trpc.projects.deliver.useMutation({
@@ -200,20 +200,35 @@ export default function ProjectDetailPage() {
         </Card>
       )}
 
-      {isAgencyStaff ? (
-        <div className="space-y-3">
+      {/* Everyone who can open a project sees its work. This used to be gated to
+          agency admins and branch heads, which left department leads and team
+          members looking at a milestone list instead of the tasks they own. The
+          client-facing variant has no audience any more — clients do not log in. */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Tasks</h2>
-          {project.tasks.length === 0 ? (
-            <EmptyState
-              title="No tasks yet"
-              description="Add the first task to start executing this project."
-              action={<Button onClick={() => setCreating(true)}>Add task</Button>}
-            />
-          ) : (
-            <KanbanBoard tasks={project.tasks} />
+          {isAgencyStaff && project.tasks.length > 0 && (
+            <Button size="sm" variant="outline" onClick={() => setCreating(true)}>
+              Add task
+            </Button>
           )}
         </div>
-      ) : (
+        {project.tasks.length === 0 ? (
+          <EmptyState
+            title="No tasks yet"
+            description={
+              isAgencyStaff
+                ? "Add the first task to start executing this project."
+                : "Your lead has not broken this project into tasks yet."
+            }
+            action={isAgencyStaff ? <Button onClick={() => setCreating(true)}>Add task</Button> : undefined}
+          />
+        ) : (
+          <KanbanBoard tasks={project.tasks} />
+        )}
+      </div>
+
+      {(
         <div className="space-y-3">
           <h2 className="text-lg font-semibold">Timeline & Milestones</h2>
           {project.milestones.length === 0 ? (

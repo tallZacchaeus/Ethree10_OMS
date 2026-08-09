@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { hasAgencyWideScope } from "@/server/auth/role-groups";
 import type { Prisma, ProjectStatus } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { AuditService } from "@/server/services/audit";
@@ -139,7 +140,7 @@ export class ProjectService {
     filters: { status?: ProjectStatus; teamId?: string } = {},
   ) {
     const agencyCtx = await getAgencyAuthContext(userId);
-    if (agencyCtx.isSuperAdmin || agencyCtx.roles.includes("agency_admin") || agencyCtx.roles.includes("finance_admin")) {
+    if (hasAgencyWideScope(agencyCtx)) {
       return ProjectService.listForAgency(filters);
     }
     const memberships = await db.membership.findMany({
@@ -164,7 +165,7 @@ export class ProjectService {
     const agencyCtx = await getAgencyAuthContext(userId);
     if (!can(agencyCtx, "project.read")) return false;
 
-    if (agencyCtx.isSuperAdmin || agencyCtx.roles.includes("agency_admin") || agencyCtx.roles.includes("finance_admin")) {
+    if (hasAgencyWideScope(agencyCtx)) {
       return true;
     }
 
@@ -235,7 +236,7 @@ export class ProjectService {
           .filter((review) => review.revision === task.revision && review.decision === "approved")
           .map((review) => review.reviewType),
       );
-      return !approvals.has("team_head") || requiredReviews.some((reviewType) => !approvals.has(reviewType));
+      return !approvals.has("branch_head") || requiredReviews.some((reviewType) => !approvals.has(reviewType));
     });
     if (missingReview) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Required team-head and specialist reviews must pass before delivery." });

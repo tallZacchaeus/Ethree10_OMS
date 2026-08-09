@@ -69,7 +69,12 @@ export class ReceiptService {
       throw err;
     }
 
-    await ReceiptService.generateReceiptPdf(receipt.id);
+    // Best-effort. The receipt ROW is the financial record of account; the PDF is
+    // a rendering of it. A storage outage must not roll back a confirmed payment
+    // or leave an invoice paid with no receipt — the PDF can be regenerated.
+    await ReceiptService.generateReceiptPdf(receipt.id).catch((error) =>
+      console.error("Receipt PDF generation failed", receipt.code, error),
+    );
     return (await db.receipt.findUnique({ where: { id: receipt.id } })) ?? receipt;
   }
 
@@ -92,7 +97,12 @@ export class ReceiptService {
         paymentRef: input.paymentRef ?? null,
       },
     });
-    await ReceiptService.generateReceiptPdf(receipt.id);
+    // Best-effort. The receipt ROW is the financial record of account; the PDF is
+    // a rendering of it. A storage outage must not roll back a confirmed payment
+    // or leave an invoice paid with no receipt — the PDF can be regenerated.
+    await ReceiptService.generateReceiptPdf(receipt.id).catch((error) =>
+      console.error("Receipt PDF generation failed", receipt.code, error),
+    );
     return (await db.receipt.findUnique({ where: { id: receipt.id } })) ?? receipt;
   }
 

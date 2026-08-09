@@ -7,20 +7,30 @@ type CapacityVariant = NonNullable<BadgeProps["variant"]>;
 
 export function getDashboardExperience(roles: Role[], isSuperAdmin: boolean) {
   const isAdmin = isSuperAdmin || roles.includes("agency_admin");
-  const isExecutive = roles.includes("finance_admin");
-  // Agency-wide overview surface — admins plus the executive oversight role.
-  const isAgencyLead = isAdmin || isExecutive;
-  // Operational tiers. The executive is read-only oversight, so it is deliberately excluded
-  // from the personal "My work" and team-execution surfaces — it only gets the
-  // agency-wide overview above. Team heads cover optional sub-units.
-  const isTeamHead = isAdmin || roles.includes("team_head");
-  const isMember = isTeamHead || roles.includes("team_member");
+  // The Chief Executive is oversight: agency-wide read plus budget approval.
+  const isExecutive = roles.includes("chief_executive");
+  // Finance gets the agency-wide picture too, but framed around money.
+  const isFinance = roles.includes("finance_manager");
+
+  // Agency-wide overview surface.
+  const isAgencyLead = isAdmin || isExecutive || isFinance;
+
+  // Delivery tiers. The Chief Executive and Finance are deliberately excluded
+  // from the personal and team-execution surfaces — neither delivers work, and
+  // stacking those panels on top of the agency overview is what made the old
+  // admin dashboard unreadable.
+  const isBranchHead = isAdmin || roles.includes("branch_head");
+  const isDeliveryLead = isBranchHead || roles.includes("department_lead");
+  const isMember = isDeliveryLead || roles.includes("team_member");
 
   return {
     isAgencyLead,
-    isTeamHead,
+    // Kept as `isTeamHead` for existing consumers; means "leads delivery".
+    isTeamHead: isDeliveryLead,
+    isBranchHead,
     isMember,
     isExecutive,
+    isFinance,
   };
 }
 

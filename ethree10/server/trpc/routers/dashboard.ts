@@ -1,4 +1,5 @@
 import { router } from "../trpc";
+import { hasAgencyWideScope } from "@/server/auth/role-groups";
 import { protectedProcedure } from "../procedures";
 import { db } from "@/server/db/client";
 import { getAgencyAuthContext } from "@/server/services/agency";
@@ -78,7 +79,10 @@ export const dashboardRouter = router({
 
   agencyLead: protectedProcedure.query(async ({ ctx }) => {
     const agencyCtx = await getAgencyAuthContext(ctx.userId);
-    if (!can(agencyCtx, "organization.update")) return null;
+    // Gate on agency-wide READ scope, not on `organization.update`. This is an
+    // overview surface: the Chief Executive and Finance are read-only by design
+    // and would otherwise get an empty dashboard.
+    if (!hasAgencyWideScope(agencyCtx)) return null;
 
     const now = new Date();
     const sevenDaysAgo = new Date(now);

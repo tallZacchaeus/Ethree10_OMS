@@ -38,13 +38,18 @@ import { UserPlus } from "lucide-react";
 import { initials } from "@/lib/format";
 import { humanize } from "@/lib/constants";
 import type { Role } from "@prisma/client";
+import { ROLE_LABELS, ROLE_DESCRIPTIONS } from "@/server/auth/role-groups";
 
-const ROLE_OPTIONS: { value: Role; label: string }[] = [
-  { value: "agency_admin",           label: "Admin" },
-  { value: "finance_admin",       label: "Executive Overview" },
-  { value: "team_head", label: "Team Head" },
-  { value: "team_member",          label: "Member" },
-
+// Assignable roles, in org seniority order. `super_admin` is deliberately absent —
+// it is a technical escape hatch granted directly on the User row, not an
+// operational role handed out from this screen.
+const ROLE_OPTIONS: { value: Role; label: string; description: string }[] = [
+  { value: "chief_executive", label: ROLE_LABELS.chief_executive, description: ROLE_DESCRIPTIONS.chief_executive },
+  { value: "agency_admin", label: ROLE_LABELS.agency_admin, description: ROLE_DESCRIPTIONS.agency_admin },
+  { value: "finance_manager", label: ROLE_LABELS.finance_manager, description: ROLE_DESCRIPTIONS.finance_manager },
+  { value: "branch_head", label: ROLE_LABELS.branch_head, description: ROLE_DESCRIPTIONS.branch_head },
+  { value: "department_lead", label: ROLE_LABELS.department_lead, description: ROLE_DESCRIPTIONS.department_lead },
+  { value: "team_member", label: ROLE_LABELS.team_member, description: ROLE_DESCRIPTIONS.team_member },
 ];
 
 export default function MembersPage() {

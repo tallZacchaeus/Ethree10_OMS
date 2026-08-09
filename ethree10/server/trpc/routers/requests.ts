@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hasAgencyWideScope } from "@/server/auth/role-groups";
 import { TRPCError } from "@trpc/server";
 import { RequestStage, Urgency } from "@prisma/client";
 import { router, publicProcedure } from "../trpc";
@@ -40,7 +41,7 @@ async function assertCanReadRequest(userId: string, requestId: string) {
 
   const agencyCtx = await getAgencyAuthContext(userId);
   if (can(agencyCtx, "request.read")) {
-    if (agencyCtx.isSuperAdmin || agencyCtx.roles.includes("agency_admin") || agencyCtx.roles.includes("finance_admin")) {
+    if (hasAgencyWideScope(agencyCtx)) {
       return request;
     }
     if (request.routedTeamId) {
@@ -58,7 +59,7 @@ async function assertCanReadRequest(userId: string, requestId: string) {
 
 async function visibleTeamIds(userId: string): Promise<string[] | null> {
   const auth = await getAgencyAuthContext(userId);
-  if (auth.isSuperAdmin || auth.roles.includes("agency_admin") || auth.roles.includes("finance_admin")) return null;
+  if (hasAgencyWideScope(auth)) return null;
   const memberships = await db.membership.findMany({
     where: { userId, removedAt: null, acceptedAt: { not: null }, teamId: { not: null } },
     select: { teamId: true },
@@ -72,20 +73,20 @@ export const requestsRouter = router({
   publicSubmit: publicProcedure
     .input(
       z.object({
+        // Deliberately minimal. The requester describes what they need; staff
+        // classify the service, set urgency, and agree scope during triage.
+        // Phone is the only optional field.
         requesterName: z.string().min(2),
         requesterEmail: z.string().email(),
         requesterPhone: z.string().optional(),
-        organizationName: z.string().optional(),
+        organizationName: z.string().trim().min(2),
         title: z.string().min(3),
         description: z.string().min(10),
-        projectType: z.string().min(2),
-        serviceId: z.string(),
-        urgency: z.nativeEnum(Urgency).default("medium"),
-        deadline: z.coerce.date().optional(),
+        deadline: z.coerce.date(),
+        // Optional: plenty of real requesters have no budget in mind and no
+        // links to hand. Requiring them only turns away genuine work.
         budgetEstimate: z.number().nonnegative().optional(),
-        expectedOutcome: z.string().trim().min(10),
         expectedDeliverables: z.string().trim().min(3),
-        acceptanceCriteria: z.string().trim().min(3),
         supportingLinks: z.array(z.string().url()).max(10).default([]),
         consentToEmail: z.literal(true),
       }),
@@ -99,15 +100,15 @@ export const requestsRouter = router({
         input: {
           title: input.title,
           description: input.description,
-          projectType: input.projectType,
-          serviceId: input.serviceId,
-          urgency: input.urgency,
+          // Unclassified until a human triages it. `projectType` stays empty and
+          // no serviceId is set, so `resolveRoutedTeamId` leaves the request
+          // unrouted and it lands in the Intake Queue.
+          projectType: "",
+          urgency: "medium",
           deadline: input.deadline,
           budgetEstimate: input.budgetEstimate,
           primaryContact: input.requesterName,
-          expectedOutcome: input.expectedOutcome,
           expectedDeliverables: input.expectedDeliverables,
-          acceptanceCriteria: input.acceptanceCriteria,
           supportingLinks: input.supportingLinks,
           consentToEmail: input.consentToEmail,
         },

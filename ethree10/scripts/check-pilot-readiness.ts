@@ -25,11 +25,19 @@ export async function evaluatePilotReadiness(): Promise<PilotCheck[]> {
     },
     {
       name: "agency admin guide",
-      pass: await contains("docs/user-guides/agency-admin.md", ["Launch checklist", "team", "organization"]),
+      pass: await contains("docs/user-guides/agency-admin.md", ["Launch checklist", "branch", "organisation"]),
     },
     {
-      name: "team head guide",
-      pass: await contains("docs/user-guides/team-head.md", ["assign", "review", "acceptance criteria"]),
+      name: "branch head guide",
+      pass: await contains("docs/user-guides/branch-head.md", ["assign", "review", "acceptance criteria"]),
+    },
+    {
+      name: "chief executive guide covers budget approval",
+      pass: await contains("docs/user-guides/chief-executive.md", ["budget", "approve", "separation of duties"]),
+    },
+    {
+      name: "finance manager guide covers payment confirmation",
+      pass: await contains("docs/user-guides/finance-manager.md", ["receipt", "confirm", "separation of duties"]),
     },
     {
       name: "requester guide",

@@ -20,12 +20,9 @@ export default function NewRequestPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [serviceId, setServiceId] = useState("");
   const [organizationId, setOrganizationId] = useState("");
-  const { data: services = [] } = trpc.services.publicList.useQuery();
   const { data: organizations = [] } = trpc.organizations.listOrganizations.useQuery();
-  const selectedService = services.find((service) => service.id === serviceId);
-  
+
   const createRequest = trpc.requests.create.useMutation({
     onSuccess: (data) => {
       toast({
@@ -47,8 +44,8 @@ export default function NewRequestPage() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!selectedService || !organizationId) {
-      toast({ title: "Complete routing details", description: "Select an organization and service.", variant: "destructive" });
+    if (!organizationId) {
+      toast({ title: "Select an organization", description: "Every request belongs to a client organization.", variant: "destructive" });
       return;
     }
 
@@ -67,15 +64,13 @@ export default function NewRequestPage() {
       organizationId,
       title: formData.get("title") as string,
       description: formData.get("description") as string,
-      projectType: selectedService.slug,
-      serviceId: selectedService.id,
-      urgency: formData.get("urgency") as "low" | "medium" | "high" | "critical",
+      // Classified at triage, not at submission — same rule as the public form.
+      projectType: "",
+      urgency: "medium",
       primaryContact: formData.get("primaryContact") as string,
       deadline,
       budgetEstimate,
-      expectedOutcome: formData.get("expectedOutcome") as string,
       expectedDeliverables: formData.get("expectedDeliverables") as string,
-      acceptanceCriteria: formData.get("acceptanceCriteria") as string,
       supportingLinks: String(formData.get("supportingLinks") || "").split(/\s+/).filter(Boolean),
       consentToEmail: false,
     });
@@ -111,39 +106,11 @@ export default function NewRequestPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="serviceId">Service *</Label>
-              <Select value={serviceId} onValueChange={setServiceId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select service" />
-                </SelectTrigger>
-                <SelectContent>
-                  {services.map((service) => <SelectItem key={service.id} value={service.id}>{service.name}{service.team ? ` — ${service.team.name}` : " — Agency review"}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="urgency">Urgency *</Label>
-              <Select name="urgency" defaultValue="medium">
-                <SelectTrigger>
-                  <SelectValue placeholder="Select urgency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2"><Label htmlFor="expectedOutcome">Expected outcome *</Label><Textarea id="expectedOutcome" name="expectedOutcome" required /></div>
           <div className="space-y-2"><Label htmlFor="expectedDeliverables">Expected deliverables *</Label><Textarea id="expectedDeliverables" name="expectedDeliverables" required /></div>
-          <div className="space-y-2"><Label htmlFor="acceptanceCriteria">Acceptance criteria *</Label><Textarea id="acceptanceCriteria" name="acceptanceCriteria" required /></div>
           <div className="space-y-2"><Label htmlFor="supportingLinks">Supporting links</Label><Textarea id="supportingLinks" name="supportingLinks" /></div>
+          <p className="text-sm text-muted-foreground">
+            The service, branch and urgency are set during triage in the Intake Queue.
+          </p>
         </div>
 
         <div className="space-y-4 bg-card p-6 rounded-lg border">

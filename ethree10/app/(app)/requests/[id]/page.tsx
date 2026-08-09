@@ -56,7 +56,7 @@ export default function RequestDetailPage() {
 
   const isAgencyStaff =
     isSuperAdmin ||
-    roles.some((r: string) => ["agency_admin", "team_head"].includes(r));
+    roles.some((r: string) => ["agency_admin", "branch_head"].includes(r));
 
   const { data: teams } = trpc.requests.agencyTeams.useQuery(undefined, {
     retry: false,

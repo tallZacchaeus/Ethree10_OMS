@@ -49,7 +49,7 @@ describe("Phase 3 execution controls", () => {
     secondMemberId = secondMember.id;
     outsiderId = outsider.id;
     await db.membership.createMany({ data: [
-      { userId: headId, role: "team_head", teamId, acceptedAt: new Date() },
+      { userId: headId, role: "branch_head", teamId, acceptedAt: new Date() },
       { userId: memberId, role: "team_member", teamId, acceptedAt: new Date() },
       { userId: secondMemberId, role: "team_member", teamId, acceptedAt: new Date() },
       { userId: outsiderId, role: "team_member", teamId: otherTeamId, acceptedAt: new Date() },
@@ -151,23 +151,23 @@ describe("Phase 3 execution controls", () => {
       notes: "QA candidate",
     });
     await caller(memberId).tasks.submitCompletion({ taskId, summary: "Ready for review" });
-    await expect(caller(memberId).tasks.review({ taskId, decision: "accept", reviewType: "team_head" })).rejects.toThrow();
+    await expect(caller(memberId).tasks.review({ taskId, decision: "accept", reviewType: "branch_head" })).rejects.toThrow();
     const revisionsRequired = await caller(headId).tasks.review({
       taskId,
       decision: "request_changes",
-      reviewType: "team_head",
+      reviewType: "branch_head",
       note: "Address QA feedback",
     });
     expect(revisionsRequired).toMatchObject({ status: "in_progress", revision: 2 });
     await caller(memberId).tasks.submitCompletion({ taskId, summary: "Revision two is ready" });
-    const afterHead = await caller(headId).tasks.review({ taskId, decision: "accept", reviewType: "team_head" });
+    const afterHead = await caller(headId).tasks.review({ taskId, decision: "accept", reviewType: "branch_head" });
     expect(afterHead.status).toBe("in_review");
     await expect(caller(headId).projects.deliver({ id: afterHead.projectId })).rejects.toThrow(/Every active task must pass review/);
     const afterQa = await caller(headId).tasks.review({ taskId, decision: "accept", reviewType: "quality_assurance" });
     expect(afterQa.status).toBe("done");
     const stored = await db.task.findUnique({ where: { id: taskId }, include: { deliverables: { include: { versions: true } }, reviews: true } });
     expect(stored?.deliverables[0]?.versions).toHaveLength(2);
-    expect(stored?.reviews.map((review) => review.reviewType)).toEqual(["team_head", "team_head", "quality_assurance"]);
+    expect(stored?.reviews.map((review) => review.reviewType)).toEqual(["branch_head", "branch_head", "quality_assurance"]);
     const delivered = await caller(headId).projects.deliver({ id: stored!.projectId });
     expect(delivered.status).toBe("delivered");
   });

@@ -36,7 +36,7 @@ export function ProposalsTab({ requestId }: { requestId: string }) {
   const isAgencyStaff =
     isSuperAdmin ||
     roles.some((r) =>
-      ["agency_admin", "team_head"].includes(r),
+      ["agency_admin", "branch_head"].includes(r),
     );
 
   const { data: proposals, isLoading, refetch } = trpc.proposals.list.useQuery({ requestId });

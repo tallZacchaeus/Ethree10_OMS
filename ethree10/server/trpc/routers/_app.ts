@@ -29,6 +29,7 @@ import { setupRouter } from "./setup";
 import { trackRouter } from "./track";
 import { servicesRouter } from "./services";
 import { executionRouter } from "./execution";
+import { budgetsRouter } from "./budgets";
 
 export const appRouter = router({
   auth: authRouter,
@@ -58,6 +59,7 @@ export const appRouter = router({
   analytics: analyticsRouter,
   sponsorships: sponsorshipsRouter,
   setup: setupRouter,
+  budgets: budgetsRouter,
   track: trackRouter,
   services: servicesRouter,
   execution: executionRouter,

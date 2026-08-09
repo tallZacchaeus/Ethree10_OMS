@@ -62,6 +62,13 @@ model User {
   deliverableVersions     DeliverableVersion[]     @relation("DeliverableVersionCreatedBy")
   taskReviews             TaskReview[]             @relation("TaskReviews")
   oauthAccounts           OAuthAccount[]
+  budgetsSubmitted        Budget[]                 @relation("BudgetSubmittedBy")
+  budgetsDecided          Budget[]                 @relation("BudgetDecidedBy")
+  budgetDecisions         BudgetDecision[]
+  expensesRequested       Expense[]                @relation("ExpenseRequestedBy")
+  expensesApproved        Expense[]                @relation("ExpenseApprovedBy")
+  expensesPaid            Expense[]                @relation("ExpensePaidBy")
+  invoicesConfirmed       Invoice[]                @relation("InvoicePaymentConfirmedBy")
 
   @@index([email])
 }
@@ -120,12 +127,25 @@ model Position {
   taskContributions TaskContributor[]
 }
 
+/// Authorization roles. Org mapping: a `Team` row is an agency **Branch**
+/// (Digital Media, Tech & Product) and a `SubUnit` row is a **Department**
+/// inside a branch. `branch_head` leads a Team; `department_lead` leads a SubUnit.
 enum Role {
+  /// Technical platform owner. Escape hatch, not an operational role.
   super_admin
+  /// Chief Executive. Sees everything, approves project budgets, may write notes.
+  /// Deliberately has no assignment, routing or delivery write power.
+  chief_executive
+  /// Runs agency operations and configuration. No budget approval, no payments.
   agency_admin
-  team_head
+  /// Confirms payments and issues receipts. Cannot approve the budgets it pays against.
+  finance_manager
+  /// Heads one branch (Digital Media or Tech & Product) and its departments.
+  branch_head
+  /// Leads one department inside a branch.
+  department_lead
+  /// Delivers the work.
   team_member
-  finance_admin
 }
 
 model Membership {
@@ -415,6 +435,8 @@ model Project {
   invoices        Invoice[]
   sponsorships    Sponsorship[]
   clientDecisions ClientDecision[]
+  budget          Budget?
+  expenses        Expense[]
 
   @@index([organizationId])
   @@index([agencyTeamId])
@@ -488,6 +510,11 @@ model Task {
   completionSummary  String?
   completionEvidence String?
   revision           Int          @default(1)
+  /// Set when the task is waiting on something — most often an unanswered
+  /// clarification. Surfaced on Workload and My Work so blocked work is visible
+  /// rather than silently stalled in someone's queue.
+  isBlocked          Boolean      @default(false)
+  blockedReason      String?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
@@ -728,6 +755,107 @@ model Milestone {
   @@index([projectId])
 }
 
+/// Lifecycle of a project budget. Only `chief_executive` may move
+/// `submitted` → `approved` / `rejected`.
+enum BudgetStatus {
+  draft
+  submitted
+  approved
+  rejected
+}
+
+/// The money envelope for a project. Approval by the Chief Executive is the hard
+/// gate: no invoice may be issued to a client and no expense may be paid until
+/// `status = approved`.
+model Budget {
+  id             String       @id @default(cuid())
+  projectId      String       @unique
+  currency       String       @default("NGN")
+  /// Total approved envelope for the project.
+  amount         Decimal      @db.Decimal(14, 2)
+  /// Inbound: what the client is billed. Invoices are capped at this.
+  clientAmount   Decimal?     @db.Decimal(14, 2)
+  /// Outbound: what the agency expects to spend. Expenses are capped at this.
+  internalAmount Decimal?     @db.Decimal(14, 2)
+  status         BudgetStatus @default(draft)
+  notes          String?
+  submittedById  String?
+  submittedAt    DateTime?
+  /// The Chief Executive who approved or rejected. Recorded so Finance can be
+  /// blocked from confirming payment on a budget it approved itself.
+  decidedById    String?
+  decidedAt      DateTime?
+  decisionNote   String?
+  version        Int          @default(1)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  submittedBy User?            @relation("BudgetSubmittedBy", fields: [submittedById], references: [id])
+  decidedBy   User?            @relation("BudgetDecidedBy", fields: [decidedById], references: [id])
+  decisions   BudgetDecision[]
+  expenses    Expense[]
+
+  @@index([status])
+}
+
+/// Append-only history of every budget submit / approve / reject. Never updated
+/// or deleted — this is the audit trail for the approval chain.
+model BudgetDecision {
+  id               String       @id @default(cuid())
+  budgetId         String
+  action           BudgetStatus
+  actorId          String?
+  note             String?
+  amountAtDecision Decimal      @db.Decimal(14, 2)
+  createdAt        DateTime     @default(now())
+
+  budget Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  actor  User?  @relation(fields: [actorId], references: [id])
+
+  @@index([budgetId])
+}
+
+/// Outbound spend against an approved budget. Requested by delivery leads,
+/// paid by `finance_manager`. The requester may never pay their own expense.
+enum ExpenseStatus {
+  requested
+  approved
+  paid
+  rejected
+}
+
+model Expense {
+  id            String        @id @default(cuid())
+  projectId     String
+  budgetId      String
+  description   String
+  amount        Decimal       @db.Decimal(14, 2)
+  currency      String        @default("NGN")
+  status        ExpenseStatus @default(requested)
+  requestedById String
+  requestedAt   DateTime      @default(now())
+  approvedById  String?
+  approvedAt    DateTime?
+  paidById      String?
+  paidAt        DateTime?
+  paymentRef    String?
+  proofUrl      String?
+  note          String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  budget      Budget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  requestedBy User    @relation("ExpenseRequestedBy", fields: [requestedById], references: [id])
+  approvedBy  User?   @relation("ExpenseApprovedBy", fields: [approvedById], references: [id])
+  paidBy      User?   @relation("ExpensePaidBy", fields: [paidById], references: [id])
+
+  @@index([projectId])
+  @@index([budgetId])
+  @@index([status])
+}
+
 enum InvoiceStatus {
   draft
   sent
@@ -750,12 +878,17 @@ model Invoice {
   paidAt         DateTime?
   paymentRef     String?
   pdfUrl         String?
+  /// Set when `finance_manager` confirms the funds landed. A receipt is only
+  /// issued after this, and the confirmer may not be the budget approver.
+  paymentConfirmedById String?
+  paymentConfirmedAt   DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  project      Project?     @relation(fields: [projectId], references: [id])
-  organization Organization @relation(fields: [organizationId], references: [id])
-  receipt      Receipt?
+  project            Project?     @relation(fields: [projectId], references: [id])
+  organization       Organization @relation(fields: [organizationId], references: [id])
+  receipt            Receipt?
+  paymentConfirmedBy User?        @relation("InvoicePaymentConfirmedBy", fields: [paymentConfirmedById], references: [id])
 
   @@index([organizationId])
   @@index([status])

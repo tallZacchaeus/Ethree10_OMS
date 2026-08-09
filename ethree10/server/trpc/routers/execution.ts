@@ -18,7 +18,7 @@ async function requireTaskAccess(userId: string, taskId: string) {
 async function requireTeamAccess(userId: string, teamId: string) {
   const user = await db.user.findUnique({ where: { id: userId }, select: { isSuperAdmin: true } });
   const broadRole = await db.membership.findFirst({
-    where: { userId, role: { in: ["agency_admin", "finance_admin"] }, acceptedAt: { not: null }, removedAt: null },
+    where: { userId, role: { in: ["agency_admin", "chief_executive", "finance_manager"] }, acceptedAt: { not: null }, removedAt: null },
   });
   if (user?.isSuperAdmin || broadRole) return;
   const membership = await db.membership.findFirst({

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hasAgencyWideScope } from "@/server/auth/role-groups";
 import { TRPCError } from "@trpc/server";
 import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
@@ -12,12 +13,12 @@ const flatJson = z.record(z.string(), z.union([z.string(), z.number(), z.boolean
 
 async function visibleReportWhere(userId: string) {
   const auth = await getAgencyAuthContext(userId);
-  if (auth.isSuperAdmin || auth.roles.includes("agency_admin") || auth.roles.includes("finance_admin")) return {};
+  if (hasAgencyWideScope(auth)) return {};
   const memberships = await db.membership.findMany({
     where: { userId, removedAt: null, acceptedAt: { not: null } },
     select: { role: true, teamId: true },
   });
-  const headedTeamIds = memberships.filter((item) => item.role === "team_head").flatMap((item) => item.teamId ? [item.teamId] : []);
+  const headedTeamIds = memberships.filter((item) => item.role === "branch_head").flatMap((item) => item.teamId ? [item.teamId] : []);
   return { OR: [{ level: "member" as const, scopeId: userId }, { level: "team" as const, scopeId: { in: headedTeamIds } }] };
 }
 
@@ -27,7 +28,7 @@ async function assertCanManage(userId: string, reportId: string) {
   const report = await db.report.findUnique({ where: { id: reportId }, select: { level: true, scopeId: true } });
   if (!report) throw new TRPCError({ code: "NOT_FOUND" });
   if (report.level === "team") {
-    const membership = await db.membership.findFirst({ where: { userId, role: "team_head", teamId: report.scopeId, removedAt: null, acceptedAt: { not: null } } });
+    const membership = await db.membership.findFirst({ where: { userId, role: "branch_head", teamId: report.scopeId, removedAt: null, acceptedAt: { not: null } } });
     if (membership) return;
   }
   throw new TRPCError({ code: "FORBIDDEN" });

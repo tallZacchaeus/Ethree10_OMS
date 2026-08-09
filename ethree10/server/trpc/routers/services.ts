@@ -25,7 +25,7 @@ async function assertCanManageService(userId: string, teamId: string | null) {
   if (auth.isSuperAdmin || auth.roles.includes("agency_admin")) return;
   if (!teamId) throw new TRPCError({ code: "FORBIDDEN", message: "Only agency admins can manage fallback services." });
   const membership = await db.membership.findFirst({
-    where: { userId, role: "team_head", teamId, removedAt: null, acceptedAt: { not: null } },
+    where: { userId, role: "branch_head", teamId, removedAt: null, acceptedAt: { not: null } },
     select: { id: true },
   });
   if (!membership) throw new TRPCError({ code: "FORBIDDEN", message: "You can manage only your team's services." });
