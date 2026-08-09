@@ -329,8 +329,14 @@ export const ROLE_GUIDES: RoleGuide[] = [
               "Inside each branch, and give each one a department lead. Departments are yours to shape — create, rename and archive them as the agency changes.",
           },
           {
+            title: "Build the skills list",
+            detail:
+              "Settings → Skills. Add what your people actually do — this is the vocabulary the app matches against when it suggests who should take a task.",
+          },
+          {
             title: "Add people",
-            detail: "Set each person's role, branch, department, position and skills.",
+            detail:
+              "Set each person's role, branch, department, position and skills. Skills are edited from the People screen; branch and department leads can keep their own team's up to date.",
             requires: ["The branch and department exist first"],
           },
           {

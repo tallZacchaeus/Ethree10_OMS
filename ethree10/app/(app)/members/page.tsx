@@ -37,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Pencil, Trash2, UserPlus } from "lucide-react";
+import { MemberSkillsDialog } from "@/components/members/member-skills-dialog";
 import { initials } from "@/lib/format";
 import { humanize } from "@/lib/constants";
 import type { Role } from "@prisma/client";
@@ -73,9 +74,15 @@ export default function MembersPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editTeamId, setEditTeamId] = useState("");
   const [editSubUnitId, setEditSubUnitId] = useState("");
+  const [skillsFor, setSkillsFor] = useState<{ userId: string; name: string } | null>(null);
 
   const canInvite = isSuperAdmin || roles.some((r: string) =>
     ["agency_admin"].includes(r)
+  );
+  // Skills are a delivery concern, so branch and department leads keep their own
+  // people's profiles current without going through an agency admin.
+  const canEditSkills = isSuperAdmin || roles.some((r: string) =>
+    ["agency_admin", "branch_head", "department_lead"].includes(r)
   );
 
   const { data, isLoading, refetch } = trpc.members.list.useQuery(undefined, {
@@ -435,10 +442,27 @@ export default function MembersPage() {
                   <TableCell className="text-sm text-muted-foreground">{m.team?.name ?? "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{m.subUnit?.name ?? "—"}</TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
                       {m.user.skills.slice(0, 3).map((s) => (
                         <Badge key={s.skill.id} variant="neutral">{s.skill.name}</Badge>
                       ))}
+                      {m.user.skills.length > 3 && (
+                        <Badge variant="neutral">+{m.user.skills.length - 3}</Badge>
+                      )}
+                      {canEditSkills ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs text-muted-foreground"
+                          aria-label={`Edit skills for ${m.user.name}`}
+                          onClick={() => setSkillsFor({ userId: m.user.id, name: m.user.name })}
+                        >
+                          {m.user.skills.length === 0 ? "Add skills" : "Edit"}
+                        </Button>
+                      ) : (
+                        m.user.skills.length === 0 && <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -476,6 +500,13 @@ export default function MembersPage() {
           </Table>
         </Card>
       )}
+
+      <MemberSkillsDialog
+        userId={skillsFor?.userId ?? null}
+        userName={skillsFor?.name ?? ""}
+        open={Boolean(skillsFor)}
+        onOpenChange={(next) => !next && setSkillsFor(null)}
+      />
     </div>
   );
 }

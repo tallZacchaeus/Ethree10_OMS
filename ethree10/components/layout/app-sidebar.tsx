@@ -29,6 +29,7 @@ import {
   BadgeCheck,
   BookOpen,
   Wallet,
+  GraduationCap,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@prisma/client";
@@ -119,6 +120,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Administration",
     items: [
       { href: "/settings/services", label: "Service Catalog", icon: Briefcase, allow: BRANCH_LEADS },
+      { href: "/settings/skills", label: "Skills", icon: GraduationCap, allow: [...AGENCY_WIDE, "branch_head", "department_lead"] },
       { href: "/integrations", label: "Integrations", icon: Plug, allow: AGENCY_ADMIN },
       { href: "/admin/cms", label: "Marketing Site", icon: FileText, allow: AGENCY_ADMIN },
       { href: "/settings", label: "Settings", icon: Settings, allow: "all" },
