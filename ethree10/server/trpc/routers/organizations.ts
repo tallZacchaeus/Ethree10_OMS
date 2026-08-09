@@ -4,38 +4,10 @@ import { Role } from "@prisma/client";
 import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { db } from "@/server/db/client";
-import { assertSeparationOfDuties } from "@/server/auth/permissions";
+import { assertRoleSetAllowed } from "@/server/auth/role-guard";
 
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
-/**
- * Refuse a role assignment that would give one person two roles which must stay
- * separate — today, Chief Executive and Finance Manager. Checked against the
- * user's other live memberships, so it holds however the roles are accumulated.
- */
-async function assertRoleSetAllowed(
-  userId: string,
-  incomingRole: Role,
-  excludeMembershipId?: string,
-): Promise<void> {
-  const others = await db.membership.findMany({
-    where: {
-      userId,
-      removedAt: null,
-      ...(excludeMembershipId ? { id: { not: excludeMembershipId } } : {}),
-    },
-    select: { role: true },
-  });
-  try {
-    assertSeparationOfDuties([...others.map((m) => m.role), incomingRole]);
-  } catch (error) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: error instanceof Error ? error.message : "Role combination not allowed.",
-    });
-  }
-}
 
 /**
  * Membership + client-organization management. (Organizations were removed; the agency is

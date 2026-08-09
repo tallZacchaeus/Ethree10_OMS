@@ -18,6 +18,11 @@ export type Action =
   | "subunit.update"
   | "subunit.archive"
   | "member.read"
+  | "member.updateSkills"
+  // The skill taxonomy itself — the shared vocabulary the assignee suggester
+  // matches against. Editing it changes what every branch can pick from, so it
+  // sits with agency configuration rather than with delivery.
+  | "skill.manage"
   | "service.read"
   | "service.manage"
   | "request.read"
@@ -151,7 +156,8 @@ const ROLE_PERMISSIONS: Record<Role, Action[]> = {
     "organization.invite", "organization.removeMember", "organization.changeRole",
     "team.read", "team.create", "team.update", "team.archive",
     "subunit.read", "subunit.create", "subunit.update", "subunit.archive",
-    "member.read",
+    "member.read", "member.updateSkills",
+    "skill.manage",
     "service.read", "service.manage",
     "request.read", "request.create", "request.update", "request.transition",
     "request.route", "request.approve", "request.reject", "request.delete",
@@ -175,7 +181,7 @@ const ROLE_PERMISSIONS: Record<Role, Action[]> = {
     "organization.read",
     "team.read", "team.update",
     "subunit.read", "subunit.create", "subunit.update", "subunit.archive",
-    "member.read",
+    "member.read", "member.updateSkills",
     "service.read", "service.manage",
     "request.read", "request.update", "request.transition", "request.route",
     "request.approve", "request.reject",
@@ -195,7 +201,7 @@ const ROLE_PERMISSIONS: Record<Role, Action[]> = {
     "organization.read",
     "team.read",
     "subunit.read", "subunit.update",
-    "member.read",
+    "member.read", "member.updateSkills",
     "service.read",
     "request.read", "request.update", "request.transition",
     "project.read", "project.create", "project.update",

@@ -4,6 +4,7 @@ import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { Role, type SkillLevel } from "@prisma/client";
 import { requireAgencyAction } from "@/server/services/agency";
+import { assertRoleSetAllowed } from "@/server/auth/role-guard";
 
 const skillLevelOrder: Record<SkillLevel, number> = {
   expert: 4,
@@ -109,6 +110,10 @@ export const membersRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Member not found." });
       }
 
+      // Separation of duties. This is the mutation the People screen calls, so
+      // without this check the control was bypassable through normal admin use.
+      await assertRoleSetAllowed(membership.userId, input.role, input.membershipId);
+
       if (input.subUnitId) {
         const subUnit = await ctx.db.subUnit.findFirst({
           where: {
@@ -168,6 +173,7 @@ export const membersRouter = router({
       if (!membership) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Member not found." });
       }
+
       if (membership.userId === ctx.userId) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -179,10 +185,6 @@ export const membersRouter = router({
         data: { removedAt: new Date() },
       });
     }),
-
-  getAllSkills: protectedProcedure.query(async ({ ctx }) => {
-    return ctx.db.skill.findMany({ orderBy: { name: "asc" } });
-  }),
 
   searchBySkill: protectedProcedure
     .input(z.object({ skillId: z.string() }))

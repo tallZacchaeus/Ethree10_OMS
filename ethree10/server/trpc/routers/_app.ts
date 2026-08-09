@@ -4,6 +4,7 @@ import { organizationsRouter } from "./organizations";
 import { teamsRouter } from "./teams";
 import { subunitsRouter } from "./subunits";
 import { membersRouter } from "./members";
+import { skillsRouter } from "./skills";
 import { requestsRouter } from "./requests";
 import { projectsRouter } from "./projects";
 import { tasksRouter } from "./tasks";
@@ -38,6 +39,7 @@ export const appRouter = router({
   teams: teamsRouter,
   subunits: subunitsRouter,
   members: membersRouter,
+  skills: skillsRouter,
   requests: requestsRouter,
   projects: projectsRouter,
   tasks: tasksRouter,
