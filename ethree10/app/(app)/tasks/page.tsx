@@ -14,7 +14,9 @@ import { formatDate } from "@/lib/format";
 type Task = RouterOutputs["tasks"]["myTasks"][number];
 
 function bucketOf(task: Task): string {
-  if (task.status === "blocked") return "Blocked";
+  // `isBlocked` is set when a clarification question goes unanswered. It is
+  // independent of status — a task can be "in progress" and still stuck.
+  if (task.status === "blocked" || task.isBlocked) return "Blocked";
   if (task.status === "in_review") return "In review";
   if (task.dueDate) {
     const due = new Date(task.dueDate);
@@ -72,6 +74,11 @@ export default function MyTasksPage() {
                             {task.project.code} · {task.project.name}
                             {task.dueDate ? ` · due ${formatDate(task.dueDate)}` : ""}
                           </p>
+                          {task.isBlocked && task.blockedReason && (
+                            <p className="mt-1 truncate text-xs text-amber-700 dark:text-amber-500">
+                              {task.blockedReason}
+                            </p>
+                          )}
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           <UrgencyTag value={task.priority} />

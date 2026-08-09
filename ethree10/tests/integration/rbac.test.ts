@@ -58,7 +58,7 @@ describe('Phase 1 Verification: RBAC & Link-Only Client Model', () => {
     teamMember = await createDbUser('member-' + Date.now() + '@ethree10.com');
 
     await db.membership.create({ data: { userId: agencyAdmin.id, role: 'agency_admin', acceptedAt: new Date() } });
-    await db.membership.create({ data: { userId: teamHead.id, role: 'team_head', teamId: team1.id, acceptedAt: new Date() } });
+    await db.membership.create({ data: { userId: teamHead.id, role: 'branch_head', teamId: team1.id, acceptedAt: new Date() } });
     await db.membership.create({ data: { userId: teamMember.id, role: 'team_member', teamId: team1.id, positionId: position.id, acceptedAt: new Date() } });
   });
 

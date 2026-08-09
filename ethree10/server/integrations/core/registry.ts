@@ -1,11 +1,12 @@
 import type { IntegrationProvider } from "@prisma/client";
 import type { IntegrationAdapter } from "@/server/integrations/core/types";
 import { planeAdapter } from "@/server/integrations/plane";
-import { trelloAdapter } from "@/server/integrations/trello";
 
+// Plane is the agency's system of execution. Trello was removed once the
+// adapter pattern had been proven — carrying a second provider doubled the
+// webhook and sync surface for no current benefit.
 const ADAPTERS: Partial<Record<IntegrationProvider, IntegrationAdapter>> = {
   plane: planeAdapter,
-  trello: trelloAdapter,
 };
 
 export function getAdapter(provider: IntegrationProvider): IntegrationAdapter {

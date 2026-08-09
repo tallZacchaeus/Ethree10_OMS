@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   CheckSquare,
   FileClock,
+  Clock,
   FolderKanban,
   Inbox,
   MessageSquareQuote,
@@ -240,6 +241,50 @@ export default function DashboardPage() {
                 : "A real leadership surface for queue health, throughput, and delivery pressure."
             }
           />
+
+          {/* The vision's own success measures (§1.7), against their targets.
+              They were defined, measurable, and never measured. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatCard
+              label="Avg. triage time"
+              value={
+                agencyData.successMetrics.averageTriageHours === null
+                  ? "—"
+                  : `${agencyData.successMetrics.averageTriageHours}h`
+              }
+              icon={Clock}
+              hint={`Target: under ${agencyData.successMetrics.triageTargetHours}h`}
+              tone={
+                agencyData.successMetrics.averageTriageHours !== null &&
+                agencyData.successMetrics.averageTriageHours > agencyData.successMetrics.triageTargetHours
+                  ? "accent"
+                  : "default"
+              }
+            />
+            <StatCard
+              label="Client satisfaction"
+              value={
+                agencyData.successMetrics.averageCsat === null
+                  ? "—"
+                  : `${agencyData.successMetrics.averageCsat} / 5`
+              }
+              icon={CheckCircle2}
+              hint={`Target: ${agencyData.successMetrics.csatTarget}+`}
+              tone={
+                agencyData.successMetrics.averageCsat !== null &&
+                agencyData.successMetrics.averageCsat < agencyData.successMetrics.csatTarget
+                  ? "accent"
+                  : "default"
+              }
+            />
+            <StatCard
+              label="Awaiting triage"
+              value={agencyData.successMetrics.awaitingTriage}
+              icon={Inbox}
+              hint="Unrouted client requests"
+              tone={agencyData.successMetrics.awaitingTriage > 0 ? "accent" : "default"}
+            />
+          </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <StatCard

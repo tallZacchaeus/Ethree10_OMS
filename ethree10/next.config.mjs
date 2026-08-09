@@ -8,7 +8,7 @@ const contentSecurityPolicyReportOnly = [
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co https://*.posthog.com https://app.posthog.com",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
-  "connect-src 'self' https://api.paystack.co https://checkout.paystack.com https://*.posthog.com https://app.posthog.com",
+  "connect-src 'self' https://*.ingest.sentry.io https://*.sentry.io https://api.paystack.co https://checkout.paystack.com https://*.posthog.com https://app.posthog.com",
   "frame-src https://checkout.paystack.com",
 ].join("; ");
 

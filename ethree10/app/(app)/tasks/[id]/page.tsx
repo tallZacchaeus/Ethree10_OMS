@@ -25,7 +25,8 @@ import { UrgencyTag } from "@/components/ui-ext/urgency-tag";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { humanize } from "@/lib/constants";
 import { TimeLogDialog } from "@/components/tasks/time-log-dialog";
-import { Clock } from "lucide-react";
+import { FileUpload } from "@/components/files/file-upload";
+import { Clock, HelpCircle, Send } from "lucide-react";
 
 const MEMBER_STATUSES: TaskStatus[] = ["todo", "in_progress", "blocked"];
 
@@ -47,8 +48,9 @@ export default function TaskDetailPage() {
   const [evidence, setEvidence] = useState("");
   const [hours, setHours] = useState("");
   const [commentBody, setCommentBody] = useState("");
+  const [question, setQuestion] = useState("");
   const [reviewNote, setReviewNote] = useState("");
-  const [reviewType, setReviewType] = useState("team_head");
+  const [reviewType, setReviewType] = useState("branch_head");
   const [contributorUserId, setContributorUserId] = useState("");
   const [contributionRole, setContributionRole] = useState("");
   const [loggingTime, setLoggingTime] = useState(false);
@@ -96,6 +98,27 @@ export default function TaskDetailPage() {
     },
     onError: (e) => toast({ title: "Comment failed", description: e.message, variant: "destructive" }),
   });
+  const askClarification = trpc.tasks.askClarification.useMutation({
+    onSuccess: (result) => {
+      setQuestion("");
+      void invalidate();
+      toast({
+        title: result.routedTo === "client" ? "Sent to the client" : "Sent to your lead",
+        description:
+          result.routedTo === "client"
+            ? "It is on their tracking link and they have been emailed."
+            : `${result.notified} ${result.notified === 1 ? "person has" : "people have"} been notified by email.`,
+      });
+    },
+    onError: (e) => toast({ title: "Could not send", description: e.message, variant: "destructive" }),
+  });
+  const resolveBlocker = trpc.tasks.resolveBlocker.useMutation({
+    onSuccess: () => {
+      void invalidate();
+      toast({ title: "Marked answered", description: "The task is no longer flagged as waiting." });
+    },
+    onError: (e) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
 
   if (isLoading) {
     return <div className="py-12 text-center text-muted-foreground">Loading…</div>;
@@ -110,7 +133,7 @@ export default function TaskDetailPage() {
   const isLead =
     isSuperAdmin ||
     roles.some((r) =>
-      ["agency_admin", "team_head"].includes(r),
+      ["agency_admin", "branch_head"].includes(r),
     );
 
   return (
@@ -270,7 +293,7 @@ export default function TaskDetailPage() {
                   <Select value={reviewType} onValueChange={setReviewType}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="team_head">Team-head approval</SelectItem>
+                      <SelectItem value="branch_head">Team-head approval</SelectItem>
                       <SelectItem value="quality_assurance">Quality assurance</SelectItem>
                       <SelectItem value="design_review">Design review</SelectItem>
                       <SelectItem value="editorial_review">Editorial review</SelectItem>
@@ -315,9 +338,126 @@ export default function TaskDetailPage() {
           <Card>
             <CardHeader><CardTitle>Deliverables and review history</CardTitle></CardHeader>
             <CardContent className="space-y-5">
-              {task.deliverables.length === 0 ? <p className="text-sm text-muted-foreground">No versioned deliverables yet.</p> : task.deliverables.map((deliverable) => <div key={deliverable.id} className="rounded-lg border p-3 text-sm"><div className="flex items-center justify-between gap-2"><strong>{deliverable.title}</strong><span className="text-xs text-muted-foreground">{deliverable.kind} · {deliverable.visibility} · v{deliverable.currentRevision}</span></div><div className="mt-2 space-y-1">{deliverable.versions.map((version) => <p key={version.id} className="text-muted-foreground">v{version.revision} · {version.url ? <a href={version.url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">Open</a> : "Document"}{version.notes ? ` · ${version.notes}` : ""}</p>)}</div></div>)}
+              {task.deliverables.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No versioned deliverables yet.</p>
+              ) : (
+                task.deliverables.map((deliverable) => (
+                  <div key={deliverable.id} className="rounded-lg border p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <strong>{deliverable.title}</strong>
+                      <span className="text-xs text-muted-foreground">
+                        {deliverable.kind} · {deliverable.visibility} · v{deliverable.currentRevision}
+                      </span>
+                    </div>
+                    {deliverable.visibility === "client" && (
+                      <p className="mt-1 text-xs text-brand-700">
+                        Client-visible — files attached here appear on the requester&apos;s tracking link.
+                      </p>
+                    )}
+                    <div className="mt-3 space-y-4">
+                      {deliverable.versions.map((version) => (
+                        <div key={version.id} className="rounded-md bg-muted/40 p-3">
+                          <p className="text-muted-foreground">
+                            v{version.revision} ·{" "}
+                            {version.url ? (
+                              <a href={version.url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
+                                Open link
+                              </a>
+                            ) : (
+                              "No link"
+                            )}
+                            {version.notes ? ` · ${version.notes}` : ""}
+                          </p>
+                          {/* Files attach to the *version*, which is what makes a
+                              deliverable a real artefact rather than a pasted URL. */}
+                          <div className="mt-2">
+                            <FileUpload
+                              parent={{ deliverableVersionId: version.id }}
+                              label={`Attach to v${version.revision}`}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
               <Separator />
               {task.reviews.length === 0 ? <p className="text-sm text-muted-foreground">No review decisions recorded.</p> : task.reviews.map((item) => <div key={item.id} className="text-sm"><strong>{humanize(item.decision)}</strong> · {humanize(item.reviewType)} · revision {item.revision}<p className="text-muted-foreground">{item.feedback || "No feedback supplied"} · {formatDateTime(item.createdAt)}</p></div>)}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Files</CardTitle>
+              <CardDescription>
+                Work files, references and evidence. Uploaded straight to secure storage — large
+                video and design files are fine.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FileUpload parent={{ taskId: id }} label="Attach files" />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Need clarity?</CardTitle>
+              <CardDescription>
+                Ask the people who can answer. Your question is emailed to them, and the task is
+                marked as waiting so it does not look stalled.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {task.isBlocked && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/40">
+                  <p className="text-sm">
+                    <strong>Waiting on an answer.</strong>{" "}
+                    <span className="text-muted-foreground">{task.blockedReason}</span>
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={resolveBlocker.isPending}
+                    onClick={() => resolveBlocker.mutate({ taskId: id })}
+                  >
+                    Mark answered
+                  </Button>
+                </div>
+              )}
+              <Textarea
+                placeholder="What do you need to know before you can continue?"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  disabled={askClarification.isPending || question.trim().length < 5}
+                  onClick={() =>
+                    askClarification.mutate({ taskId: id, question, audience: "internal" })
+                  }
+                >
+                  <HelpCircle className="mr-2 h-4 w-4" />
+                  Ask my lead
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={askClarification.isPending || question.trim().length < 5}
+                  onClick={() =>
+                    askClarification.mutate({ taskId: id, question, audience: "client" })
+                  }
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  Ask the client
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                &ldquo;Ask my lead&rdquo; goes to your department lead, branch head and the
+                assignee. &ldquo;Ask the client&rdquo; posts on the requester&apos;s tracking link
+                and emails them.
+              </p>
             </CardContent>
           </Card>
 

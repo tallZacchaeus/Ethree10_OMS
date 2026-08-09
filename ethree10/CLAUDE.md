@@ -27,12 +27,26 @@ pnpm test -- tests/unit/authorization.test.ts
 pnpm test:e2e
 
 # Database
-pnpm db:migrate      # run pending migrations
-pnpm db:push         # push schema without migration (dev shortcut)
+pnpm db:deploy       # PRODUCTION: apply pending migrations (prisma migrate deploy)
+pnpm db:migrate      # dev: create + apply a migration from schema changes
+pnpm db:push         # local prototyping ONLY — never against a shared or production DB
 pnpm db:seed         # seed demo data
 pnpm db:generate     # regenerate Prisma client after schema changes
 pnpm db:studio       # open Prisma Studio UI
 ```
+
+### Schema changes
+
+The migration history was baselined on 2026-08-09 (`20260809000000_baseline`)
+after a long period of `db push` development left it unusable. From here:
+
+- **Never run `db push` against a shared or production database.** It is for local
+  prototyping only, and `--force-reset` destroys data.
+- Change `schema.prisma`, then `pnpm db:migrate` to generate a migration.
+- Deploys run `pnpm db:deploy` (`prisma migrate deploy`), which applies pending
+  migrations and never resets.
+- `prisma/migrations/migration_lock.toml` must stay committed; without it Prisma
+  cannot read the folder as a history.
 
 Env validation runs on every server boot. Copy `.env.example` to `.env.local` and fill in all required keys before running anything. Set `SKIP_ENV_VALIDATION=true` to bypass (CI only).
 
@@ -50,19 +64,37 @@ The app uses three Next.js route groups in `app/`:
 
 - `(marketing)/` — public marketing site (home, services, about, contact, public request form, public invoice viewer). Uses `ClientMarketingNav`.
 - `(auth)/` — login and magic-link-sent pages. No sidebar.
-- `(app)/` — the authenticated OMS application. All pages here require session; the layout enforces auth, MFA, and workspace context.
+- `(app)/` — the authenticated OMS application. Staff only. All pages here require session; the layout enforces auth and MFA.
 
-### Data access: scoped DB
+### Organisation model
 
-Every authenticated tRPC procedure that operates inside a workspace uses `scopedDb(workspaceId)` from `server/db/client.ts` rather than the raw `db` singleton. `scopedDb` automatically injects `{ workspaceId }` into every `findMany`, `findFirst`, and `count` call so row-level workspace isolation is enforced without per-call boilerplate. Raw `db` is only used for super-admin operations or pre-auth bootstrap.
+Ethree10 is **one agency**. There is no workspace/tenant abstraction — it was removed. The hierarchy is:
 
-The active workspace ID is stored in `localStorage` (`ethree10.activeWorkspaceId`) and attached to every tRPC request as the `x-workspace-id` header by the tRPC client link.
+```
+Agency → Branch (2) → Department (many) → People
+```
+
+Business terms map onto the schema as follows, and this mapping is the contract:
+
+| Business term | Prisma model | Lead |
+|---|---|---|
+| **Branch** — Digital Media, Tech & Product | `Team` | `Team.leadId` (`branch_head`) |
+| **Department** — Engineering, Design & Brand, … | `SubUnit` | `SubUnit.leadId` (`department_lead`) |
+| **Client organisation** | `Organization` | — |
+
+The models keep their old names for now; the UI and roles use Branch/Department. Renaming the models is an outstanding mechanical change.
+
+### Data access
+
+Staff queries are **agency-global** — there is no `scopedDb`, no `workspaceId`, and no `x-workspace-id` header. Use the `db` singleton from `server/db/client.ts`. Where a role should only see part of the agency, scope explicitly (see `visibleTeamIds` in `server/trpc/routers/requests.ts`, which limits non-agency-wide roles to their own branches).
+
+Client data is grouped by `organizationId`. Clients have no accounts at all.
 
 ### tRPC
 
 - Server entry: `app/api/trpc/[trpc]/route.ts`
-- Context: `server/trpc/context.ts` — resolves session, userId, workspaceId, scopedDb, and an `authorize(action)` helper.
-- Procedures: `server/trpc/procedures.ts` exports `publicProcedure`, `protectedProcedure`, `superAdminProcedure`, and `workspaceProcedure`. Use `workspaceProcedure` for anything that requires workspace context; it adds `ctx.scope` (a `scopedDb` instance) and validates the `x-workspace-id` header.
+- Context: `server/trpc/context.ts` — resolves session, userId, and an `authorize(action)` helper.
+- Procedures: `server/trpc/procedures.ts` exports `publicProcedure`, `protectedProcedure`, and `superAdminProcedure`.
 - All routers are wired in `server/trpc/routers/_app.ts`.
 - Client usage: `lib/trpc/client.ts` (React Query hooks), `lib/trpc/server.ts` (server-component caller).
 
@@ -74,9 +106,34 @@ Sessions use JWT strategy. The JWT callback copies `user.id` into `token.userId`
 
 ### RBAC
 
-Permissions are defined as a union type `Action` in `server/auth/permissions.ts`. The `ROLE_PERMISSIONS` map declares which actions each `Role` (Prisma enum) may perform. `AuthorizationService.require(userId, action, workspaceId)` in `server/services/authorization.ts` resolves the user's memberships and throws `TRPCError(FORBIDDEN)` if none of their roles grant the action.
+Permissions are a union type `Action` in `server/auth/permissions.ts`. The `ROLE_PERMISSIONS` map declares which actions each `Role` may perform. `requireAgencyAction(userId, action)` in `server/services/agency.ts` resolves the user's memberships and throws `TRPCError(FORBIDDEN)` if no role grants the action.
 
-Roles: `super_admin`, `agency_admin`, `agency_lead`, `department_lead`, `subunit_lead`, `member`, `project_manager`, `requester_admin`, `requester_member`, `requester_observer`.
+Named role groups live in `server/auth/role-groups.ts` (`AGENCY_WIDE_ROLES`, `DELIVERY_LEAD_ROLES`, `FINANCE_ROLES`, …) plus helpers like `hasAgencyWideScope()`. **Use these rather than inlining role arrays** — copy-pasted arrays are how the previous model drifted apart.
+
+The seven roles:
+
+| Role | Purpose |
+|---|---|
+| `super_admin` | Technical platform owner. Escape hatch, not operational. |
+| `chief_executive` | Overall head. Agency-wide read, comments, and the **only** role that can approve a budget. No delivery writes. |
+| `agency_admin` | Runs operations and configuration. **No** budget approval or payments. |
+| `finance_manager` | Invoices, confirms payments, issues receipts, pays expenses. **Cannot** approve budgets. |
+| `branch_head` | Heads a branch (`Team`) and its departments. Full delivery authority within it. |
+| `department_lead` | Leads a department (`SubUnit`). Assigns and reviews that department's work. |
+| `team_member` | Delivers assigned work. |
+
+### Money governance — read before touching invoices, receipts or budgets
+
+All of it lives in `server/services/budget.ts`. Two rules:
+
+1. **Approval gate.** No invoice may be sent and no expense paid until the Chief Executive has approved the project's budget. Call `BudgetService.assertApproved(projectId)` before any money action.
+2. **Separation of duties.** The budget approver may never confirm the resulting payment; a requester may never pay their own expense. `assertSeparationOfDuties()` also blocks one user holding both `chief_executive` and `finance_manager`.
+
+Receipts are only ever created by `confirmInvoicePayment`. Do not call `ReceiptService.issueForInvoice` directly from a router — that is exactly the bypass that existed before.
+
+Verify with `pnpm tsx scripts/verify-governance.ts` (24 assertions against a live DB).
+
+See `../GOVERNANCE-AND-JOURNEYS.md` for the full model and per-role journeys.
 
 ### Background workers
 

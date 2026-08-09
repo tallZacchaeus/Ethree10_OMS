@@ -3,8 +3,10 @@ import { Prisma, type TaskStatus, type TaskPriority } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { AuditService } from "@/server/services/audit";
 import { NotificationService } from "@/server/services/notification";
+import { EmailService } from "@/server/notifications/email";
 import { IntegrationService } from "@/server/integrations/core/service";
 import { generateCode } from "@/lib/utils/codes";
+import { captureCriticalFailure } from "@/lib/observability";
 
 /** Outbound integration sync is best-effort: it must never break local work. */
 async function syncOutbound(fn: () => Promise<void>): Promise<void> {
@@ -133,7 +135,7 @@ export class TaskService {
   /** Candidate assignees for a sub-unit, ranked by current load (best fit first). */
   static async candidates(subUnitId: string) {
     const memberships = await db.membership.findMany({
-      where: { subUnitId, removedAt: null, role: { in: ["team_member", "team_head"] } },
+      where: { subUnitId, removedAt: null, role: { in: ["team_member", "branch_head"] } },
       select: {
         user: {
           select: {
@@ -252,19 +254,80 @@ export class TaskService {
       after: { code: task.code, title: task.title },
     });
 
-    if (task.assigneeUserId) {
-      await NotificationService.create({
-        userId: task.assigneeUserId,
-        kind: "task_assigned",
-        title: `Task assigned: ${task.title}`,
-        body: task.code,
-        link: `/tasks/${task.id}`,
-        entityType: "Task",
-        entityId: task.id,
-      });
+    // Re-read the assignee: a primary contributor may have overridden it above.
+    const finalAssigneeId =
+      (await db.task.findUnique({ where: { id: task.id }, select: { assigneeUserId: true } }))
+        ?.assigneeUserId ?? null;
+    if (finalAssigneeId) {
+      await TaskService.notifyAssignment(task.id, finalAssigneeId);
     }
     await syncOutbound(() => IntegrationService.onTaskCreated(task));
     return task;
+  }
+
+  /**
+   * Notify someone that work is now theirs — in-app and by email.
+   *
+   * The email carries everything the assignee needs to start without opening
+   * the app first: what the task is, which project it belongs to, its priority,
+   * its deadline, and a direct link. Email delivery is best-effort and never
+   * blocks the assignment itself.
+   */
+  private static async notifyAssignment(taskId: string, assigneeUserId: string): Promise<void> {
+    const task = await db.task.findUnique({
+      where: { id: taskId },
+      include: {
+        project: { select: { name: true, code: true } },
+        subUnit: { select: { name: true } },
+      },
+    });
+    if (!task) return;
+
+    await NotificationService.create({
+      userId: assigneeUserId,
+      kind: "task_assigned",
+      title: `Task assigned: ${task.title}`,
+      body: task.code,
+      link: `/tasks/${task.id}`,
+      entityType: "Task",
+      entityId: task.id,
+    });
+
+    const assignee = await db.user.findUnique({
+      where: { id: assigneeUserId },
+      select: { email: true, name: true, timezone: true },
+    });
+    if (!assignee?.email) return;
+
+    const due = task.dueDate
+      ? new Intl.DateTimeFormat("en-GB", {
+          dateStyle: "full",
+          timeZone: assignee.timezone || "Africa/Lagos",
+        }).format(task.dueDate)
+      : "No deadline set";
+
+    const lines = [
+      `Hi ${assignee.name.split(" ")[0] ?? assignee.name},`,
+      ``,
+      `You have been assigned "${task.title}" (${task.code}).`,
+      ``,
+      `Project: ${task.project.name} (${task.project.code})`,
+      task.subUnit ? `Department: ${task.subUnit.name}` : null,
+      `Priority: ${task.priority}`,
+      `Deadline: ${due}`,
+      task.estimatedHours ? `Estimated effort: ${task.estimatedHours.toString()} hours` : null,
+      ``,
+      task.description ? `What needs doing:\n${task.description}` : null,
+      task.acceptanceCriteria ? `\nAcceptance criteria:\n${task.acceptanceCriteria}` : null,
+    ].filter((line): line is string => line !== null);
+
+    await EmailService.sendNotification({
+      to: assignee.email,
+      title: `New task assigned: ${task.title}`,
+      body: lines.join("\n"),
+      ctaLabel: "Open task",
+      ctaPath: `/tasks/${task.id}`,
+    }).catch((error) => captureCriticalFailure("notification-worker", error, { taskCode: task.code, kind: "assignment" }));
   }
 
   static async update(args: {
@@ -344,15 +407,11 @@ export class TaskService {
       before: { assigneeUserId: before.assigneeUserId },
       after: { assigneeUserId: args.assigneeUserId },
     });
-    await NotificationService.create({
-      userId: args.assigneeUserId,
-      kind: "task_assigned",
-      title: `Task assigned: ${updated.title}`,
-      body: updated.code,
-      link: `/tasks/${updated.id}`,
-      entityType: "Task",
-      entityId: updated.id,
-    });
+    // Only notify on an actual change of hands, so re-saving a task does not
+    // spam the same person.
+    if (before.assigneeUserId !== args.assigneeUserId) {
+      await TaskService.notifyAssignment(args.taskId, args.assigneeUserId);
+    }
     await syncOutbound(() => IntegrationService.onTaskUpdated(updated));
     return updated;
   }
@@ -448,7 +507,7 @@ export class TaskService {
     }
     const accepted = args.decision === "accept";
     const revisionsRequired = args.decision === "request_changes";
-    const reviewType = args.reviewType ?? "team_head";
+    const reviewType = args.reviewType ?? "branch_head";
     const requiredReviews = Array.isArray(before.project.request.service?.requiredReviews)
       ? before.project.request.service.requiredReviews.filter((value): value is string => typeof value === "string")
       : [];
@@ -459,7 +518,7 @@ export class TaskService {
     const approvedTypes = new Set(priorApprovedTypes.map((review) => review.reviewType));
     if (accepted) approvedTypes.add(reviewType);
     const allRequiredApproved = requiredReviews.every((required) => approvedTypes.has(required));
-    const finalApproval = accepted && approvedTypes.has("team_head") && allRequiredApproved;
+    const finalApproval = accepted && approvedTypes.has("branch_head") && allRequiredApproved;
     const now = new Date();
     const updated = await db.$transaction(async (tx) => {
       await tx.taskReview.create({
@@ -544,6 +603,31 @@ export class TaskService {
     return updated;
   }
 
+  /**
+   * Everyone who should hear about activity on a task: the assignee, the lead of
+   * the department it sits in, and the head of the branch that owns the project.
+   *
+   * Without this, a comment only reached people who were explicitly @mentioned —
+   * so "I need clarity on this" sat in the thread and notified nobody.
+   */
+  private static async taskAudience(taskId: string): Promise<string[]> {
+    const task = await db.task.findUnique({
+      where: { id: taskId },
+      select: {
+        assigneeUserId: true,
+        subUnit: { select: { leadId: true } },
+        project: { select: { pmUserId: true, team: { select: { leadId: true } } } },
+      },
+    });
+    if (!task) return [];
+    return [
+      task.assigneeUserId,
+      task.subUnit?.leadId,
+      task.project?.team?.leadId,
+      task.project?.pmUserId,
+    ].filter((id): id is string => Boolean(id));
+  }
+
   static async addComment(args: {
     actorId: string;
     taskId: string;
@@ -561,15 +645,192 @@ export class TaskService {
       },
       include: { author: { select: { id: true, name: true, avatarUrl: true } } },
     });
+
+    const task = await db.task.findUnique({
+      where: { id: args.taskId },
+      select: { title: true, code: true },
+    });
+
+    // Notify the people responsible for this task, minus the author.
+    const audience = (await TaskService.taskAudience(args.taskId)).filter(
+      (userId) => userId !== args.actorId,
+    );
+    await NotificationService.createMany(audience, {
+      kind: "mention",
+      title: `New comment on ${task?.title ?? "a task"}`,
+      body: args.body.slice(0, 160),
+      link: `/tasks/${args.taskId}`,
+      entityType: "Task",
+      entityId: args.taskId,
+    });
+
     if (args.mentions?.length) {
-      await NotificationService.createMany(args.mentions, {
+      await NotificationService.createMany(
+        args.mentions.filter((userId) => !audience.includes(userId) && userId !== args.actorId),
+        {
+          kind: "mention",
+          title: "You were mentioned on a task",
+          body: args.body.slice(0, 160),
+          link: `/tasks/${args.taskId}`,
+          entityType: "Task",
+          entityId: args.taskId,
+        },
+      );
+    }
+    return comment;
+  }
+
+  /**
+   * Ask a question about a task and make sure a human actually sees it.
+   *
+   * `audience: "internal"` puts the question to the department lead, branch head
+   * and assignee — in-app and by email, so it does not depend on anyone opening
+   * the task.
+   *
+   * `audience: "client"` escalates it to the requester. The question is posted on
+   * the parent **request** thread as a client-visible message, which is what the
+   * client's tracking link shows, and they are emailed. A copy stays on the task
+   * so the internal history is complete.
+   *
+   * Either way the task is flagged `isBlocked` so it shows as waiting rather than
+   * silently stalling in someone's queue.
+   */
+  static async askClarification(args: {
+    actorId: string;
+    taskId: string;
+    question: string;
+    audience: "internal" | "client";
+  }) {
+    const task = await db.task.findUnique({
+      where: { id: args.taskId },
+      include: {
+        project: {
+          select: {
+            name: true,
+            requestId: true,
+            request: { select: { id: true, code: true, requesterName: true, requesterEmail: true, publicToken: true } },
+          },
+        },
+      },
+    });
+    if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Task not found." });
+
+    const asker = await db.user.findUnique({
+      where: { id: args.actorId },
+      select: { name: true },
+    });
+    const prefix = args.audience === "client" ? "Question for the client" : "Question";
+
+    // Record the question and flag the task atomically. Doing these separately
+    // left an orphaned comment behind whenever the second write failed.
+    await db.$transaction([
+      db.taskComment.create({
+        data: {
+          taskId: args.taskId,
+          authorId: args.actorId,
+          body: `**${prefix}:** ${args.question}`,
+          isInternal: args.audience === "internal",
+        },
+      }),
+      db.task.update({
+        where: { id: args.taskId },
+        data: {
+          isBlocked: true,
+          blockedReason: `Awaiting clarification: ${args.question.slice(0, 180)}`,
+        },
+      }),
+    ]);
+
+    await AuditService.log({
+      actorId: args.actorId,
+      action: `task.clarification_${args.audience}`,
+      entityType: "Task",
+      entityId: args.taskId,
+      after: { question: args.question },
+    });
+
+    if (args.audience === "internal") {
+      const audience = (await TaskService.taskAudience(args.taskId)).filter(
+        (userId) => userId !== args.actorId,
+      );
+      await NotificationService.createMany(audience, {
         kind: "mention",
-        title: "You were mentioned on a task",
+        title: `Clarification needed: ${task.title}`,
+        body: args.question.slice(0, 160),
         link: `/tasks/${args.taskId}`,
         entityType: "Task",
         entityId: args.taskId,
       });
+
+      const recipients = await db.user.findMany({
+        where: { id: { in: audience } },
+        select: { email: true, name: true },
+      });
+      for (const recipient of recipients) {
+        await EmailService.sendNotification({
+          to: recipient.email,
+          title: `Clarification needed on ${task.code}`,
+          body: `${asker?.name ?? "A team member"} asked about "${task.title}" (${task.project.name}):\n\n${args.question}`,
+          ctaLabel: "Answer on the task",
+          ctaPath: `/tasks/${args.taskId}`,
+        }).catch((error) => captureCriticalFailure("notification-worker", error, { taskCode: task.code, kind: "clarification" }));
+      }
+      return { routedTo: "internal" as const, notified: audience.length };
     }
-    return comment;
+
+    // Client-facing: post on the request thread so it appears on their tracking link.
+    const request = task.project.request;
+    if (!request) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "This task's project has no client request to ask on.",
+      });
+    }
+    await db.taskComment.create({
+      data: {
+        requestId: request.id,
+        authorId: args.actorId,
+        body: args.question,
+        isInternal: false,
+      },
+    });
+
+    if (request.requesterEmail) {
+      await EmailService.sendNotification({
+        to: request.requesterEmail,
+        title: `A question about your request ${request.code}`,
+        body: `The team working on "${task.project.name}" has a question:\n\n${args.question}\n\nReply on your tracking link and they will pick it up.`,
+        ctaLabel: "Reply to the team",
+        ctaPath: request.publicToken ? `/track/${request.publicToken}` : `/`,
+      }).catch((error) => captureCriticalFailure("notification-worker", error, { requestCode: request.code, kind: "client-clarification" }));
+    }
+    return { routedTo: "client" as const, notified: request.requesterEmail ? 1 : 0 };
+  }
+
+  /** Clear a blocker once the question has been answered, and tell the assignee. */
+  static async resolveBlocker(args: { actorId: string; taskId: string }) {
+    const task = await db.task.update({
+      where: { id: args.taskId },
+      data: { isBlocked: false, blockedReason: null },
+    });
+    await AuditService.log({
+      actorId: args.actorId,
+      action: "task.blocker_resolved",
+      entityType: "Task",
+      entityId: args.taskId,
+      after: { isBlocked: false },
+    });
+    if (task.assigneeUserId && task.assigneeUserId !== args.actorId) {
+      await NotificationService.create({
+        userId: task.assigneeUserId,
+        kind: "mention",
+        title: `Unblocked: ${task.title}`,
+        body: "Your question was answered — you can carry on.",
+        link: `/tasks/${task.id}`,
+        entityType: "Task",
+        entityId: task.id,
+      });
+    }
+    return task;
   }
 }

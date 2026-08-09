@@ -143,7 +143,7 @@ export class ExecutionService {
                 task: { status: { in: ["todo", "in_progress", "blocked", "in_review"] } },
               },
               include: {
-                task: { select: { id: true, status: true, estimatedHours: true, loggedHours: true, dueDate: true } },
+                task: { select: { id: true, status: true, estimatedHours: true, loggedHours: true, dueDate: true, isBlocked: true, blockedReason: true } },
               },
             },
           },
@@ -168,7 +168,12 @@ export class ExecutionService {
         capacityPercent,
         weeklyCapacity,
         openTaskCount: tasks.length,
-        blockedTaskCount: tasks.filter((task) => task.status === "blocked").length,
+        // Counts both an explicit blocked status and a task waiting on an
+        // unanswered clarification — the latter is the common real case.
+        blockedTaskCount: tasks.filter((task) => task.status === "blocked" || task.isBlocked).length,
+        blockedReasons: tasks
+          .filter((task) => task.isBlocked && task.blockedReason)
+          .map((task) => task.blockedReason as string),
         overdueTaskCount: tasks.filter((task) => task.dueDate && task.dueDate < now).length,
         remainingHours,
         utilizationPercent: weeklyCapacity > 0 ? Math.round((remainingHours / weeklyCapacity) * 100) : 100,

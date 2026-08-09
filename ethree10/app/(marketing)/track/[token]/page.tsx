@@ -13,6 +13,14 @@ import { StatusPill } from "@/components/ui-ext/status-pill";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
 
+/** Human-readable file size for download links. */
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${Math.round(bytes / 1024 ** 2)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+
 export default function TrackRequestPage() {
   const params = useParams<{ token: string }>();
   const token = params.token;
@@ -148,6 +156,24 @@ export default function TrackRequestPage() {
                 </div>
                 {item.content && <p className="mt-2 whitespace-pre-wrap text-sm">{item.content}</p>}
                 {item.notes && <p className="mt-2 text-sm text-muted-foreground">{item.notes}</p>}
+
+                {item.files.length > 0 && (
+                  <ul className="mt-3 space-y-1 border-t pt-3">
+                    {item.files.map((file) => (
+                      <li key={file.id} className="flex items-center justify-between gap-3">
+                        <span className="min-w-0 truncate text-sm">{file.fileName}</span>
+                        <Button variant="ghost" size="sm" asChild>
+                          {/* The link carries the tracking token; the server
+                              re-checks it before serving anything. */}
+                          <a href={file.downloadUrl} target="_blank" rel="noreferrer">
+                            <Download className="mr-1.5 h-4 w-4" />
+                            {formatFileSize(file.size)}
+                          </a>
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ))}
           </CardContent>

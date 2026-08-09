@@ -20,10 +20,7 @@ import { CheckCircle2, Copy } from "lucide-react";
 export default function PublicRequestPage() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [serviceId, setServiceId] = useState("");
   const [done, setDone] = useState<{ code: string; trackingUrl: string } | null>(null);
-  const { data: services = [], isLoading: servicesLoading } = trpc.services.publicList.useQuery();
-  const selectedService = services.find((service) => service.id === serviceId);
 
   const submit = trpc.requests.publicSubmit.useMutation({
     onSuccess: (data) => {
@@ -37,13 +34,8 @@ export default function PublicRequestPage() {
   });
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!selectedService) {
-      toast({ title: "Pick a service", description: "Tell us what kind of solution you need.", variant: "destructive" });
-      return;
-    }
-
     setIsSubmitting(true);
+    e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const deadlineStr = fd.get("deadline") as string;
     const budgetStr = fd.get("budgetEstimate") as string;
@@ -52,21 +44,19 @@ export default function PublicRequestPage() {
       .map((value) => value.trim())
       .filter(Boolean);
 
+    // No service, urgency, outcome or acceptance criteria here by design. The
+    // requester says what they need in their own words; staff classify the
+    // service, set urgency and agree the scope during triage.
     submit.mutate({
       requesterName: fd.get("requesterName") as string,
       requesterEmail: fd.get("requesterEmail") as string,
       requesterPhone: (fd.get("requesterPhone") as string) || undefined,
-      organizationName: (fd.get("organizationName") as string) || undefined,
+      organizationName: fd.get("organizationName") as string,
       title: fd.get("title") as string,
       description: fd.get("description") as string,
-      projectType: selectedService.slug,
-      serviceId: selectedService.id,
-      urgency: fd.get("urgency") as "low" | "medium" | "high" | "critical",
-      deadline: deadlineStr ? new Date(deadlineStr) : undefined,
+      deadline: new Date(deadlineStr),
       budgetEstimate: budgetStr ? parseFloat(budgetStr) : undefined,
-      expectedOutcome: fd.get("expectedOutcome") as string,
       expectedDeliverables: fd.get("expectedDeliverables") as string,
-      acceptanceCriteria: fd.get("acceptanceCriteria") as string,
       supportingLinks,
       consentToEmail: true,
     });
@@ -136,12 +126,12 @@ export default function PublicRequestPage() {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="organizationName">Organization</Label>
-                <Input id="organizationName" name="organizationName" placeholder="Your ministry or NGO" />
+                <Label htmlFor="organizationName">Organization *</Label>
+                <Input id="organizationName" name="organizationName" required placeholder="Your ministry or NGO" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="requesterPhone">Phone</Label>
-                <Input id="requesterPhone" name="requesterPhone" type="tel" placeholder="+234…" />
+                <Input id="requesterPhone" name="requesterPhone" type="tel" placeholder="+234… (optional)" />
               </div>
             </div>
 
@@ -150,52 +140,15 @@ export default function PublicRequestPage() {
               <Input id="title" name="title" required placeholder="e.g. Easter Campaign Landing Page" />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="serviceId">Service *</Label>
-                <Select value={serviceId} onValueChange={setServiceId} disabled={servicesLoading}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={servicesLoading ? "Loading services…" : "Select a service"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {services.map((service) => (
-                      <SelectItem key={service.id} value={service.id}>
-                        {service.name}{service.team ? ` — ${service.team.name}` : " — Agency review"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="urgency">Urgency *</Label>
-                <Select name="urgency" defaultValue="medium">
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select urgency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
             <div className="space-y-2">
-              <Label htmlFor="description">Project Description *</Label>
+              <Label htmlFor="description">What do you need? *</Label>
               <Textarea
                 id="description"
                 name="description"
                 required
                 className="min-h-[150px]"
-                placeholder="Goals, audience, timeline, any specific requirements…"
+                placeholder="Describe it in your own words — goals, audience, and anything specific you have in mind. Our team will work out the details with you."
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="expectedOutcome">Expected outcome *</Label>
-              <Textarea id="expectedOutcome" name="expectedOutcome" required placeholder="What should improve or become possible when this work is complete?" />
             </div>
 
             <div className="space-y-2">
@@ -204,23 +157,18 @@ export default function PublicRequestPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="acceptanceCriteria">Success / acceptance criteria *</Label>
-              <Textarea id="acceptanceCriteria" name="acceptanceCriteria" required placeholder="How will both sides know the solution is complete and acceptable?" />
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="supportingLinks">Supporting links</Label>
-              <Textarea id="supportingLinks" name="supportingLinks" placeholder="Paste links to briefs, brand assets, references, or existing systems (one per line)." />
+              <Textarea id="supportingLinks" name="supportingLinks" placeholder="Optional — links to briefs, brand assets, references, or existing systems (one per line)." />
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="deadline">Requested Deadline</Label>
-                <Input id="deadline" name="deadline" type="date" />
+                <Label htmlFor="deadline">Requested Deadline *</Label>
+                <Input id="deadline" name="deadline" type="date" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="budgetEstimate">Budget Estimate (NGN)</Label>
-                <Input id="budgetEstimate" name="budgetEstimate" type="number" min="0" step="1000" placeholder="e.g. 500000" />
+                <Input id="budgetEstimate" name="budgetEstimate" type="number" min="0" step="1000" placeholder="Optional — e.g. 500000" />
               </div>
             </div>
 

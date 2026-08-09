@@ -144,6 +144,7 @@ export default function NewInvoicePage() {
                   variant="ghost" 
                   size="icon"
                   className="text-muted-foreground hover:text-destructive"
+                  aria-label={`Remove line item ${i + 1}`}
                   onClick={() => handleRemoveLineItem(i)}
                   disabled={lineItems.length === 1}
                 >

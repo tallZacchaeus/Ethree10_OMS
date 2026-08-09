@@ -159,7 +159,7 @@ function validateRequiredBrief(service: { requiredBriefFields: Prisma.JsonValue 
 async function notifyIntakeOwners(request: { id: string; code: string; title: string; routedTeamId: string | null }) {
   const memberships = await db.membership.findMany({
     where: request.routedTeamId
-      ? { role: "team_head", teamId: request.routedTeamId, removedAt: null, acceptedAt: { not: null } }
+      ? { role: "branch_head", teamId: request.routedTeamId, removedAt: null, acceptedAt: { not: null } }
       : { role: "agency_admin", removedAt: null, acceptedAt: { not: null } },
     select: { userId: true },
   });
@@ -261,6 +261,11 @@ export class RequestService {
     const created = await db.request.create({
       data: {
         code,
+        // Internally-raised requests get a tracking link too. A staff member
+        // logging a request on a client's behalf still needs something to send
+        // them — without this, "Copy tracking link" had nothing to copy.
+        publicToken: generatePublicToken(),
+        publicTokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         organizationId: args.organizationId,
         submittedById: args.actorId,
         title: args.input.title,
@@ -326,10 +331,12 @@ export class RequestService {
     const seq = await nextRequestSeq();
     const code = generateCode("request", seq);
     const publicToken = generatePublicToken();
+    // Public submissions are intentionally unclassified. The client tells us what
+    // they need in plain words; a human picks the service, branch and urgency
+    // during triage. A request with no service simply arrives unrouted in the
+    // Intake Queue, which is the correct place for a decision to be made.
     const service = await resolveService(args.input.serviceId);
-    if (!service) throw new TRPCError({ code: "BAD_REQUEST", message: "Please select a service." });
-    validateRequiredBrief(service, args.input);
-    const routedTeamId = service.teamId;
+    const routedTeamId = service?.teamId ?? null;
 
     const created = await db.request.create({
       data: {
@@ -344,7 +351,7 @@ export class RequestService {
         title: args.input.title,
         description: args.input.description,
         projectType: args.input.projectType,
-        serviceId: service.id,
+        serviceId: service?.id ?? null,
         expectedOutcome: args.input.expectedOutcome,
         expectedDeliverables: args.input.expectedDeliverables,
         acceptanceCriteria: args.input.acceptanceCriteria,
