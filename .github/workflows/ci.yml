@@ -137,13 +137,25 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm db:generate
       - run: pnpm prisma migrate deploy
+      # The login-dependent specs sign in as a seeded user, so the demo data has
+      # to exist. Without this they reach /unauthorized (no memberships).
+      - run: pnpm db:seed
       - run: pnpm build
         env:
           CI: true
+          # NEXT_PUBLIC_* is inlined at build time, so this must be set HERE, not
+          # only at runtime. Without it the "Quick Login (Local Dev)" button is
+          # never rendered in a production build and every signed-in spec times
+          # out waiting to click it.
+          E2E_TEST_AUTH: "true"
+          NEXT_PUBLIC_E2E_TEST_AUTH: "true"
       - name: Start server
         run: pnpm start &
         env:
           PORT: 3000
+          # Registers the dev-only credentials provider on the server side.
+          E2E_TEST_AUTH: "true"
+          NEXT_PUBLIC_E2E_TEST_AUTH: "true"
       - name: Wait for server
         run: npx wait-on http://localhost:3000 --timeout 60000
       - run: pnpm test:e2e

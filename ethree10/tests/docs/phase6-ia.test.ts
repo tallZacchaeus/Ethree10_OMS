@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const coreRoutes = [
@@ -61,7 +61,12 @@ describe("Phase 6 core information architecture", () => {
     // it was missing on main, which is how the project ended up with no
     // reliable production migration path.
     expect(existsSync(resolve(process.cwd(), "prisma/migrations/migration_lock.toml"))).toBe(true);
-    // main's baseline is authoritative; it is already deployed.
-    expect(existsSync(resolve(process.cwd(), "prisma/migrations/00000000000000_baseline/migration.sql"))).toBe(true);
+    // A single squashed baseline that actually builds the schema. The previous
+    // `00000000000000_baseline` was a two-line comment that created nothing, so
+    // the next migration's `ALTER TABLE "Department"` failed on any fresh
+    // database — which is what kept CI red.
+    const baseline = resolve(process.cwd(), "prisma/migrations/0_init/migration.sql");
+    expect(existsSync(baseline)).toBe(true);
+    expect(readFileSync(baseline, "utf8")).toContain('CREATE TABLE "Team"');
   });
 });
