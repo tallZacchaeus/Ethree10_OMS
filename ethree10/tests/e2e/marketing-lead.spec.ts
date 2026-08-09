@@ -26,9 +26,15 @@ test.describe("Marketing site lead flow", () => {
     await expect(page.getByRole("heading", { name: /about ethree10/i })).toBeVisible();
   });
 
-  test("services page renders", async ({ page }) => {
+  test("services page renders without leaking internal branch names", async ({ page }) => {
     await page.goto("/services");
-    await expect(page.getByRole("heading", { name: "Services" })).toBeVisible();
+    // The heading is client-facing copy, not the word "Services" — the page was
+    // rewritten to stop grouping by internal branch name.
+    await expect(page.getByRole("heading", { name: /what we can build for you/i })).toBeVisible();
+    const body = await page.locator("body").innerText();
+    for (const internal of ["Digital Media", "Tech & Product", "Agency fallback"]) {
+      expect(body).not.toContain(internal);
+    }
   });
 
   test("contact page renders", async ({ page }) => {
