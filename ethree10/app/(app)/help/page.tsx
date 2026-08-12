@@ -6,8 +6,8 @@ import { PageHeader } from "@/components/ui-ext/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ROLE_GUIDES, UNIVERSAL_RULES, LIFECYCLE, type HelpStep } from "@/lib/help-content";
-import { Check, X, ArrowRight, BookOpen } from "lucide-react";
+import { ROLE_GUIDES, UNIVERSAL_RULES, LIFECYCLE, GLOSSARY, type HelpStep } from "@/lib/help-content";
+import { Check, X, ArrowRight, BookOpen, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 function StepCard({ step, index }: { step: HelpStep; index: number }) {
@@ -33,6 +33,15 @@ function StepCard({ step, index }: { step: HelpStep; index: number }) {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {step.example && (
+            <div className="rounded-md border-l-2 border-brand-300 bg-muted/50 p-3 dark:border-brand-800">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                For example
+              </p>
+              <p className="mt-1 text-sm leading-relaxed">{step.example}</p>
             </div>
           )}
 
@@ -196,11 +205,55 @@ export default function HelpPage() {
             <CardTitle className="text-lg">Rules that apply to everyone</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
           {UNIVERSAL_RULES.map((rule) => (
             <div key={rule.heading}>
               <p className="font-medium">{rule.heading}</p>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{rule.body}</p>
+              {rule.example && (
+                <p className="mt-2 border-l-2 border-brand-300 pl-3 text-sm leading-relaxed dark:border-brand-800">
+                  <span className="font-medium">For example: </span>
+                  {rule.example}
+                </p>
+              )}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <ListChecks className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-lg">Every status, in plain English</CardTitle>
+          </div>
+          <CardDescription>
+            What each word on screen actually means, and what it asks of you.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {GLOSSARY.map((group) => (
+            <div key={group.heading}>
+              <p className="font-medium">{group.heading}</p>
+              {group.body && (
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{group.body}</p>
+              )}
+              <dl className="mt-3 space-y-2">
+                {group.entries.map((entry) => (
+                  <div
+                    key={entry.term}
+                    className="grid gap-1 rounded-md bg-muted/40 p-3 sm:grid-cols-[10rem_1fr] sm:gap-4"
+                  >
+                    <dt className="text-sm font-medium">{entry.term}</dt>
+                    <dd className="min-w-0 text-sm text-muted-foreground">
+                      {entry.meaning}
+                      {entry.action && (
+                        <span className="mt-1 block text-foreground">→ {entry.action}</span>
+                      )}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </div>
           ))}
         </CardContent>

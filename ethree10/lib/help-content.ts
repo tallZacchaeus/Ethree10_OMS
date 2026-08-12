@@ -19,12 +19,33 @@ export interface HelpStep {
   requires?: string[];
   /** What the system does once the step completes. */
   then?: string[];
+  /**
+   * A concrete worked example. Abstract instructions are easy to nod along to
+   * and hard to act on; a named example with real-looking values is what people
+   * actually pattern-match against.
+   */
+  example?: string;
 }
 
 export interface HelpSection {
   heading: string;
   body?: string;
   steps?: HelpStep[];
+  example?: string;
+}
+
+/** A term, what it means in plain English, and what the reader should do about it. */
+export interface GlossaryEntry {
+  term: string;
+  meaning: string;
+  /** The action this state implies, where there is one. */
+  action?: string;
+}
+
+export interface GlossaryGroup {
+  heading: string;
+  body?: string;
+  entries: GlossaryEntry[];
 }
 
 export interface RoleGuide {
@@ -72,6 +93,109 @@ export const UNIVERSAL_RULES: HelpSection[] = [
     body:
       "Screens hide actions you do not have permission for, but hiding is only a convenience. Every action is checked again on the server. If you think you should be able to do something and cannot, it is a role question for your Agency Admin, not a bug.",
   },
+  {
+    heading: "When the system will contact you, and how",
+    body:
+      "You are notified when work is assigned to you, when a task you own is due soon or overdue, when someone replies on something you are responsible for, when a client comments or accepts delivery, when a budget needs your approval, and when a report you are accountable for is finalized. Notifications appear on the bell in the top bar and in full at Notifications; most also send an email. You can turn individual kinds of email off in Settings — the in-app record always remains, so turning email off never means missing something entirely.",
+    example:
+      "A client replies on REQ-2026-0042 at 14:10. The branch head, the project manager and the Agency Admins each get a bell notification and an email within a minute. Two separate replies produce two separate notifications — repeat messages are never silently merged.",
+  },
+  {
+    heading: "Finding things quickly",
+    body:
+      "The search box in the top bar (or Cmd/Ctrl-K) searches requests, projects, tasks and people at once, and only ever returns things you are already allowed to see. Searching a code such as REQ-2026-0042 or PRJ-2026-0007 jumps straight to that record, which is usually faster than navigating to it.",
+    example:
+      "You are asked about \"the Lightbearers site refresh\". Press Cmd-K, type \"lightbearers\", and the request, its project and its open tasks all appear together.",
+  },
+  {
+    heading: "Codes are the shared language",
+    body:
+      "Every request, project, invoice and receipt gets a permanent human-readable code — REQ-2026-0042, PRJ-2026-0007, INV-2026-0015. Use these in conversation, in comments and in email rather than titles: titles get edited and duplicated, codes never change and are searchable.",
+  },
+  {
+    heading: "Nothing is deleted, and everything is attributable",
+    body:
+      "Actions that matter are written to an append-only audit record: who did what, when, and what changed. Rejections, revisions, budget decisions and payment confirmations all leave a trail that cannot be edited afterwards. This is why the system prefers cancelling and superseding over deleting — a record that can vanish cannot be evidence.",
+  },
+];
+
+/**
+ * Every state a reader will meet on screen, in plain English.
+ *
+ * Mirrors the enums in `prisma/schema.prisma` and the client-facing mapping in
+ * `server/services/client-tracking.ts`. If a state is added there and not here,
+ * people will meet a word on screen that the handbook cannot explain.
+ */
+export const GLOSSARY: GlossaryGroup[] = [
+  {
+    heading: "Request stages",
+    body:
+      "A request moves through these from intake to close. Not every request visits every stage — a straightforward brief often goes submitted → under review → scoping → approved without stopping.",
+    entries: [
+      { term: "Submitted", meaning: "Newly arrived and not yet routed to a branch.", action: "A lead should triage it from the Intake Queue." },
+      { term: "Needs clarification", meaning: "The team has asked the client a question and is waiting.", action: "Chase it if the client has gone quiet — this stage stalls silently." },
+      { term: "Pending approval", meaning: "An approval rule was triggered and someone must sign off before it proceeds.", action: "An agency lead approves or rejects it on the request." },
+      { term: "Under review", meaning: "The agency is assessing feasibility, effort and fit." },
+      { term: "Scoping", meaning: "Deliverables, acceptance criteria and effort are being worked out." },
+      { term: "Proposal", meaning: "A proposal has been prepared for the client." },
+      { term: "Approved", meaning: "Accepted as work the agency will do. A project is created from it." },
+      { term: "In progress", meaning: "Tasks are being delivered." },
+      { term: "In review", meaning: "Work is with a lead for review, or the client asked for changes and it has reopened." },
+      { term: "Delivered", meaning: "Handed to the client, who can now accept or request changes.", action: "Waiting on the client — no internal action." },
+      { term: "Closed", meaning: "The client accepted. The work is finished." },
+      { term: "Rejected", meaning: "The agency declined the request, with a recorded reason." },
+      { term: "On hold", meaning: "Paused deliberately, expected to resume." },
+      { term: "Cancelled", meaning: "Stopped for good, without being delivered." },
+    ],
+  },
+  {
+    heading: "What the client sees instead",
+    body:
+      "Clients never see internal stage names. Their tracking link shows a simplified status, so several internal stages collapse into one client-facing phrase. Useful to know before you tell a client \"you should see it as scoping\" — they will not.",
+    entries: [
+      { term: "Planning", meaning: "Internally: submitted, pending approval, under review, scoping, proposal, or approved." },
+      { term: "Waiting for your response", meaning: "Internally: needs clarification. The client is being asked something." },
+      { term: "Work in progress", meaning: "Internally: in progress or in review." },
+      { term: "Ready for review", meaning: "Internally: delivered. They can accept or request changes." },
+      { term: "Completed", meaning: "Internally: closed." },
+      { term: "Not active", meaning: "Internally: on hold, cancelled or rejected." },
+    ],
+  },
+  {
+    heading: "Task statuses",
+    entries: [
+      { term: "To do", meaning: "Assigned but not started." },
+      { term: "In progress", meaning: "Being worked on." },
+      { term: "Blocked", meaning: "Cannot proceed until something else happens.", action: "Say what you are blocked on in a comment — blocked without a reason reads as stalled." },
+      { term: "In review", meaning: "Submitted for review. Not finished yet.", action: "A lead needs to accept it or send it back." },
+      { term: "Done", meaning: "Reviewed and accepted. Only a lead can make a task done." },
+      { term: "Cancelled", meaning: "No longer needed. Does not block delivery." },
+    ],
+  },
+  {
+    heading: "Budget and invoice states",
+    entries: [
+      { term: "Budget: draft", meaning: "Being prepared, not yet with the Chief Executive." },
+      { term: "Budget: submitted", meaning: "Awaiting the Chief Executive's decision.", action: "Nothing can be invoiced or spent yet." },
+      { term: "Budget: approved", meaning: "Spending and invoicing are unlocked for this project." },
+      { term: "Budget: rejected", meaning: "Sent back with a note.", action: "Revise and resubmit — this clears the previous version." },
+      { term: "Invoice: draft", meaning: "Created but not sent to the client." },
+      { term: "Invoice: sent", meaning: "With the client, awaiting payment." },
+      { term: "Invoice: paid", meaning: "Funds confirmed by Finance. A receipt was issued automatically." },
+      { term: "Invoice: overdue", meaning: "Past its due date and still unpaid." },
+      { term: "Invoice: void", meaning: "Cancelled. Kept for the record rather than deleted." },
+    ],
+  },
+  {
+    heading: "Urgency",
+    body: "Set by a lead during triage, not by the client. It orders the Intake Queue and people's task lists.",
+    entries: [
+      { term: "Low", meaning: "No date pressure." },
+      { term: "Medium", meaning: "The normal default." },
+      { term: "High", meaning: "Ahead of normal work." },
+      { term: "Critical", meaning: "Reserved for genuine emergencies.", action: "Use sparingly — if everything is critical, nothing is." },
+    ],
+  },
 ];
 
 /** The lifecycle every piece of work follows, end to end. */
@@ -85,6 +209,8 @@ export const LIFECYCLE: HelpStep[] = [
       "A private tracking link is generated and shown to them",
       "The request appears in the Intake Queue, unrouted",
     ],
+    example:
+      "Grace at Lightbearers Hub submits \"Website refresh before our December conference\", deadline 1 December, expected deliverables \"new homepage and events page\". It becomes REQ-2026-0042 and she is shown a tracking link to bookmark. Nobody at the agency has touched it yet.",
   },
   {
     title: "2 · A lead triages it",
@@ -92,17 +218,23 @@ export const LIFECYCLE: HelpStep[] = [
       "A branch head, department lead or agency admin opens the Intake Queue, reads what was asked for, sets the service — which routes it to the right branch — and sets the urgency.",
     requires: ["The request is in the Intake Queue", "You can route requests"],
     then: ["The request is routed to a branch", "It appears in that branch's Brief Review"],
+    example:
+      "A department lead opens REQ-2026-0042, sets the service to \"Website build\" — which routes it to Tech & Product — and sets urgency to High because the December conference is fixed. It leaves the Intake Queue and lands in that branch's Brief Review.",
   },
   {
     title: "3 · Scope is agreed with the client",
     detail:
       "In the request's conversation thread. Choose 'client-visible' for anything the client should see; use internal notes for everything else. The client replies from their tracking link.",
     then: ["The client is emailed on client-visible replies and stage changes"],
+    example:
+      "The lead asks Grace, client-visible: \"Do you need online ticket sales, or is a link to Eventbrite enough?\" and moves the request to Needs clarification. Separately they add an internal note: \"If she wants payments this is a much bigger job — flag to the branch head.\" Grace sees the question on her tracking link. She never sees the internal note.",
   },
   {
     title: "4 · The request is accepted and becomes a project",
     detail: "Accepting the brief turns the request into a project owned by a branch.",
     requires: ["The brief is complete enough to work from"],
+    example:
+      "Grace confirms a simple Eventbrite link is fine. The branch head accepts REQ-2026-0042, and PRJ-2026-0007 \"Lightbearers Hub site refresh\" is created under Tech & Product with a target delivery date of 24 November — a week before her conference.",
   },
   {
     title: "5 · The budget is submitted and approved",
@@ -113,6 +245,8 @@ export const LIFECYCLE: HelpStep[] = [
       "Approved: Finance can invoice, and leads can request spend",
       "Rejected: it goes back to the branch to revise and resubmit",
     ],
+    example:
+      "The branch head submits ₦1,800,000 — ₦1,400,000 billed to Lightbearers, ₦400,000 expected agency cost including stock photography. Every Chief Executive is notified. She approves it with the note \"Approved; keep photography under ₦400k.\" Only now can Finance raise an invoice.",
   },
   {
     title: "6 · Work is broken into tasks and assigned",
@@ -122,6 +256,8 @@ export const LIFECYCLE: HelpStep[] = [
       "The assignee is emailed the brief, deadline, priority and a direct link",
       "The task appears in their My Work",
     ],
+    example:
+      "The department lead creates four tasks — \"Homepage wireframe\", \"Events page build\", \"Content migration\", \"Accessibility pass\" — and assigns the first to a designer with an estimate of 12 hours, due 5 November. It lands in that designer's My Work and in their inbox.",
   },
   {
     title: "7 · The task is done and submitted for review",
@@ -129,6 +265,8 @@ export const LIFECYCLE: HelpStep[] = [
       "The assignee logs time, attaches deliverables, and submits a completion summary with evidence and hours.",
     requires: ["The task is assigned to you or you are a contributor"],
     then: ["The task moves to 'in review' — it is NOT done yet"],
+    example:
+      "The designer logs 11.5 hours, attaches the wireframe PDF, and writes: \"Homepage wireframe done — three sections as agreed, conference banner at the top. Open question: Grace has not sent the sponsor logos.\" The task becomes In review. It is not done, and it does not count as complete anywhere.",
   },
   {
     title: "8 · A lead reviews it",
@@ -139,6 +277,8 @@ export const LIFECYCLE: HelpStep[] = [
       "Accepted by the branch head, and any required specialist review passed: the task becomes 'done'",
       "Revisions requested: it returns to 'in progress' for the assignee",
     ],
+    example:
+      "The lead sends it back once: \"Good, but the conference date needs to be visible without scrolling on mobile.\" The task returns to In progress at revision 2. The designer fixes it and resubmits; this time the lead accepts and it becomes Done. Both the rejection and its reason stay on the record permanently.",
   },
   {
     title: "9 · The project is delivered to the client",
@@ -153,6 +293,8 @@ export const LIFECYCLE: HelpStep[] = [
       "The request stage becomes 'delivered'",
       "The client is emailed and can accept or request changes from their link",
     ],
+    example:
+      "All four tasks are Done. The lead delivers PRJ-2026-0007. Grace gets an email; her tracking link now reads \"Ready for review\" and shows the deliverables marked client-visible — the wireframe PDF and the staging URL. The internal notes about sponsor logos are not there.",
   },
   {
     title: "10 · The client accepts, and it is billed",
@@ -162,6 +304,8 @@ export const LIFECYCLE: HelpStep[] = [
       "Finance sends the invoice (only if the budget is approved)",
       "Finance confirms funds received, which issues the receipt automatically",
     ],
+    example:
+      "Grace accepts. The request closes. Finance raises INV-2026-0015 for ₦1,400,000 and sends it — allowed because the budget is approved. Two weeks later the transfer lands; Finance confirms it with the bank reference, the invoice becomes Paid and a receipt is issued automatically. Note the Chief Executive who approved the budget could not have confirmed this payment herself.",
   },
 ];
 
@@ -391,16 +535,22 @@ export const ROLE_GUIDES: RoleGuide[] = [
             detail:
               "Choosing the service routes the request to the right branch. If it belongs to the other branch, re-route it.",
             then: ["It moves into that branch's Brief Review"],
+            example:
+              "\"We need a video for our product launch and a landing page to host it\" is two services and two branches. Route the piece that leads — usually the one with the fixed date — and raise the other as its own request rather than letting half the job go untracked.",
           },
           {
             title: "Agree the scope in the thread",
             detail:
               "Ask the client what you still need. Use client-visible replies for anything they should see; keep internal notes internal.",
             then: ["The client is emailed and can reply from their tracking link"],
+            example:
+              "Ask for the things that change the estimate, not everything at once: \"Do you have brand assets, or should we design from scratch?\" and \"Is 1 December fixed, or is it the conference date that matters?\" Two precise questions get answered; ten do not.",
           },
           {
             title: "Accept it",
             detail: "This turns the request into a project you own.",
+            example:
+              "Accept once you could write the task list without asking anything else. Accepting a vague brief moves the argument to review time, when someone has already spent the hours.",
           },
         ],
       },
@@ -522,10 +672,14 @@ export const ROLE_GUIDES: RoleGuide[] = [
             title: "Move it to 'in progress' and log time as you go",
             detail:
               "Logging time is what keeps Workload honest for everyone, and it feeds your own contribution record.",
+            example:
+              "Log 3.5 hours on Tuesday and 4 on Wednesday as you go, rather than 7.5 in one entry on Friday. Your lead reads Workload to decide who gets the next job; a week of blank entries makes you look free when you are not.",
           },
           {
             title: "Attach deliverables",
             detail: "Add versions as you produce them so the review has something concrete to look at.",
+            example:
+              "Attach \"homepage-wireframe-v1.pdf\" when you have something reviewable, then \"v2\" after feedback, rather than replacing the file. The revision history is what shows the work responded to the review.",
           },
           {
             title: "Submit for review",
@@ -535,6 +689,8 @@ export const ROLE_GUIDES: RoleGuide[] = [
               "The task moves to 'in review' — it is not done yet",
               "Your lead is notified",
             ],
+            example:
+              "Good: \"Built the events page with the Eventbrite link as agreed. Tested on mobile and desktop. 11.5 hours. Staging: staging.lightbearers.org/events. Note: sponsor logos still outstanding from the client.\" Weak: \"Done.\" The first can be reviewed immediately; the second forces your lead to come and ask.",
           },
         ],
       },
