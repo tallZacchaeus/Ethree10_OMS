@@ -1,12 +1,15 @@
-import type { User } from "next-auth";
-
 import { AccountMenu } from "@/components/layout/account-menu";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { GlobalSearch } from "@/components/layout/global-search";
 
 interface AppTopbarProps {
-  user: User;
+  /**
+   * Read from the database by the layout, not from the session. The JWT is
+   * stamped at sign-in and never refreshed, so `session.user.image` kept
+   * showing the old avatar after a profile save until the user logged out.
+   */
+  user: { name: string | null; email: string | null; image: string | null };
 }
 
 export function AppTopbar({ user }: AppTopbarProps) {

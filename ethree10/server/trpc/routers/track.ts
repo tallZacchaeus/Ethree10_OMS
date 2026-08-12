@@ -17,6 +17,33 @@ async function agencyLeadUserIds() {
   return leads.map((membership) => membership.userId);
 }
 
+/**
+ * Everyone who should hear about a client message on a request.
+ *
+ * Previously this was "the routed branch head, or else agency admins". That
+ * missed the person most likely to act on it — the project manager running the
+ * work — and went silent altogether when the routed branch had no lead
+ * assigned. Agency admins are always included as a backstop so a client
+ * message can never land with nobody watching.
+ */
+async function clientMessageRecipients(requestId: string): Promise<string[]> {
+  const request = await db.request.findUnique({
+    where: { id: requestId },
+    select: {
+      routedTeam: { select: { leadId: true } },
+      project: { select: { pmUserId: true } },
+    },
+  });
+
+  const recipients = [
+    request?.routedTeam?.leadId,
+    request?.project?.pmUserId,
+    ...(await agencyLeadUserIds()),
+  ].filter((id): id is string => Boolean(id));
+
+  return Array.from(new Set(recipients));
+}
+
 const tokenInput = z.string().min(32).max(128);
 
 export const trackRouter = router({
@@ -42,15 +69,18 @@ export const trackRouter = router({
           isInternal: false,
         },
       });
-      const recipients = request.routedTeam?.leadId ? [request.routedTeam.leadId] : await agencyLeadUserIds();
+      const recipients = await clientMessageRecipients(request.id);
       if (recipients.length) {
         await NotificationService.createMany(recipients, {
           kind: "mention",
-          title: `Client comment on ${request.code}`,
+          title: `Client replied on ${request.code}`,
           body: input.body.slice(0, 140),
           link: `/requests/${request.id}`,
           entityType: "Request",
           entityId: request.id,
+          // Every client reply is new content. Without this, a second message
+          // inside the dedup window is swallowed and nobody is told.
+          allowDuplicate: true,
         });
       }
       return { id: comment.id, createdAt: comment.createdAt };

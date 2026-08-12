@@ -23,9 +23,20 @@ describe("permissions.can", () => {
     expect(can(memberCtx, "team.create")).toBe(false);
   });
 
-  it("member can create requests", () => {
-    expect(can(memberCtx, "request.create")).toBe(true);
+  it("member has no access to the request pipeline", () => {
+    // Requests are lead territory: intake, triage and client correspondence.
+    // A team member sees the resulting work as tasks, not the client brief.
+    expect(can(memberCtx, "request.read")).toBe(false);
+    expect(can(memberCtx, "request.create")).toBe(false);
     expect(can(memberCtx, "request.approve")).toBe(false);
+    expect(can(memberCtx, "task.read")).toBe(true);
+  });
+
+  it("leads retain request access", () => {
+    const branchHeadCtx: AuthContext = { isSuperAdmin: false, roles: ["branch_head"] };
+    const deptLeadCtx: AuthContext = { isSuperAdmin: false, roles: ["department_lead"] };
+    expect(can(branchHeadCtx, "request.read")).toBe(true);
+    expect(can(deptLeadCtx, "request.read")).toBe(true);
   });
 
   it("finance_manager is read-only for operations", () => {

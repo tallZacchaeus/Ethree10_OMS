@@ -112,17 +112,17 @@ export default function RequestDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{request.title}</h1>
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight">{request.title}</h1>
             <span className="font-mono text-xs text-muted-foreground">{request.code}</span>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="break-words text-sm text-muted-foreground">
             {request.organization?.name} · submitted by{" "}
             {request.submitter?.name ?? request.requesterName ?? "—"} · {formatDate(request.createdAt)}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <StatusPill kind="request" value={request.stage} />
           <UrgencyTag value={request.urgency} />
         </div>
@@ -131,29 +131,32 @@ export default function RequestDetailPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {request.stage === "pending_approval" && isAgencyStaff && (
           <div className="col-span-full rounded-md border border-amber-500 bg-amber-50 p-4 text-amber-900 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
                 <h4 className="font-semibold">Approval Required</h4>
                 <p className="text-sm">This request triggered an approval rule and requires sign-off before proceeding.</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex shrink-0 gap-2">
                 <Button size="sm" onClick={() => transition.mutate({ id, toStage: "under_review" })}>Approve</Button>
                 <Button size="sm" variant="outline" onClick={() => transition.mutate({ id, toStage: "rejected" })}>Reject</Button>
               </div>
             </div>
           </div>
         )}
-        <div className="space-y-6 lg:col-span-2">
+        {/* `min-w-0` on both columns: a grid item defaults to `min-width: auto`,
+            so a single long URL or unbroken word in the description would widen
+            the column past the viewport and scroll the whole page sideways. */}
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>Description</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="whitespace-pre-wrap text-sm">{request.description}</p>
+              <p className="whitespace-pre-wrap break-words text-sm">{request.description}</p>
             </CardContent>
           </Card>
 
-          <Card><CardHeader><CardTitle>Requested outcome</CardTitle></CardHeader><CardContent className="space-y-4 text-sm"><div><strong>Outcome</strong><p className="whitespace-pre-wrap text-muted-foreground">{request.expectedOutcome || "Not supplied"}</p></div><div><strong>Deliverables</strong><p className="whitespace-pre-wrap text-muted-foreground">{request.expectedDeliverables || "Not supplied"}</p></div><div><strong>Acceptance criteria</strong><p className="whitespace-pre-wrap text-muted-foreground">{request.acceptanceCriteria || "Not supplied"}</p></div>{request.supportingLinks.length > 0 && <div><strong>Supporting links</strong><ul className="list-disc pl-5">{request.supportingLinks.map((link) => <li key={link}><a className="text-brand-600 hover:underline" href={link} target="_blank" rel="noreferrer">{link}</a></li>)}</ul></div>}</CardContent></Card>
+          <Card><CardHeader><CardTitle>Requested outcome</CardTitle></CardHeader><CardContent className="space-y-4 text-sm"><div><strong>Outcome</strong><p className="whitespace-pre-wrap break-words text-muted-foreground">{request.expectedOutcome || "Not supplied"}</p></div><div><strong>Deliverables</strong><p className="whitespace-pre-wrap break-words text-muted-foreground">{request.expectedDeliverables || "Not supplied"}</p></div><div><strong>Acceptance criteria</strong><p className="whitespace-pre-wrap break-words text-muted-foreground">{request.acceptanceCriteria || "Not supplied"}</p></div>{request.supportingLinks.length > 0 && <div><strong>Supporting links</strong><ul className="list-disc pl-5">{request.supportingLinks.map((link) => <li key={link} className="min-w-0"><a className="break-all text-brand-600 hover:underline" href={link} target="_blank" rel="noreferrer">{link}</a></li>)}</ul></div>}</CardContent></Card>
 
           <Card>
             <CardHeader>
@@ -167,8 +170,8 @@ export default function RequestDetailPage() {
             </CardContent>
           </Card>
 
-          <Tabs defaultValue="comments">
-            <TabsList>
+          <Tabs defaultValue="comments" className="min-w-0">
+            <TabsList className="max-w-full overflow-x-auto">
               <TabsTrigger value="comments">Comments</TabsTrigger>
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
               {(request.stage === "scoping" || request.stage === "proposal" || request.stage === "approved") && (
@@ -193,17 +196,17 @@ export default function RequestDetailPage() {
                             : "rounded-lg bg-muted/50 p-4"
                       }
                     >
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-2 text-sm font-semibold">
+                      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                        <span className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold">
                           {comment.author?.name ?? comment.authorName ?? "Client"}
                           {isClient && <Badge variant="default">Client</Badge>}
                           {comment.isInternal && <Badge variant="warning">Internal</Badge>}
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="shrink-0 text-xs text-muted-foreground">
                           {formatDateTime(comment.createdAt)}
                         </span>
                       </div>
-                      <p className="whitespace-pre-wrap text-sm">{comment.body}</p>
+                      <p className="whitespace-pre-wrap break-words text-sm">{comment.body}</p>
                     </div>
                   );
                 })
@@ -239,11 +242,11 @@ export default function RequestDetailPage() {
 
             <TabsContent value="timeline" className="space-y-3 pt-4">
               {request.stageEvents.map((event) => (
-                <div key={event.id} className="flex gap-4 text-sm">
+                <div key={event.id} className="flex flex-col gap-1 text-sm sm:flex-row sm:gap-4">
                   <span className="w-40 shrink-0 text-muted-foreground">
                     {formatDateTime(event.createdAt)}
                   </span>
-                  <span>
+                  <span className="min-w-0 break-words">
                     {event.fromStage ? `${humanize(event.fromStage)} → ` : ""}
                     <span className="font-medium">{humanize(event.toStage)}</span>
                     {event.note ? ` — ${event.note}` : ""}
@@ -258,7 +261,7 @@ export default function RequestDetailPage() {
           </Tabs>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Details</CardTitle>
@@ -297,10 +300,10 @@ export default function RequestDetailPage() {
                   <Separator />
                   <div className="space-y-2">
                     <div className="text-xs font-medium text-muted-foreground">Client</div>
-                    <p className="text-sm">
+                    <p className="text-sm break-words">
                       {request.requesterName ?? "—"}
                       {request.requesterEmail && (
-                        <span className="block text-xs text-muted-foreground">{request.requesterEmail}</span>
+                        <span className="block break-all text-xs text-muted-foreground">{request.requesterEmail}</span>
                       )}
                     </p>
                     <Button
@@ -400,9 +403,9 @@ export default function RequestDetailPage() {
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <div className="mb-0.5 text-xs font-medium text-muted-foreground">{label}</div>
-      <div>{value}</div>
+      <div className="break-words">{value}</div>
     </div>
   );
 }

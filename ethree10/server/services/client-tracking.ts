@@ -168,6 +168,9 @@ export class ClientTrackingService {
         link: `/projects/${project.id}`,
         entityType: "Project",
         entityId: project.id,
+        // A client accepting, then re-opening with changes, inside the same
+        // hour is two decisions — dedup must not collapse them into one.
+        allowDuplicate: true,
       });
     }
     await AuditService.log({

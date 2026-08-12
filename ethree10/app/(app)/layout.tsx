@@ -44,7 +44,13 @@ export default async function AppLayout({
         isSuperAdmin={dbUser?.isSuperAdmin ?? false}
       />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <AppTopbar user={session.user} />
+        <AppTopbar
+          user={{
+            name: dbUser?.name ?? session.user.name ?? null,
+            email: dbUser?.email ?? session.user.email ?? null,
+            image: dbUser?.avatarUrl ?? null,
+          }}
+        />
         <main
           id="main-content"
           tabIndex={-1}
