@@ -23,11 +23,11 @@ describe("permissions.can", () => {
     expect(can(memberCtx, "team.create")).toBe(false);
   });
 
-  it("member has no access to the request pipeline", () => {
-    // Requests are lead territory: intake, triage and client correspondence.
-    // A team member sees the resulting work as tasks, not the client brief.
+  it("member can raise a request but not read the pipeline", () => {
+    // Raising work is open to everyone; reading other people's requests is not.
+    // Their own submissions come back via myRequests, which is self-scoped.
+    expect(can(memberCtx, "request.create")).toBe(true);
     expect(can(memberCtx, "request.read")).toBe(false);
-    expect(can(memberCtx, "request.create")).toBe(false);
     expect(can(memberCtx, "request.approve")).toBe(false);
     expect(can(memberCtx, "task.read")).toBe(true);
   });

@@ -34,9 +34,9 @@ export const DELIVERY_LEAD_ROLES: Role[] = [
 ];
 
 /**
- * May open the Requests area at all. Mirrors exactly which roles hold
- * `request.read` in ROLE_PERMISSIONS — nav gating and the router must agree, or
- * the sidebar advertises a page that then 403s.
+ * May read the whole request pipeline, not just their own submissions. Mirrors
+ * exactly which roles hold `request.read` in ROLE_PERMISSIONS — the screens and
+ * the router must agree, or a page renders a query the server then rejects.
  */
 export const REQUEST_ACCESS_ROLES: Role[] = [
   "chief_executive",

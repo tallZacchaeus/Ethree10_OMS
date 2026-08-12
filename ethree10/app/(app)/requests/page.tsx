@@ -16,15 +16,20 @@ export default function RequestsPage() {
   const { roles, isSuperAdmin } = useAgencyContext();
   const [stageFilter, setStageFilter] = useState<RequestStage | "ALL">("ALL");
 
-  // Same role set the router enforces via `request.read`. Checked here only so
-  // a deep link shows an explanation instead of a failed query.
+  // Same role set the router enforces via `request.read`. Anyone else may still
+  // raise a request and follow their own — they just don't see the pipeline —
+  // so the two queries are mutually exclusive rather than one being gated off.
   const canReadRequests =
     isSuperAdmin || roles.some((r: Role) => REQUEST_ACCESS_ROLES.includes(r));
 
-  const { data: requests, isLoading } = trpc.requests.list.useQuery(
+  const pipeline = trpc.requests.list.useQuery(
     { stage: stageFilter !== "ALL" ? stageFilter : undefined },
     { enabled: canReadRequests },
   );
+  const own = trpc.requests.myRequests.useQuery(undefined, { enabled: !canReadRequests });
+
+  const requests = canReadRequests ? pipeline.data : own.data;
+  const isLoading = canReadRequests ? pipeline.isLoading : own.isLoading;
 
   const getUrgencyBadge = (urgency: string) => {
     switch (urgency) {
@@ -47,28 +52,18 @@ export default function RequestsPage() {
     }
   };
 
-  if (!canReadRequests) {
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardContent className="py-12 text-center">
-            <h1 className="text-lg font-semibold">Requests are limited to leads</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Client requests are handled by branch and department leads. Your assigned work
-              is on <Link href="/tasks" className="text-brand-600 hover:underline">My Work</Link>.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div className="min-w-0">
-          <h1 className="text-3xl font-bold tracking-tight">Requests</h1>
-          <p className="text-muted-foreground">Manage and track project requests.</p>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {canReadRequests ? "Requests" : "Your requests"}
+          </h1>
+          <p className="text-muted-foreground">
+            {canReadRequests
+              ? "Manage and track project requests."
+              : "Requests you have raised. The wider pipeline is handled by branch and department leads."}
+          </p>
         </div>
         <Link href="/requests/new" className="shrink-0">
           <Button>New Request</Button>
@@ -78,7 +73,7 @@ export default function RequestsPage() {
       <Card>
         <CardHeader className="py-4">
           <div className="flex items-center gap-4">
-            <div className="w-[200px]">
+            <div className={canReadRequests ? "w-[200px]" : "hidden"}>
               <Select value={stageFilter} onValueChange={(v) => setStageFilter(v as RequestStage | "ALL")}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by status" />
@@ -103,7 +98,9 @@ export default function RequestsPage() {
             <div className="text-center py-8 text-muted-foreground">Loading requests...</div>
           ) : requests?.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              No requests found matching your filters.
+              {canReadRequests
+                ? "No requests found matching your filters."
+                : "You haven't raised any requests yet."}
             </div>
           ) : (
             <Table>
