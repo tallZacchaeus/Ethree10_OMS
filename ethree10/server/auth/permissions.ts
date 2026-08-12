@@ -216,17 +216,19 @@ const ROLE_PERMISSIONS: Record<Role, Action[]> = {
   // Delivers the work. Project-management actions come from the
   // canManageProjects capability toggle, not from this base role.
   //
-  // Deliberately has NO request permissions. The request pipeline — intake,
-  // triage, client correspondence, budget estimates — is lead territory; a
-  // team member sees the work that came out of it as tasks, not the raw
-  // client brief. Granting `request.read` here made every request in the
-  // member's branch readable by everyone in it.
+  // May raise a request, but not read the pipeline. Intake, triage, client
+  // correspondence and budget estimates are lead territory; a team member sees
+  // the work that came out of it as tasks, not the raw client brief. Granting
+  // `request.read` here made every request in the member's branch readable by
+  // everyone in it. Their own submissions stay visible via `myRequests` and
+  // the owner escape in `assertCanReadRequest`.
   team_member: [
     "organization.read",
     "team.read",
     "subunit.read",
     "member.read",
     "service.read",
+    "request.create",
     "project.read",
     "task.read", "task.update", "task.submitCompletion",
     "comment.create",

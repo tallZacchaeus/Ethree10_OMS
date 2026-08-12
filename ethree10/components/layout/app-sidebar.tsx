@@ -34,7 +34,6 @@ import {
 } from "lucide-react";
 import type { Role } from "@prisma/client";
 
-import { REQUEST_ACCESS_ROLES } from "@/server/auth/role-groups";
 import { E310Logo } from "@/components/brand/e310-logo";
 import { cn } from "@/lib/utils/cn";
 
@@ -80,8 +79,9 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       // Triage queue — only people who can actually route work should see it.
       { href: "/inbox", label: "Intake Queue", icon: Inbox, allow: DELIVERY_LEADS },
-      // Requests are lead-only, same as the router's `request.read` gate.
-      { href: "/requests", label: "Requests", icon: FileText, allow: REQUEST_ACCESS_ROLES },
+      // Everyone can raise a request and follow their own. The page itself
+      // shows the full pipeline only to roles holding `request.read`.
+      { href: "/requests", label: "Requests", icon: FileText, allow: "all" },
       { href: "/projects", label: "Projects", icon: FolderKanban, allow: "all" },
     ],
   },
