@@ -25,7 +25,10 @@ export function AccountMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-2 rounded-md p-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <Avatar className="h-8 w-8">
+        {/* Keyed on the image: Radix keeps its "loaded" status when AvatarImage
+            unmounts, so removing a photo would otherwise leave a blank circle
+            with no initials until the next full page load. */}
+        <Avatar key={image ?? "none"} className="h-8 w-8">
           {image ? <AvatarImage src={image} alt={name ?? "User"} /> : null}
           <AvatarFallback>{initials(name ?? email)}</AvatarFallback>
         </Avatar>

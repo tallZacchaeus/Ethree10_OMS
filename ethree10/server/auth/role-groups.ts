@@ -33,6 +33,19 @@ export const DELIVERY_LEAD_ROLES: Role[] = [
   "department_lead",
 ];
 
+/**
+ * May open the Requests area at all. Mirrors exactly which roles hold
+ * `request.read` in ROLE_PERMISSIONS — nav gating and the router must agree, or
+ * the sidebar advertises a page that then 403s.
+ */
+export const REQUEST_ACCESS_ROLES: Role[] = [
+  "chief_executive",
+  "agency_admin",
+  "finance_manager",
+  "branch_head",
+  "department_lead",
+];
+
 /** Leads a branch or the whole agency — may restructure teams and services. */
 export const BRANCH_LEAD_ROLES: Role[] = ["agency_admin", "branch_head"];
 

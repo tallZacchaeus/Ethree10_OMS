@@ -41,6 +41,15 @@ export interface CreateNotificationArgs {
   link?: string | null;
   entityType?: string | null;
   entityId?: string | null;
+  /**
+   * Suppress the hour-long dedup window for this notification.
+   *
+   * Dedup exists to stop repeated *state* notifications about the same entity
+   * stacking up. It is wrong for events that carry new content each time —
+   * a client posting two messages on one request within the hour is two things
+   * to read, not a duplicate, and collapsing them silently dropped the second.
+   */
+  allowDuplicate?: boolean;
 }
 
 /**
@@ -49,7 +58,7 @@ export interface CreateNotificationArgs {
  */
 export class NotificationService {
   static async create(args: CreateNotificationArgs) {
-    if (args.entityId && args.entityType) {
+    if (!args.allowDuplicate && args.entityId && args.entityType) {
       const recent = await db.notification.findFirst({
         where: {
           userId: args.userId,

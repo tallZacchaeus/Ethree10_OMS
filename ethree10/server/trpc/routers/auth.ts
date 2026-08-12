@@ -51,7 +51,16 @@ export const authRouter = router({
   }),
 
   updateProfile: protectedProcedure
-    .input(z.object({ name: z.string().optional(), timezone: z.string().optional(), workingHoursPerWeek: z.number().optional() }))
+    .input(
+      z.object({
+        name: z.string().optional(),
+        timezone: z.string().optional(),
+        workingHoursPerWeek: z.number().optional(),
+        // An empty string clears the avatar and falls back to initials, so the
+        // field has to distinguish "not supplied" (undefined) from "removed".
+        avatarUrl: z.union([z.string().url(), z.literal("")]).optional(),
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       return ctx.db.user.update({
         where: { id: ctx.userId },
@@ -59,6 +68,7 @@ export const authRouter = router({
           name: input.name,
           timezone: input.timezone,
           workingHoursPerWeek: input.workingHoursPerWeek,
+          avatarUrl: input.avatarUrl === undefined ? undefined : input.avatarUrl || null,
         },
       });
     }),
