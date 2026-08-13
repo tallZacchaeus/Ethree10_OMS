@@ -12,6 +12,7 @@ import type { Role } from "@prisma/client";
 /** Every internal staff role. Everyone who logs in is one of these. */
 export const STAFF_ROLES: Role[] = [
   "chief_executive",
+  "chief_operating_officer",
   "agency_admin",
   "finance_manager",
   "branch_head",
@@ -22,12 +23,14 @@ export const STAFF_ROLES: Role[] = [
 /** Can see the whole agency, across every branch. Read scope, not write scope. */
 export const AGENCY_WIDE_ROLES: Role[] = [
   "chief_executive",
+  "chief_operating_officer",
   "agency_admin",
   "finance_manager",
 ];
 
 /** Runs delivery: routes work, assigns people, reviews output. */
 export const DELIVERY_LEAD_ROLES: Role[] = [
+  "chief_operating_officer",
   "agency_admin",
   "branch_head",
   "department_lead",
@@ -40,6 +43,7 @@ export const DELIVERY_LEAD_ROLES: Role[] = [
  */
 export const REQUEST_ACCESS_ROLES: Role[] = [
   "chief_executive",
+  "chief_operating_officer",
   "agency_admin",
   "finance_manager",
   "branch_head",
@@ -47,7 +51,7 @@ export const REQUEST_ACCESS_ROLES: Role[] = [
 ];
 
 /** Leads a branch or the whole agency — may restructure teams and services. */
-export const BRANCH_LEAD_ROLES: Role[] = ["agency_admin", "branch_head"];
+export const BRANCH_LEAD_ROLES: Role[] = ["chief_operating_officer", "agency_admin", "branch_head"];
 
 /** Touches money. Deliberately excludes agency_admin and the Chief Executive. */
 export const FINANCE_ROLES: Role[] = ["finance_manager"];
@@ -59,6 +63,7 @@ export const BUDGET_APPROVER_ROLES: Role[] = ["chief_executive"];
 export const ROLE_LABELS: Record<Role, string> = {
   super_admin: "Super Admin",
   chief_executive: "Chief Executive",
+  chief_operating_officer: "Chief Operating Officer",
   agency_admin: "Agency Admin",
   finance_manager: "Finance Manager",
   branch_head: "Branch Head",
@@ -71,6 +76,8 @@ export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   super_admin: "Technical platform owner. Full access.",
   chief_executive:
     "Oversees the whole agency and approves project budgets. Views everything; comments but does not assign or route.",
+  chief_operating_officer:
+    "Runs the agency day to day, second to the Chief Executive. Full operations and agency-wide visibility. Does not approve budgets unless the Chief Executive delegates it, and never confirms payments.",
   agency_admin:
     "Runs agency operations, people and configuration. No budget approval or payments.",
   finance_manager:

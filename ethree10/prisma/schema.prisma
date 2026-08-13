@@ -137,6 +137,10 @@ enum Role {
   /// Chief Executive. Sees everything, approves project budgets, may write notes.
   /// Deliberately has no assignment, routing or delivery write power.
   chief_executive
+  /// Chief Operating Officer. Below the Chief Executive, above every other role.
+  /// Full operations and agency-wide read; never approves budgets by role, and
+  /// never executes payments. See docs/coo-role-plan.md.
+  chief_operating_officer
   /// Runs agency operations and configuration. No budget approval, no payments.
   agency_admin
   /// Confirms payments and issues receipts. Cannot approve the budgets it pays against.
