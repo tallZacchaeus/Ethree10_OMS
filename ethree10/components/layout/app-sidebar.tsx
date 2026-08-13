@@ -58,7 +58,11 @@ const DELIVERY_LEADS: Role[] = ["agency_admin", "branch_head", "department_lead"
 const BRANCH_LEADS: Role[] = ["agency_admin", "branch_head"];
 // Sees the whole agency across every branch.
 const AGENCY_WIDE: Role[] = ["chief_executive", "agency_admin", "finance_manager"];
-const AGENCY_ADMIN: Role[] = ["agency_admin"];
+// Agency configuration surfaces. The COO belongs here because `integration.manage`
+// moved to it — without this the only role that can connect an integration cannot
+// reach the page. The rest of the COO's navigation is wired up in step 2 of
+// docs/coo-role-plan.md.
+const AGENCY_ADMIN: Role[] = ["chief_operating_officer", "agency_admin"];
 // Money. The Chief Executive approves budgets; Finance moves the money.
 const FINANCE: Role[] = ["finance_manager"];
 const BUDGET_APPROVER: Role[] = ["chief_executive"];

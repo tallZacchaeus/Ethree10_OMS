@@ -110,13 +110,14 @@ Permissions are a union type `Action` in `server/auth/permissions.ts`. The `ROLE
 
 Named role groups live in `server/auth/role-groups.ts` (`AGENCY_WIDE_ROLES`, `DELIVERY_LEAD_ROLES`, `FINANCE_ROLES`, …) plus helpers like `hasAgencyWideScope()`. **Use these rather than inlining role arrays** — copy-pasted arrays are how the previous model drifted apart.
 
-The seven roles:
+The eight roles:
 
 | Role | Purpose |
 |---|---|
 | `super_admin` | Technical platform owner. Escape hatch, not operational. |
 | `chief_executive` | Overall head. Agency-wide read, comments, and the **only** role that can approve a budget. No delivery writes. |
-| `agency_admin` | Runs operations and configuration. **No** budget approval or payments. |
+| `chief_operating_officer` | Second to the Chief Executive. Runs operations agency-wide. A strict superset of `agency_admin`, `branch_head` and `department_lead`: it alone may create/archive branches, archive departments and client orgs, delete requests/projects/tasks, and manage integrations. Never approves budgets by role (delegation only — see `docs/coo-role-plan.md`) and never confirms payments. |
+| `agency_admin` | Runs operations and configuration: people, services, skills, routing, assignment, review. **Cannot** reshape the agency (create/archive branches, archive departments or client orgs), delete records, or manage integrations — those are the COO's. No budget approval or payments. |
 | `finance_manager` | Invoices, confirms payments, issues receipts, pays expenses. **Cannot** approve budgets. |
 | `branch_head` | Heads a branch (`Team`) and its departments. Full delivery authority within it. |
 | `department_lead` | Leads a department (`SubUnit`). Assigns and reviews that department's work. |

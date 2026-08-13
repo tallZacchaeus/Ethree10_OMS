@@ -1,7 +1,7 @@
 # Plan — Chief Operating Officer role
 
-**Status:** proposal, not yet implemented
-**Date:** 2026-08-12
+**Status:** step 1 complete (role, permissions, migration, seed). Steps 2–5 outstanding — see §6.
+**Date:** 2026-08-12, updated 2026-08-13
 
 Adds a seventh operational role, `chief_operating_officer` (COO): below the Chief
 Executive, above every other role, excluding `super_admin`.
@@ -51,17 +51,30 @@ unchanged:** no role other than `chief_executive` ever holds `budget.approve` in
 
 ## 3. Permission set
 
-A union of `agency_admin` (everything) and `chief_executive`'s read surface.
-Concretely, `agency_admin`'s list plus:
+**Implementation note (2026-08-13).** The original plan assumed a union of
+`agency_admin` and the Chief Executive's read surface would produce a superset.
+It did not: `agency_admin` already held every read the Chief Executive has
+except `budget.approve`, so the union was *identical* to `agency_admin` — 53
+actions each, zero difference. The COO would have outranked nobody.
+
+`agency_admin` was therefore narrowed. These eight actions are now COO-only:
 
 ```
-audit.read          (agency_admin already has it — no change)
-integration.read    (agency_admin already has it — no change)
-invoice.read
-receipt.read
-expense.read
-budget.read
+organization.archive              retiring a client relationship
+team.create / team.archive        creating or retiring a branch
+subunit.archive                   retiring a department
+request.delete / project.delete   irreversible; the system prefers
+task.delete                       cancelling and superseding
+integration.manage                moves agency data outside the system
 ```
+
+`agency_admin` keeps every day-to-day power: inviting and managing people,
+services, skills, routing, assignment, review, and creating organisations,
+departments, projects and tasks. It also keeps `integration.read`.
+
+`tests/unit/authorization.test.ts` asserts both halves — that the COO holds
+everything `agency_admin`, `branch_head` and `department_lead` hold, and that
+the difference over `agency_admin` is exactly these eight.
 
 **Deliberately excluded:**
 

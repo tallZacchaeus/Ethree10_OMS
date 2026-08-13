@@ -224,6 +224,12 @@ async function main() {
       title: "Chief Executive",
     },
     {
+      email: "operations@ethree10.r4c.global",
+      name: "Ngozi Adeleke",
+      role: Role.chief_operating_officer,
+      title: "Chief Operating Officer",
+    },
+    {
       email: "admin.ops@ethree10.r4c.global",
       name: "Tunde Bakare",
       role: Role.agency_admin,
