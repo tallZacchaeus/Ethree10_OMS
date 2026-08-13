@@ -63,6 +63,8 @@ export type Action =
   | "budget.read"
   | "budget.submit"
   | "budget.approve"
+  /// Grant another user time-boxed budget.approve. Chief Executive only.
+  | "budget.delegate"
   | "payment.confirm"
   | "expense.read"
   | "expense.request"
@@ -81,6 +83,12 @@ export interface AuthContext {
   isSuperAdmin: boolean;
   roles: Role[];
   capabilities?: Capabilities;
+  /**
+   * Actions granted by an active delegation rather than by a role. Kept separate
+   * from `roles` on purpose: the role map stays the single answer to "what may
+   * this role do", and a delegation is visible as the exception it is.
+   */
+  delegatedActions?: Action[];
 }
 
 /** Actions unlocked by the `canManageProjects` capability toggle. */
@@ -125,7 +133,7 @@ export const ROLE_PERMISSIONS: Record<Role, Action[]> = {
     "integration.read",
     "report.read", "report.generate",
     "invoice.read", "receipt.read",
-    "budget.read", "budget.approve",
+    "budget.read", "budget.approve", "budget.delegate",
     "expense.read",
   ],
 
@@ -326,6 +334,9 @@ export function assertSeparationOfDuties(roles: Role[]): void {
 export function can(ctx: AuthContext, action: Action): boolean {
   if (ctx.isSuperAdmin) return true;
   if (ctx.roles.some((role) => ROLE_PERMISSIONS[role]?.includes(action))) return true;
+  // Time-boxed grants resolved from BudgetApprovalDelegation. Checked last so a
+  // delegation can only ever add, never mask a role decision.
+  if (ctx.delegatedActions?.includes(action)) return true;
   if (ctx.capabilities?.canManageProjects && CAN_MANAGE_PROJECTS_ACTIONS.includes(action)) {
     return true;
   }

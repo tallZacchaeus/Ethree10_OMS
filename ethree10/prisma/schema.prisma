@@ -50,26 +50,29 @@ model User {
   skills                  UserSkill[]
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
-  auditLogs               AuditLog[]               @relation("ActorAuditLogs")
+  auditLogs               AuditLog[]                 @relation("ActorAuditLogs")
   authoredComments        TaskComment[]
-  authoredReports         Report[]                 @relation("ReportAuthoredBy")
-  finalizedReports        Report[]                 @relation("ReportFinalizedBy")
+  authoredReports         Report[]                   @relation("ReportAuthoredBy")
+  finalizedReports        Report[]                   @relation("ReportFinalizedBy")
   reportAmendments        ReportAmendment[]
-  timeLogs                TimeLog[]                @relation("UserTimeLogs")
-  taskContributions       TaskContributor[]        @relation("TaskContributors")
+  timeLogs                TimeLog[]                  @relation("UserTimeLogs")
+  taskContributions       TaskContributor[]          @relation("TaskContributors")
   staffAvailability       StaffAvailability[]
-  createdDeliverables     Deliverable[]            @relation("DeliverableCreatedBy")
-  deliverableVersions     DeliverableVersion[]     @relation("DeliverableVersionCreatedBy")
-  taskReviews             TaskReview[]             @relation("TaskReviews")
-  uploadedAttachments     Attachment[]             @relation("AttachmentUploadedBy")
+  createdDeliverables     Deliverable[]              @relation("DeliverableCreatedBy")
+  deliverableVersions     DeliverableVersion[]       @relation("DeliverableVersionCreatedBy")
+  taskReviews             TaskReview[]               @relation("TaskReviews")
+  uploadedAttachments     Attachment[]               @relation("AttachmentUploadedBy")
   oauthAccounts           OAuthAccount[]
-  budgetsSubmitted        Budget[]                 @relation("BudgetSubmittedBy")
-  budgetsDecided          Budget[]                 @relation("BudgetDecidedBy")
+  budgetsSubmitted        Budget[]                   @relation("BudgetSubmittedBy")
+  budgetsDecided          Budget[]                   @relation("BudgetDecidedBy")
   budgetDecisions         BudgetDecision[]
-  expensesRequested       Expense[]                @relation("ExpenseRequestedBy")
-  expensesApproved        Expense[]                @relation("ExpenseApprovedBy")
-  expensesPaid            Expense[]                @relation("ExpensePaidBy")
-  invoicesConfirmed       Invoice[]                @relation("InvoicePaymentConfirmedBy")
+  expensesRequested       Expense[]                  @relation("ExpenseRequestedBy")
+  expensesApproved        Expense[]                  @relation("ExpenseApprovedBy")
+  expensesPaid            Expense[]                  @relation("ExpensePaidBy")
+  invoicesConfirmed       Invoice[]                  @relation("InvoicePaymentConfirmedBy")
+  delegationsGranted      BudgetApprovalDelegation[] @relation("DelegationGrantedBy")
+  delegationsHeld         BudgetApprovalDelegation[] @relation("DelegationDelegate")
+  delegationsRevoked      BudgetApprovalDelegation[] @relation("DelegationRevokedBy")
 
   @@index([email])
 }
@@ -624,8 +627,8 @@ model DeliverableVersion {
   notes         String?
   createdAt     DateTime @default(now())
 
-  deliverable Deliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
-  createdBy   User        @relation("DeliverableVersionCreatedBy", fields: [createdById], references: [id])
+  deliverable Deliverable  @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  createdBy   User         @relation("DeliverableVersionCreatedBy", fields: [createdById], references: [id])
   attachments Attachment[]
 
   @@unique([deliverableId, revision])
@@ -806,6 +809,35 @@ model Budget {
 
 /// Append-only history of every budget submit / approve / reject. Never updated
 /// or deleted — this is the audit trail for the approval chain.
+/// A time-boxed grant of `budget.approve` from the Chief Executive to another
+/// user — in practice the Chief Operating Officer, so approval does not stall
+/// while the executive is away.
+///
+/// Deliberately NOT a role permission: `chief_executive` stays the only role
+/// holding budget.approve in ROLE_PERMISSIONS, which is what
+/// GOVERNANCE-AND-JOURNEYS.md states and scripts/verify-governance.ts asserts.
+/// See docs/coo-role-plan.md §4.
+model BudgetApprovalDelegation {
+  id          String    @id @default(cuid())
+  grantedById String
+  delegateId  String
+  reason      String
+  startsAt    DateTime  @default(now())
+  /// Required, and capped at 90 days by the service. An open-ended delegation
+  /// is a second permanent approver by the back door.
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  revokedById String?
+  createdAt   DateTime  @default(now())
+
+  grantedBy User  @relation("DelegationGrantedBy", fields: [grantedById], references: [id])
+  delegate  User  @relation("DelegationDelegate", fields: [delegateId], references: [id])
+  revokedBy User? @relation("DelegationRevokedBy", fields: [revokedById], references: [id])
+
+  @@index([delegateId, expiresAt])
+  @@index([revokedAt])
+}
+
 model BudgetDecision {
   id               String       @id @default(cuid())
   budgetId         String
@@ -870,25 +902,25 @@ enum InvoiceStatus {
 }
 
 model Invoice {
-  id             String        @id @default(cuid())
-  code           String        @unique
-  projectId      String?
-  organizationId String
-  status         InvoiceStatus @default(draft)
-  currency       String        @default("NGN")
-  amount         Decimal       @db.Decimal(14, 2)
-  lineItems      Json
-  issuedAt       DateTime?
-  dueAt          DateTime?
-  paidAt         DateTime?
-  paymentRef     String?
-  pdfUrl         String?
+  id                   String        @id @default(cuid())
+  code                 String        @unique
+  projectId            String?
+  organizationId       String
+  status               InvoiceStatus @default(draft)
+  currency             String        @default("NGN")
+  amount               Decimal       @db.Decimal(14, 2)
+  lineItems            Json
+  issuedAt             DateTime?
+  dueAt                DateTime?
+  paidAt               DateTime?
+  paymentRef           String?
+  pdfUrl               String?
   /// Set when `finance_manager` confirms the funds landed. A receipt is only
   /// issued after this, and the confirmer may not be the budget approver.
   paymentConfirmedById String?
   paymentConfirmedAt   DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
   project            Project?     @relation(fields: [projectId], references: [id])
   organization       Organization @relation(fields: [organizationId], references: [id])
@@ -1151,20 +1183,20 @@ model KpiSnapshot {
 /// created after the object is confirmed present in storage, never before.
 /// Files are served exclusively through `/api/files/[...key]`.
 model Attachment {
-  id         String  @id @default(cuid())
-  taskId     String?
-  requestId  String?
+  id                   String   @id @default(cuid())
+  taskId               String?
+  requestId            String?
   /// Delivery evidence. Attaching here is what makes a deliverable revision a
   /// real artefact rather than a pasted link.
   deliverableVersionId String?
-  fileName   String
-  mimeType   String
-  size       Int
+  fileName             String
+  mimeType             String
+  size                 Int
   /// Key in the private bucket. Never exposed directly to a browser.
-  storageKey String  @unique
-  publicUrl  String?
-  uploadedById String
-  createdAt    DateTime @default(now())
+  storageKey           String   @unique
+  publicUrl            String?
+  uploadedById         String
+  createdAt            DateTime @default(now())
 
   task               Task?               @relation("TaskAttachments", fields: [taskId], references: [id], onDelete: Cascade)
   request            Request?            @relation("RequestAttachments", fields: [requestId], references: [id], onDelete: Cascade)
