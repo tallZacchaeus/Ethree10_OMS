@@ -43,10 +43,18 @@ export class ReceiptService {
     const existing = await db.receipt.findUnique({ where: { invoiceId } });
     if (existing) return existing;
 
-    if (opts.paymentRef) {
-      const byRef = await db.receipt.findFirst({ where: { paymentRef: opts.paymentRef } });
-      if (byRef) return byRef;
-    }
+    // NOTE: there used to be a second idempotency check here that looked up any
+    // receipt with the same `paymentRef`, unscoped by invoice. Payment
+    // references are not globally unique — banks reuse them, and staff retype
+    // them — so a second invoice paid with a reference already seen returned the
+    // FIRST invoice's receipt and created no row of its own. The invoice was
+    // left `paid` with no receipt, and the caller was handed a receipt belonging
+    // to a different invoice, and potentially a different client.
+    //
+    // `invoiceId` is unique on Receipt, so the check above already makes this
+    // idempotent for the case that check was meant to cover — a retried webhook
+    // for the same invoice — and the P2002 handler below covers the concurrent
+    // race. Deduplicating across invoices was never safe.
 
     let receipt: Receipt;
     try {
@@ -68,6 +76,16 @@ export class ReceiptService {
         if (winner) return winner;
       }
       throw err;
+    }
+
+    // The receipt must belong to the invoice we were asked about. This can only
+    // trip if a future change reintroduces a lookup that is not scoped by
+    // invoice; it is here because when that happened it failed silently, leaving
+    // a paid invoice with no receipt and handing the caller someone else's.
+    if (receipt.invoiceId !== invoiceId) {
+      throw new Error(
+        `Receipt ${receipt.code} belongs to invoice ${receipt.invoiceId}, not ${invoiceId}`,
+      );
     }
 
     // Best-effort. The receipt ROW is the financial record of account; the PDF is
