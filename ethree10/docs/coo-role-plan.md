@@ -1,6 +1,6 @@
 # Plan — Chief Operating Officer role
 
-**Status:** steps 1–3 complete (role, permissions, migration, seed, reachability, delegation model). Steps 4–5 outstanding — see §6.
+**Status:** steps 1–4 complete (role, permissions, migration, seed, reachability, delegation model and UI). Step 5 outstanding — see §6.
 **Date:** 2026-08-12, updated 2026-08-13
 
 Adds a seventh operational role, `chief_operating_officer` (COO): below the Chief

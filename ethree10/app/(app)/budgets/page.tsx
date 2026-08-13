@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { BadgeCheck, X } from "lucide-react";
+import { DelegationPanel } from "./delegation-panel";
 
 function money(amount: string | number, currency: string) {
   const value = typeof amount === "string" ? Number(amount) : amount;
@@ -59,6 +60,8 @@ export default function BudgetsPage() {
         title="Budget approvals"
         description="Approve the money before it moves. Nothing can be invoiced or spent on a project until its budget is approved here."
       />
+
+      <DelegationPanel />
 
       <Card>
         <CardHeader>

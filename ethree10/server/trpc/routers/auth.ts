@@ -2,6 +2,8 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import { protectedProcedure } from "../procedures";
+import { getAgencyAuthContext } from "@/server/services/agency";
+import { can } from "@/server/auth/permissions";
 
 function mfaDisabledError(): never {
   throw new TRPCError({
@@ -45,9 +47,15 @@ export const authRouter = router({
       throw new TRPCError({ code: "NOT_FOUND", message: "User not found." });
     }
 
+    // Resolved rather than inferred from roles: budget approval can also come
+    // from a time-boxed delegation, and the navigation has to agree with the
+    // page guard or it advertises a page that then redirects.
+    const authCtx = await getAgencyAuthContext(ctx.userId);
+    const canApproveBudgets = can(authCtx, "budget.approve");
 
 
-    return user;
+
+    return { ...user, canApproveBudgets };
   }),
 
   updateProfile: protectedProcedure

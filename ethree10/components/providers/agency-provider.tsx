@@ -13,5 +13,7 @@ export function useAgencyContext() {
   // Exposed so screens can hide self-service actions that the server would
   // reject anyway — e.g. paying an expense you raised yourself.
   const userId = user?.id ?? null;
-  return { isSuperAdmin, roles, teamIds, userId, agency: { id: "agency", name: "Ethree10", type: "agency" as const } };
+  // True when the user may approve budgets by role OR by an active delegation.
+  const canApproveBudgets = user?.canApproveBudgets ?? false;
+  return { isSuperAdmin, roles, teamIds, userId, canApproveBudgets, agency: { id: "agency", name: "Ethree10", type: "agency" as const } };
 }
