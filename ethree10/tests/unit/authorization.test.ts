@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest";
 import { can, assertSeparationOfDuties, ROLE_PERMISSIONS } from "@/server/auth/permissions";
 import type { AuthContext } from "@/server/auth/permissions";
 import {
+  AGENCY_CONFIG_ROLES,
+  AGENCY_WIDE_ROLES,
+  BRANCH_LEAD_ROLES,
   BUDGET_APPROVER_ROLES,
+  DELIVERY_LEAD_ROLES,
+  FINANCE_ROLES,
   REQUEST_ACCESS_ROLES,
   STAFF_ROLES,
   hasAgencyWideScope,
@@ -186,6 +191,22 @@ describe("permissions.can", () => {
         assertSeparationOfDuties(["chief_operating_officer", "finance_manager"]),
       ).toThrow(/separation of duties/i);
       expect(() => assertSeparationOfDuties(["chief_operating_officer"])).not.toThrow();
+    });
+
+    // Navigation and route guards read the same named groups, so a role added to
+    // a group reaches both. Before this, the sidebar kept its own copies and a
+    // page could be reachable by URL yet invisible in the nav.
+    it("belongs to the groups that gate agency-wide pages", () => {
+      expect(AGENCY_WIDE_ROLES).toContain("chief_operating_officer");
+      expect(DELIVERY_LEAD_ROLES).toContain("chief_operating_officer");
+      expect(BRANCH_LEAD_ROLES).toContain("chief_operating_officer");
+      expect(AGENCY_CONFIG_ROLES).toContain("chief_operating_officer");
+      expect(STAFF_ROLES).toContain("chief_operating_officer");
+      // Budget Approvals stays the Chief Executive's surface until a delegation
+      // exists — step 4 replaces that guard with an action-aware one.
+      expect(BUDGET_APPROVER_ROLES).not.toContain("chief_operating_officer");
+      // Money execution stays with Finance.
+      expect(FINANCE_ROLES).not.toContain("chief_operating_officer");
     });
 
     it("leaves the Chief Executive the only role-level budget approver", () => {

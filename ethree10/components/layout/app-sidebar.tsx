@@ -34,6 +34,14 @@ import {
 } from "lucide-react";
 import type { Role } from "@prisma/client";
 
+import {
+  AGENCY_CONFIG_ROLES,
+  AGENCY_WIDE_ROLES,
+  BRANCH_LEAD_ROLES,
+  BUDGET_APPROVER_ROLES,
+  DELIVERY_LEAD_ROLES,
+  FINANCE_ROLES,
+} from "@/server/auth/role-groups";
 import { E310Logo } from "@/components/brand/e310-logo";
 import { cn } from "@/lib/utils/cn";
 
@@ -49,23 +57,22 @@ interface NavSection {
   items: NavItem[];
 }
 
-// Everyone who delivers work. The Chief Executive is deliberately excluded —
-// it has no personal queue, so "My Work" would always be empty for it.
+// These come from role-groups.ts rather than being redeclared here. Local copies
+// are how the previous role model drifted apart — a role added to a group would
+// silently fail to appear in navigation, so a page would be reachable by URL but
+// invisible in the sidebar.
+const DELIVERY_LEADS = DELIVERY_LEAD_ROLES;
+const BRANCH_LEADS = BRANCH_LEAD_ROLES;
+const AGENCY_WIDE = AGENCY_WIDE_ROLES;
+const AGENCY_ADMIN = AGENCY_CONFIG_ROLES;
+
+// Everyone who delivers work through a personal queue. Deliberately NOT a shared
+// group: the Chief Executive and the COO are excluded because neither is assigned
+// tasks, so "My Work" would always be empty for them.
 const DELIVERY_STAFF: Role[] = ["agency_admin", "branch_head", "department_lead", "team_member"];
-// Runs delivery for a branch or department: routing, assignment, review.
-const DELIVERY_LEADS: Role[] = ["agency_admin", "branch_head", "department_lead"];
-// May restructure a branch and manage the service catalogue.
-const BRANCH_LEADS: Role[] = ["agency_admin", "branch_head"];
-// Sees the whole agency across every branch.
-const AGENCY_WIDE: Role[] = ["chief_executive", "agency_admin", "finance_manager"];
-// Agency configuration surfaces. The COO belongs here because `integration.manage`
-// moved to it — without this the only role that can connect an integration cannot
-// reach the page. The rest of the COO's navigation is wired up in step 2 of
-// docs/coo-role-plan.md.
-const AGENCY_ADMIN: Role[] = ["chief_operating_officer", "agency_admin"];
 // Money. The Chief Executive approves budgets; Finance moves the money.
-const FINANCE: Role[] = ["finance_manager"];
-const BUDGET_APPROVER: Role[] = ["chief_executive"];
+const FINANCE = FINANCE_ROLES;
+const BUDGET_APPROVER = BUDGET_APPROVER_ROLES;
 
 const NAV_SECTIONS: NavSection[] = [
   {
@@ -108,7 +115,8 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/invoices", label: "Invoices", icon: FileSpreadsheet, allow: FINANCE },
       { href: "/receipts", label: "Receipts", icon: ReceiptText, allow: FINANCE },
       { href: "/expenses", label: "Expenses", icon: Wallet, allow: [...FINANCE, ...DELIVERY_LEADS] },
-      { href: "/leads", label: "Enquiries", icon: Sparkles, allow: [...FINANCE, "agency_admin"] },
+      // Matches the route guard on /leads, which is agency-wide.
+      { href: "/leads", label: "Enquiries", icon: Sparkles, allow: AGENCY_WIDE },
     ],
   },
   {

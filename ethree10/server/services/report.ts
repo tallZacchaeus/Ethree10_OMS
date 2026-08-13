@@ -451,9 +451,15 @@ export class ReportService {
       const dept = await db.subUnit.findUnique({ where: { id: report.scopeId }, select: { leadId: true } });
       if (dept?.leadId) recipientIds.add(dept.leadId);
     }
-    // The Chief Executive sees every finalized report.
+    // The Chief Executive and the Chief Operating Officer see every finalized
+    // report — the executive for oversight, the COO because they run the
+    // operation the report describes.
     const executives = await db.membership.findMany({
-      where: { role: "chief_executive", removedAt: null, acceptedAt: { not: null } },
+      where: {
+        role: { in: ["chief_executive", "chief_operating_officer"] },
+        removedAt: null,
+        acceptedAt: { not: null },
+      },
       select: { userId: true },
     });
     for (const executive of executives) recipientIds.add(executive.userId);

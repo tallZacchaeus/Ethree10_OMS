@@ -41,13 +41,19 @@ import { MemberSkillsDialog } from "@/components/members/member-skills-dialog";
 import { initials } from "@/lib/format";
 import { humanize } from "@/lib/constants";
 import type { Role } from "@prisma/client";
-import { ROLE_LABELS, ROLE_DESCRIPTIONS } from "@/server/auth/role-groups";
+import {
+  AGENCY_CONFIG_ROLES,
+  DELIVERY_LEAD_ROLES,
+  ROLE_LABELS,
+  ROLE_DESCRIPTIONS,
+} from "@/server/auth/role-groups";
 
 // Assignable roles, in org seniority order. `super_admin` is deliberately absent —
 // it is a technical escape hatch granted directly on the User row, not an
 // operational role handed out from this screen.
 const ROLE_OPTIONS: { value: Role; label: string; description: string }[] = [
   { value: "chief_executive", label: ROLE_LABELS.chief_executive, description: ROLE_DESCRIPTIONS.chief_executive },
+  { value: "chief_operating_officer", label: ROLE_LABELS.chief_operating_officer, description: ROLE_DESCRIPTIONS.chief_operating_officer },
   { value: "agency_admin", label: ROLE_LABELS.agency_admin, description: ROLE_DESCRIPTIONS.agency_admin },
   { value: "finance_manager", label: ROLE_LABELS.finance_manager, description: ROLE_DESCRIPTIONS.finance_manager },
   { value: "branch_head", label: ROLE_LABELS.branch_head, description: ROLE_DESCRIPTIONS.branch_head },
@@ -76,14 +82,14 @@ export default function MembersPage() {
   const [editSubUnitId, setEditSubUnitId] = useState("");
   const [skillsFor, setSkillsFor] = useState<{ userId: string; name: string } | null>(null);
 
-  const canInvite = isSuperAdmin || roles.some((r: string) =>
-    ["agency_admin"].includes(r)
-  );
+  // Named groups rather than inline arrays: these mirror `organization.invite`
+  // and `member.updateSkills`, and drifted from them once already.
+  const canInvite =
+    isSuperAdmin || roles.some((r: Role) => AGENCY_CONFIG_ROLES.includes(r));
   // Skills are a delivery concern, so branch and department leads keep their own
   // people's profiles current without going through an agency admin.
-  const canEditSkills = isSuperAdmin || roles.some((r: string) =>
-    ["agency_admin", "branch_head", "department_lead"].includes(r)
-  );
+  const canEditSkills =
+    isSuperAdmin || roles.some((r: Role) => DELIVERY_LEAD_ROLES.includes(r));
 
   const { data, isLoading, refetch } = trpc.members.list.useQuery(undefined, {
     enabled: true,

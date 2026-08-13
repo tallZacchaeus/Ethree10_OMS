@@ -53,6 +53,26 @@ export const REQUEST_ACCESS_ROLES: Role[] = [
 /** Leads a branch or the whole agency — may restructure teams and services. */
 export const BRANCH_LEAD_ROLES: Role[] = ["chief_operating_officer", "agency_admin", "branch_head"];
 
+/**
+ * Administers the agency itself — integrations, the marketing site, and adding
+ * or removing people. The COO is here because `integration.manage` is COO-only;
+ * without it the one role that can connect an integration could not reach the
+ * page, and because it outranks the Agency Admin it must also be able to invite.
+ */
+export const AGENCY_CONFIG_ROLES: Role[] = ["chief_operating_officer", "agency_admin"];
+
+/**
+ * May trigger agency-wide report generation. Mirrors `report.generate`, minus the
+ * Chief Executive — reports are an operational chore, and the executive receives
+ * every finalized one anyway.
+ */
+export const REPORT_GENERATOR_ROLES: Role[] = [
+  "chief_operating_officer",
+  "agency_admin",
+  "finance_manager",
+  "branch_head",
+];
+
 /** Touches money. Deliberately excludes agency_admin and the Chief Executive. */
 export const FINANCE_ROLES: Role[] = ["finance_manager"];
 
