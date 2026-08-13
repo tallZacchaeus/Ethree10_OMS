@@ -13,7 +13,9 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { BudgetService } from "../server/services/budget";
-import { assertSeparationOfDuties } from "../server/auth/permissions";
+import { DelegationService } from "../server/services/delegation";
+import { assertSeparationOfDuties, can } from "../server/auth/permissions";
+import { getAgencyAuthContext } from "../server/services/agency";
 
 const db = new PrismaClient();
 
@@ -48,6 +50,8 @@ async function mustPass(label: string, fn: () => Promise<unknown>) {
   }
 }
 
+const DAY = 24 * 60 * 60 * 1000;
+
 async function main() {
   const byEmail = async (email: string) => {
     const user = await db.user.findUnique({ where: { email } });
@@ -60,6 +64,7 @@ async function main() {
   const techLead = await byEmail("techlead@ethree10.r4c.global");
   const member = await byEmail("member@ethree10.r4c.global");
   const admin = await byEmail("admin.ops@ethree10.r4c.global");
+  const coo = await byEmail("operations@ethree10.r4c.global");
 
   const project = await db.project.findFirst();
   if (!project) throw new Error("Seed project missing.");
@@ -211,6 +216,96 @@ async function main() {
   } else {
     bad("Revision resets approval", `status=${revised?.status} decidedById=${revised?.decidedById}`);
   }
+
+  console.log("\n── Chief Operating Officer ────────────────────────────────");
+  const cooCtx = await getAgencyAuthContext(coo.id);
+  if (!can(cooCtx, "budget.approve")) {
+    ok("COO cannot approve a budget by role");
+  } else {
+    bad("COO cannot approve by role", "COO holds budget.approve without a delegation");
+  }
+  const adminCtx = await getAgencyAuthContext(admin.id);
+  const cooOnly = ["team.create", "organization.archive", "project.delete", "integration.manage"] as const;
+  for (const action of cooOnly) {
+    if (can(cooCtx, action) && !can(adminCtx, action)) {
+      ok(`${action} is COO-only`);
+    } else {
+      bad(`${action} is COO-only`, `coo=${can(cooCtx, action)} admin=${can(adminCtx, action)}`);
+    }
+  }
+
+  console.log("\n── Budget approval delegation ─────────────────────────────");
+  await mustFail("COO granting itself a delegation", async () =>
+    DelegationService.grant({
+      actorId: coo.id,
+      delegateId: admin.id,
+      reason: "should be refused",
+      expiresAt: new Date(Date.now() + DAY),
+    }),
+  );
+  await mustFail("Chief Executive delegating to themselves", async () =>
+    DelegationService.grant({
+      actorId: exec.id,
+      delegateId: exec.id,
+      reason: "should be refused",
+      expiresAt: new Date(Date.now() + DAY),
+    }),
+  );
+  await mustFail("A delegation longer than the 90-day cap", async () =>
+    DelegationService.grant({
+      actorId: exec.id,
+      delegateId: coo.id,
+      reason: "should be refused",
+      expiresAt: new Date(Date.now() + 120 * DAY),
+    }),
+  );
+  await mustFail("Delegating to someone who can confirm payments", async () =>
+    DelegationService.grant({
+      actorId: exec.id,
+      delegateId: finance.id,
+      reason: "should be refused — separation of duties",
+      expiresAt: new Date(Date.now() + DAY),
+    }),
+  );
+
+  const delegation = await DelegationService.grant({
+    actorId: exec.id,
+    delegateId: coo.id,
+    reason: "verify-governance run",
+    expiresAt: new Date(Date.now() + 7 * DAY),
+  });
+  const delegatedCtx = await getAgencyAuthContext(coo.id);
+  if (can(delegatedCtx, "budget.approve")) {
+    ok("COO can approve while a delegation is active");
+  } else {
+    bad("COO can approve while delegated", "budget.approve still denied");
+  }
+  if (!can(delegatedCtx, "payment.confirm") && !can(delegatedCtx, "expense.pay")) {
+    ok("A delegated approver still cannot move money");
+  } else {
+    bad("Delegated approver cannot move money", "delegation leaked payment rights");
+  }
+
+  await DelegationService.revoke({ actorId: exec.id, delegationId: delegation.id });
+  const revokedCtx = await getAgencyAuthContext(coo.id);
+  if (!can(revokedCtx, "budget.approve")) {
+    ok("Revoking a delegation removes approval immediately");
+  } else {
+    bad("Revoke removes approval", "budget.approve survived revocation");
+  }
+
+  const delegationAudit = await db.auditLog.count({
+    where: { entityType: "BudgetApprovalDelegation", entityId: delegation.id },
+  });
+  if (delegationAudit >= 2) {
+    ok(`Grant and revoke are both audited (${delegationAudit} entries)`);
+  } else {
+    bad("Delegation is audited", `${delegationAudit} audit entries found`);
+  }
+
+  await db.auditLog.deleteMany({ where: { entityId: delegation.id } });
+  await db.notification.deleteMany({ where: { entityId: delegation.id } });
+  await db.budgetApprovalDelegation.delete({ where: { id: delegation.id } });
 
   console.log(`\n${failed === 0 ? "[32m" : "[31m"}${passed} passed, ${failed} failed[0m\n`);
   if (failed > 0) process.exitCode = 1;
