@@ -161,8 +161,14 @@ export function SidebarContent({ roles: serverRoles, isSuperAdmin: serverIsSuper
   const isSuperAdmin = serverIsSuperAdmin ?? client.isSuperAdmin;
   const sections = NAV_SECTIONS;
 
-  const canSee = (item: NavItem) =>
-    item.allow === "all" || isSuperAdmin || item.allow.some((r) => roles.includes(r as Role));
+  // Budget Approvals is the one entry that is not purely role-based: a delegate
+  // holds `budget.approve` for a fixed window without holding the role. The nav
+  // has to follow the same rule as the page guard, or it hides a page the user
+  // can open — or shows one that redirects.
+  const canSee = (item: NavItem) => {
+    if (item.href === "/budgets" && client.canApproveBudgets) return true;
+    return item.allow === "all" || isSuperAdmin || item.allow.some((r) => roles.includes(r as Role));
+  };
 
   return (
     <div className="flex h-full flex-col">
