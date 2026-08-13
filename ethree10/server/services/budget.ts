@@ -5,6 +5,7 @@ import { AuditService } from "@/server/services/audit";
 import { ReceiptService } from "@/server/services/receipt";
 import { requireAgencyAction } from "@/server/services/agency";
 import { NotificationService } from "@/server/services/notification";
+import { DelegationService } from "@/server/services/delegation";
 import { captureCriticalFailure } from "@/lib/observability";
 
 /**
@@ -133,11 +134,19 @@ export class BudgetService {
       after: { amount: input.amount, version: budget.version, projectId: input.projectId },
     });
 
-    // Tell every Chief Executive there is something to approve.
-    const approvers = await db.membership.findMany({
+    // Tell every Chief Executive there is something to approve — and anyone
+    // currently holding a delegation, or a submission during an absence sits
+    // unseen, which is the whole thing delegation exists to prevent.
+    const approverMemberships = await db.membership.findMany({
       where: { role: "chief_executive", removedAt: null, acceptedAt: { not: null } },
       select: { userId: true },
     });
+    const activeDelegations = await DelegationService.listActive();
+    const approverIds = new Set([
+      ...approverMemberships.map((m) => m.userId),
+      ...activeDelegations.map((d) => d.delegateId),
+    ]);
+    const approvers = Array.from(approverIds, (userId) => ({ userId }));
     for (const approver of approvers) {
       await NotificationService.create({
         userId: approver.userId,
@@ -189,13 +198,22 @@ export class BudgetService {
       },
     });
 
+    // An auditor reading BudgetDecision should see that an approval was made
+    // under delegation without having to cross-reference another table.
+    const delegation = await DelegationService.activeFor(actorId);
+    const noteWithProvenance = delegation
+      ? [args.note?.trim(), `[Approved under delegation granted ${delegation.startsAt.toDateString()}, expiring ${delegation.expiresAt.toDateString()}]`]
+          .filter(Boolean)
+          .join(" ")
+      : args.note ?? null;
+
     await db.budgetDecision.create({
       data: {
         budgetId: budget.id,
         action: args.decision,
         actorId,
         amountAtDecision: budget.amount,
-        note: args.note ?? null,
+        note: noteWithProvenance,
       },
     });
 
