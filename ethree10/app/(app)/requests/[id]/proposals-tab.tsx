@@ -18,6 +18,8 @@ import { formatMoney, formatDate } from "@/lib/format";
 import { useToast } from "@/components/ui/use-toast";
 import { CreateProposalDialog } from "@/components/proposals/create-proposal-dialog";
 import { AnimatedItem, AnimatedSection } from "@/components/ui-ext/animated";
+import { BRANCH_LEAD_ROLES } from "@/server/auth/role-groups";
+import type { Role } from "@prisma/client";
 
 type ProposalLineItem = { qty: number; label: string; unitPrice: number | string };
 
@@ -36,7 +38,7 @@ export function ProposalsTab({ requestId }: { requestId: string }) {
   const isAgencyStaff =
     isSuperAdmin ||
     roles.some((r) =>
-      ["agency_admin", "branch_head"].includes(r),
+      BRANCH_LEAD_ROLES.includes(r as Role),
     );
 
   const { data: proposals, isLoading, refetch } = trpc.proposals.list.useQuery({ requestId });

@@ -6,7 +6,12 @@ import type { BadgeProps } from "@/components/ui/badge";
 type CapacityVariant = NonNullable<BadgeProps["variant"]>;
 
 export function getDashboardExperience(roles: Role[], isSuperAdmin: boolean) {
-  const isAdmin = isSuperAdmin || roles.includes("agency_admin");
+  // The COO runs operations, so it gets the same agency-wide operational
+  // surface as the Agency Admin rather than the executive read-only one.
+  const isAdmin =
+    isSuperAdmin ||
+    roles.includes("agency_admin") ||
+    roles.includes("chief_operating_officer");
   // The Chief Executive is oversight: agency-wide read plus budget approval.
   const isExecutive = roles.includes("chief_executive");
   // Finance gets the agency-wide picture too, but framed around money.

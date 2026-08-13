@@ -13,6 +13,7 @@ import { useAgencyContext } from "@/components/providers/agency-provider";
 import { PageHeader } from "@/components/ui-ext/page-header";
 import { StatCard } from "@/components/ui-ext/stat-card";
 import { AnimatedPage, AnimatedSection } from "@/components/ui-ext/animated";
+import { REPORT_GENERATOR_ROLES } from "@/server/auth/role-groups";
 
 export default function ReportsPage() {
   const { agency, roles, isSuperAdmin } = useAgencyContext();
@@ -54,7 +55,7 @@ export default function ReportsPage() {
           title="Reports"
           description="Weekly and monthly rollups across the agency."
           actions={
-            agency.type === "agency" && (isSuperAdmin || roles.some((role) => ["agency_admin", "finance_manager", "branch_head"].includes(role))) ? (
+            agency.type === "agency" && (isSuperAdmin || roles.some((role) => REPORT_GENERATOR_ROLES.includes(role))) ? (
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => generateWeekly.mutate()} disabled={generateWeekly.isPending}>
                   {generateWeekly.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}

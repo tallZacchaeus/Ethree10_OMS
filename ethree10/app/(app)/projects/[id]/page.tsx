@@ -17,6 +17,8 @@ import { useToast } from "@/components/ui/use-toast";
 
 import { formatDate } from "@/lib/format";
 import { Textarea } from "@/components/ui/textarea";
+import { BRANCH_LEAD_ROLES } from "@/server/auth/role-groups";
+import type { Role } from "@prisma/client";
 
 
 export default function ProjectDetailPage() {
@@ -34,7 +36,7 @@ export default function ProjectDetailPage() {
   const isAgencyStaff =
     isSuperAdmin ||
     roles.some((r) =>
-      ["agency_admin", "branch_head"].includes(r),
+      BRANCH_LEAD_ROLES.includes(r as Role),
     );
 
   const deliver = trpc.projects.deliver.useMutation({

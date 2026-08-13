@@ -27,6 +27,8 @@ import { humanize } from "@/lib/constants";
 import { TimeLogDialog } from "@/components/tasks/time-log-dialog";
 import { FileUpload } from "@/components/files/file-upload";
 import { Clock, HelpCircle, Send } from "lucide-react";
+import { BRANCH_LEAD_ROLES } from "@/server/auth/role-groups";
+import type { Role } from "@prisma/client";
 
 const MEMBER_STATUSES: TaskStatus[] = ["todo", "in_progress", "blocked"];
 
@@ -133,7 +135,7 @@ export default function TaskDetailPage() {
   const isLead =
     isSuperAdmin ||
     roles.some((r) =>
-      ["agency_admin", "branch_head"].includes(r),
+      BRANCH_LEAD_ROLES.includes(r as Role),
     );
 
   return (

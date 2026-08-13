@@ -2,6 +2,7 @@ import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { db } from "@/server/db/client";
 import { requireAgencyAction } from "@/server/services/agency";
+import { STAFF_ROLES } from "@/server/auth/role-groups";
 
 /**
  * First-run "ready to use" checklist for agency admins. Derives each step's completion from
@@ -20,7 +21,7 @@ export const setupRouter = router({
       // Staff = org-null memberships.
       db.membership.count({
         where: {
-          role: { in: ["super_admin", "chief_executive", "agency_admin", "finance_manager", "branch_head", "department_lead", "team_member"] },
+          role: { in: ["super_admin", ...STAFF_ROLES] },
           acceptedAt: { not: null },
         },
       }),

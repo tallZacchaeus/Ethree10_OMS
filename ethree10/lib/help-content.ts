@@ -86,7 +86,7 @@ export const UNIVERSAL_RULES: HelpSection[] = [
   {
     heading: "Reports write themselves, but somebody still has to finalize them",
     body:
-      "Every week and month the system generates reports for the agency, each branch, each department, each person and each client — built from real activity, not from anyone filling in a form. They arrive as drafts. Finalizing one is the moment it becomes real: the PDF is produced and stored, and it is emailed to whoever is accountable for it, always including the Chief Executive. Once finalized a report can only be changed by recording an amendment, which keeps the original visible.",
+      "Every week and month the system generates reports for the agency, each branch, each department, each person and each client — built from real activity, not from anyone filling in a form. They arrive as drafts. Finalizing one is the moment it becomes real: the PDF is produced and stored, and it is emailed to whoever is accountable for it, always including the Chief Executive and the Chief Operating Officer. Once finalized a report can only be changed by recording an amendment, which keeps the original visible.",
   },
   {
     heading: "If a button is missing, the server would have refused anyway",
@@ -363,6 +363,51 @@ export const ROLE_GUIDES: RoleGuide[] = [
       },
     ],
   },
+  {
+    role: "chief_operating_officer",
+    label: "Chief Operating Officer",
+    tagline: "Runs the agency day to day. Everything except the money.",
+    summary:
+      "You are second to the Chief Executive and senior to every other role. You can do anything an Agency Admin, Branch Head or Department Lead can do, and a few things only you can: creating and retiring branches, archiving departments and client organisations, deleting records, and connecting integrations. What you cannot do is money — you do not approve budgets, and you never confirm a payment. That is not an oversight; it is what keeps the approval chain worth something in an audit.",
+    home: "Dashboard, then Intake Queue",
+    can: [
+      "See every request, project, task, report and audit entry across both branches",
+      "Route, assign, review and deliver work anywhere in the agency",
+      "Create and archive branches, and archive departments and client organisations",
+      "Delete requests, projects and tasks — the only operational role that can",
+      "Connect and configure integrations",
+      "Invite people, change roles, and manage services and skills",
+      "Submit a budget for the Chief Executive to approve",
+    ],
+    cannot: [
+      "Approve a budget — unless the Chief Executive delegates it to you",
+      "Confirm a payment, issue a receipt, or pay an expense",
+      "Create or send invoices",
+      "Hold the Finance Manager role at the same time as this one",
+    ],
+    sections: [
+      {
+        heading: "What you have that an Agency Admin does not",
+        body:
+          "Exactly eight things, and they share a theme: reshaping the agency, and destroying records. Creating or archiving a branch, archiving a department, archiving a client organisation, deleting a request, a project or a task, and managing integrations. Everything else an Agency Admin can do, you can do too.",
+        example:
+          "A department is folded into another after a reorganisation. The Agency Admin can rename it and move people between departments, but archiving the empty one is yours. The same applies to a client you no longer work with: the Admin can update the record, you archive it.",
+      },
+      {
+        heading: "Why you cannot approve budgets",
+        body:
+          "Only the Chief Executive approves spending, so that authorising money is one person's decision and is traceable to them. If they are away, they can delegate approval to you for a fixed period — it expires on its own, one person holds it at a time, and every approval made under it is recorded as delegated. You still cannot confirm the payment afterwards, for the same reason they cannot.",
+      },
+      {
+        heading: "Deleting is rarely the right answer",
+        body:
+          "You are the only operational role that can delete a request, project or task, which is precisely why it is worth hesitating. The system prefers cancelling and superseding: a cancelled task stays visible, keeps its history and does not block delivery, while a deleted one takes its trail with it. Delete when something was created in error. Cancel when it happened and then stopped mattering.",
+        example:
+          "A client submits the same brief twice by accident. Delete the duplicate — it never represented real work. A project that ran for three weeks and was then called off should be cancelled, not deleted: the hours logged against it are real, and the reports need them.",
+      },
+    ],
+  },
+
   {
     role: "finance_manager",
     label: "Finance Manager",

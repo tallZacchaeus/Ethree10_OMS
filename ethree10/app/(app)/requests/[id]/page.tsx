@@ -30,6 +30,8 @@ import { useAgencyContext } from "@/components/providers/agency-provider";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { humanize } from "@/lib/constants";
 import { ProposalsTab } from "./proposals-tab";
+import { BRANCH_LEAD_ROLES } from "@/server/auth/role-groups";
+import type { Role } from "@prisma/client";
 
 // Allowed onward transitions per stage (mirrors the server-side guard).
 const NEXT_STAGES: Partial<Record<RequestStage, RequestStage[]>> = {
@@ -57,7 +59,7 @@ export default function RequestDetailPage() {
 
   const isAgencyStaff =
     isSuperAdmin ||
-    roles.some((r: string) => ["agency_admin", "branch_head"].includes(r));
+    roles.some((r: string) => BRANCH_LEAD_ROLES.includes(r as Role));
 
   const { data: teams } = trpc.requests.agencyTeams.useQuery(undefined, {
     retry: false,

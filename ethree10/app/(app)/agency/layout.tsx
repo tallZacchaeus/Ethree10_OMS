@@ -1,6 +1,7 @@
 import { requirePageRole } from "@/server/auth/page-access";
+import { AGENCY_WIDE_ROLES } from "@/server/auth/role-groups";
 
 export default async function AgencyLayout({ children }: { children: React.ReactNode }) {
-  await requirePageRole(["chief_executive", "agency_admin", "finance_manager"]);
+  await requirePageRole(AGENCY_WIDE_ROLES);
   return children;
 }

@@ -3,7 +3,7 @@ import { AvailabilityType, DeliverableKind, DeliverableVisibility } from "@prism
 import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { requireAgencyAction, getAgencyAuthContext } from "@/server/services/agency";
-import { hasAgencyWideScope } from "@/server/auth/role-groups";
+import { AGENCY_WIDE_ROLES, hasAgencyWideScope } from "@/server/auth/role-groups";
 import { ProjectService } from "@/server/services/project";
 import { ExecutionService } from "@/server/services/execution";
 import { db } from "@/server/db/client";
@@ -19,7 +19,7 @@ async function requireTaskAccess(userId: string, taskId: string) {
 async function requireTeamAccess(userId: string, teamId: string) {
   const user = await db.user.findUnique({ where: { id: userId }, select: { isSuperAdmin: true } });
   const broadRole = await db.membership.findFirst({
-    where: { userId, role: { in: ["agency_admin", "chief_executive", "finance_manager"] }, acceptedAt: { not: null }, removedAt: null },
+    where: { userId, role: { in: AGENCY_WIDE_ROLES }, acceptedAt: { not: null }, removedAt: null },
   });
   if (user?.isSuperAdmin || broadRole) return;
   const membership = await db.membership.findFirst({
