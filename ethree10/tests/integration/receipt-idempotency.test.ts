@@ -131,3 +131,72 @@ describe("ReceiptService.issueForInvoice — offline payment methods", () => {
     },
   );
 });
+
+/**
+ * Regression: two invoices paid under the SAME reference.
+ *
+ * Payment references are not globally unique — banks reuse them and staff
+ * retype them. Issuance used to fall back to "any receipt with this
+ * paymentRef", unscoped by invoice, so the second invoice was handed the first
+ * invoice's receipt and got no row of its own: a paid invoice with no receipt,
+ * and a receipt returned for a client it did not belong to.
+ *
+ * The suite missed it because every other multi-invoice case here uses a
+ * distinct reference per invoice.
+ */
+describe("ReceiptService.issueForInvoice — a reference reused across invoices", () => {
+  let organizationId: string;
+  const SHARED_REF = "BANK-REF-REUSED";
+
+  beforeAll(async () => {
+    await ensureBucket();
+    const ws = await db.organization.create({
+      data: { name: "Shared Ref WS", slug: `shared-ref-${Date.now()}`, defaultCurrency: "NGN" },
+    });
+    organizationId = ws.id;
+  });
+
+  afterAll(async () => {
+    try {
+      if (organizationId) await db.receipt.deleteMany({ where: { organizationId } });
+      if (organizationId) await db.invoice.deleteMany({ where: { organizationId } });
+      if (organizationId) await db.organization.delete({ where: { id: organizationId } });
+    } catch (e) {}
+  });
+
+  it("gives each invoice its own receipt", async () => {
+    const mk = (code: string) =>
+      db.invoice.create({
+        data: {
+          code: `${code}-${Date.now()}`,
+          organizationId,
+          status: "paid",
+          currency: "NGN",
+          amount: "50000.00",
+          lineItems: [{ description: "Retainer", quantity: 1, unitPrice: 50000 }],
+          paidAt: new Date(),
+        },
+      });
+
+    const first = await mk("INV-SHARED-A");
+    const second = await mk("INV-SHARED-B");
+
+    const receiptA = await ReceiptService.issueForInvoice(first.id, {
+      paymentMethod: "bank_transfer",
+      paymentRef: SHARED_REF,
+    });
+    const receiptB = await ReceiptService.issueForInvoice(second.id, {
+      paymentMethod: "bank_transfer",
+      paymentRef: SHARED_REF,
+    });
+
+    // Each receipt belongs to the invoice it was issued for.
+    expect(receiptA.invoiceId).toBe(first.id);
+    expect(receiptB.invoiceId).toBe(second.id);
+    expect(receiptB.id).not.toBe(receiptA.id);
+
+    // And neither invoice is left paid with no receipt.
+    await expect(db.receipt.count({ where: { invoiceId: first.id } })).resolves.toBe(1);
+    await expect(db.receipt.count({ where: { invoiceId: second.id } })).resolves.toBe(1);
+  });
+});
