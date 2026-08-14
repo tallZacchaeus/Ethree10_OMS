@@ -31,6 +31,16 @@ function run(command, args, env) {
     env: { ...process.env, ...env },
     shell: process.platform === "win32",
   });
+  // Distinguish "could not start the build" from "the build failed". Both stop
+  // the deploy, but only one of them means someone should go looking at the
+  // toolchain rather than at the code.
+  if (result.error) {
+    console.error(
+      `[build-atomic] Could not run \`${command}\`: ${result.error.message}\n` +
+        "Run this through `pnpm build` so node_modules/.bin is on PATH.",
+    );
+    return 1;
+  }
   return result.status ?? 1;
 }
 
