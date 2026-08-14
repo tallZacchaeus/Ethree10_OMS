@@ -35,6 +35,18 @@
 
 ## Auto-deploy (CI/CD)
 
+**Builds are atomic.** `pnpm build` compiles into `.next-build` and only swaps it
+into `.next` once the build has succeeded (`scripts/build-atomic.mjs`). A failed
+build therefore leaves the running app untouched and still serving the previous
+version, and the deploy fails loudly without an outage.
+
+This matters because the deploy rebuilds in place. Before this, a build that
+failed part-way left `.next` partially rewritten while the old server process
+kept running — it served HTML referencing chunks the new build had deleted,
+those requests fell through to Node and returned 500, and the browser reported
+`ChunkLoadError`. A single type error took production down for a day.
+
+
 Push to `main` triggers:
 1. **CI** (`.github/workflows/ci.yml`) — typecheck, lint, unit tests, build
 2. **Deploy** (`.github/workflows/deploy.yml`) — SSHes into VPS, runs `/srv/ethree10/deploy.sh`

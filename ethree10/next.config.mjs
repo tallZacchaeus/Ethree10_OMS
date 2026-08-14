@@ -37,6 +37,11 @@ export const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Build output location. Overridable so a deploy can build into a staging
+  // directory and swap it in only once the build has succeeded — see
+  // scripts/build-atomic.mjs. Unset everywhere else, so this is `.next` for
+  // local development and for `next start`.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   images: {
     remotePatterns: [
       {

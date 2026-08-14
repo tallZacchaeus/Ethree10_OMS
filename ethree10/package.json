@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "concurrently \"next dev\" \"tsx watch workers/index.ts\"",
     "dev:next": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && node scripts/build-atomic.mjs",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

@@ -46,3 +46,7 @@ next-env.d.ts
 
 # Local pnpm content-addressable store — never belongs in git
 .pnpm-store/
+
+# Atomic build staging directories (scripts/build-atomic.mjs)
+.next-build
+.next-previous
