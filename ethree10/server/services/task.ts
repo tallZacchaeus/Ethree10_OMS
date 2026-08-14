@@ -3,6 +3,7 @@ import { Prisma, type TaskStatus, type TaskPriority } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { AuditService } from "@/server/services/audit";
 import { NotificationService } from "@/server/services/notification";
+import { checkAssignmentEligibility } from "@/server/services/assignment-eligibility";
 import { NotificationAudience } from "@/server/services/notification-audience";
 import { EmailService } from "@/server/notifications/email";
 import { IntegrationService } from "@/server/integrations/core/service";
@@ -372,8 +373,46 @@ export class TaskService {
   }
 
   static async assign(args: { actorId: string; taskId: string; assigneeUserId: string }) {
-    const before = await db.task.findUnique({ where: { id: args.taskId } });
+    const before = await db.task.findUnique({
+      where: { id: args.taskId },
+      include: { project: { select: { agencyTeamId: true } } },
+    });
     if (!before) throw new TRPCError({ code: "NOT_FOUND" });
+
+    // Who may receive this work. Until now nothing was checked here at all, so
+    // any user id — including one from the other branch, or one belonging to no
+    // account — was written straight to the task. See
+    // server/services/assignment-eligibility.ts for the rule and its reasoning.
+    const assignee = await db.user.findUnique({
+      where: { id: args.assigneeUserId },
+      select: {
+        isSuperAdmin: true,
+        deactivatedAt: true,
+        memberships: {
+          where: { removedAt: null, acceptedAt: { not: null } },
+          select: { role: true, teamId: true },
+        },
+      },
+    });
+    if (!assignee) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "That user does not exist." });
+    }
+    if (assignee.deactivatedAt) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "That account is deactivated, so work cannot be assigned to it.",
+      });
+    }
+
+    const eligibility = checkAssignmentEligibility({
+      memberships: assignee.memberships,
+      isSuperAdmin: assignee.isSuperAdmin,
+      projectTeamId: before.project.agencyTeamId,
+    });
+    if (!eligibility.ok) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: eligibility.reason });
+    }
+
     const updated = await db.$transaction(async (tx) => {
       await tx.taskContributor.updateMany({
         where: { taskId: args.taskId, removedAt: null },
