@@ -88,3 +88,30 @@ export function checkAssignmentEligibility(
 
   return { ok: true };
 }
+
+/**
+ * Whether someone may decide an assignment on a given branch.
+ *
+ * Holding `task.assignmentApprove` is necessary but not sufficient: a branch
+ * head may only decide on their own branch, or the permission would let one
+ * branch head approve work inside the other branch. Agency-wide holders — COO
+ * and Agency Admin — hold no branch and are not confined by one, the same
+ * reasoning as `checkAssignmentEligibility` above.
+ *
+ * Pure for the same reason: the integration suite does not run in CI.
+ */
+export function canDecideAssignment(input: {
+  holdsApprovePermission: boolean;
+  isSuperAdmin: boolean;
+  /** Branches the approver belongs to. Empty for agency-wide roles. */
+  approverBranchIds: string[];
+  /** Branch the task's project belongs to, or null if unrouted. */
+  taskBranchId: string | null;
+}): boolean {
+  if (input.isSuperAdmin) return true;
+  if (!input.holdsApprovePermission) return false;
+  if (input.approverBranchIds.length === 0) return true;
+  if (!input.taskBranchId) return true;
+  return input.approverBranchIds.includes(input.taskBranchId);
+}
+

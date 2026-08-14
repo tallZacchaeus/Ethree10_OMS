@@ -40,7 +40,12 @@ export type Action =
   | "task.read"
   | "task.create"
   | "task.update"
+  /// Propose an assignee. The proposal only becomes real once someone holding
+  /// task.assignmentApprove decides on it.
   | "task.assign"
+  /// Decide a proposed assignment. Held by branch leads — the branch head must
+  /// approve work given to their people. See docs/service-assignment-plan.md.
+  | "task.assignmentApprove"
   | "task.submitCompletion"
   | "task.review"
   | "task.delete"
@@ -191,7 +196,7 @@ export const ROLE_PERMISSIONS: Record<Role, Action[]> = {
     "request.read", "request.create", "request.update", "request.transition",
     "request.route", "request.approve", "request.reject", "request.delete",
     "project.read", "project.create", "project.update", "project.delete",
-    "task.read", "task.create", "task.update", "task.assign", "task.review", "task.delete",
+    "task.read", "task.create", "task.update", "task.assign", "task.review", "task.assignmentApprove", "task.delete",
     "comment.create",
     "lead.read", "lead.update", "lead.convert",
     "audit.read",
@@ -229,7 +234,7 @@ export const ROLE_PERMISSIONS: Record<Role, Action[]> = {
     "request.read", "request.create", "request.update", "request.transition",
     "request.route", "request.approve", "request.reject",
     "project.read", "project.create", "project.update",
-    "task.read", "task.create", "task.update", "task.assign", "task.review",
+    "task.read", "task.create", "task.update", "task.assign", "task.review", "task.assignmentApprove",
     "comment.create",
     "lead.read", "lead.update", "lead.convert",
     "audit.read",
@@ -253,7 +258,7 @@ export const ROLE_PERMISSIONS: Record<Role, Action[]> = {
     "request.read", "request.update", "request.transition", "request.route",
     "request.approve", "request.reject",
     "project.read", "project.create", "project.update",
-    "task.read", "task.create", "task.update", "task.assign", "task.review",
+    "task.read", "task.create", "task.update", "task.assign", "task.review", "task.assignmentApprove",
     "comment.create",
     "report.read", "report.generate",
     "budget.read", "budget.submit",
