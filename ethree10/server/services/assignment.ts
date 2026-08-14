@@ -9,6 +9,7 @@ import {
   canDecideAssignment,
   checkAssignmentEligibility,
 } from "@/server/services/assignment-eligibility";
+import { buildRationale, rankCandidates } from "@/server/services/assignee-ranking";
 
 /**
  * Proposing work, and the branch head deciding on it.
@@ -86,6 +87,7 @@ export class AssignmentService {
             title: true,
             dueDate: true,
             priority: true,
+            service: { select: { name: true } },
             project: { select: { id: true, name: true, agencyTeamId: true } },
           },
         },
@@ -320,6 +322,112 @@ export class AssignmentService {
     }
 
     return rejected;
+  }
+
+
+  /**
+   * Propose the best available person for a task, using capability and load.
+   *
+   * Returns null rather than guessing when nobody is recorded as able to
+   * deliver the service. A proposal drawn from no capability data is worse than
+   * none: it looks considered, so a branch head is likely to wave it through.
+   * The absence is itself the signal — the task waits for a manual proposal,
+   * and the gap shows up on the service's capability panel.
+   */
+  static async autoPropose(taskId: string) {
+    const task = await db.task.findUnique({
+      where: { id: taskId },
+      select: {
+        id: true,
+        serviceId: true,
+        assigneeUserId: true,
+        project: { select: { agencyTeamId: true } },
+        service: { select: { name: true } },
+      },
+    });
+    if (!task || !task.serviceId) return null;
+
+    // Never override a decision already made, and never stack a second
+    // proposal on top of one still awaiting an answer.
+    if (task.assigneeUserId) return null;
+    const existing = await db.taskAssignment.findFirst({
+      where: { taskId, status: "proposed" },
+      select: { id: true },
+    });
+    if (existing) return null;
+
+    const capabilities = await db.serviceCapability.findMany({
+      where: { serviceId: task.serviceId, revokedAt: null },
+      select: {
+        level: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            isSuperAdmin: true,
+            deactivatedAt: true,
+            memberships: {
+              where: { removedAt: null, acceptedAt: { not: null } },
+              select: { role: true, teamId: true },
+            },
+          },
+        },
+      },
+    });
+
+    // Only people the approval step could actually honour — the same rule the
+    // manual path enforces, so auto-proposal cannot produce something a branch
+    // head is then unable to approve.
+    const eligible = capabilities.filter(
+      (entry) =>
+        !entry.user.deactivatedAt &&
+        checkAssignmentEligibility({
+          memberships: entry.user.memberships,
+          isSuperAdmin: entry.user.isSuperAdmin,
+          projectTeamId: task.project.agencyTeamId,
+        }).ok,
+    );
+    if (eligible.length === 0) return null;
+
+    const loads = await db.task.groupBy({
+      by: ["assigneeUserId"],
+      where: {
+        assigneeUserId: { in: eligible.map((entry) => entry.user.id) },
+        status: { in: ["todo", "in_progress", "in_review"] },
+      },
+      _count: { _all: true },
+      _sum: { estimatedHours: true },
+    });
+    const loadByUser = new Map(
+      loads.map((row) => [
+        row.assigneeUserId,
+        {
+          openTaskCount: row._count._all,
+          estimatedHoursRemaining: Number(row._sum.estimatedHours ?? 0),
+        },
+      ]),
+    );
+
+    const ranked = rankCandidates(
+      eligible.map((entry) => ({
+        userId: entry.user.id,
+        name: entry.user.name,
+        level: entry.level,
+        openTaskCount: loadByUser.get(entry.user.id)?.openTaskCount ?? 0,
+        estimatedHoursRemaining: loadByUser.get(entry.user.id)?.estimatedHoursRemaining ?? 0,
+      })),
+    );
+
+    const rationale = buildRationale(ranked, task.service?.name ?? null);
+
+    // actorId null: the system proposed this, so it is never auto-approved.
+    // A machine suggestion is exactly the case the branch head should see.
+    return AssignmentService.propose({
+      actorId: null,
+      taskId,
+      assigneeId: ranked[0]!.userId,
+      rationale: rationale ?? undefined,
+    });
   }
 
   private static async notifyProposed(

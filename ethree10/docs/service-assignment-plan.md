@@ -1,6 +1,6 @@
 # Plan — service-based assignment with branch-head approval
 
-**Status:** steps 1–3 complete (branch validation; capability model; proposal and approval). Steps 4–5 outstanding — see §7.
+**Status:** steps 1–4 complete (branch validation; capability model; proposal and approval; automatic proposal). Step 5 — rollout — outstanding, see §7.
 **Date:** 2026-08-14
 
 Three things, in one flow:

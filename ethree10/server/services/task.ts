@@ -5,6 +5,7 @@ import { AuditService } from "@/server/services/audit";
 import { NotificationService } from "@/server/services/notification";
 import { checkAssignmentEligibility } from "@/server/services/assignment-eligibility";
 import { NotificationAudience } from "@/server/services/notification-audience";
+import { AssignmentService } from "@/server/services/assignment";
 import { EmailService } from "@/server/notifications/email";
 import { IntegrationService } from "@/server/integrations/core/service";
 import { generateCode } from "@/lib/utils/codes";
@@ -38,6 +39,8 @@ async function subUnitLeadId(subUnitId: string | null): Promise<string | null> {
 
 export interface CreateTaskInput {
   projectId: string;
+  /** Defaults to the originating request's service when omitted. */
+  serviceId?: string;
   title: string;
   description?: string;
   acceptanceCriteria?: string;
@@ -185,7 +188,13 @@ export class TaskService {
   static async create(args: { actorId: string; input: CreateTaskInput }) {
     const project = await db.project.findUnique({
       where: { id: args.input.projectId },
-      select: { id: true, organizationId: true },
+      select: {
+        id: true,
+        organizationId: true,
+        // The originating request's service is the sensible default for what
+        // kind of work a task on this project is.
+        request: { select: { serviceId: true } },
+      },
     });
     if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found." });
 
@@ -205,6 +214,7 @@ export class TaskService {
             ? new Prisma.Decimal(args.input.estimatedHours)
             : null,
         dueDate: args.input.dueDate ?? null,
+        serviceId: args.input.serviceId ?? project.request?.serviceId ?? null,
       },
     });
 
@@ -262,6 +272,13 @@ export class TaskService {
         ?.assigneeUserId ?? null;
     if (finalAssigneeId) {
       await TaskService.notifyAssignment(task.id, finalAssigneeId);
+    } else {
+      // Nobody was named, so propose someone from who can deliver this service.
+      // Best-effort: a task that exists with no proposal is a lead's problem to
+      // solve, but a task that failed to be created is everyone's.
+      await AssignmentService.autoPropose(task.id).catch((error) => {
+        console.error("Auto-proposal failed for", task.code, error);
+      });
     }
     await syncOutbound(() => IntegrationService.onTaskCreated(task));
     return task;
