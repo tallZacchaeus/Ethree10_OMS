@@ -62,6 +62,26 @@ GitHub Actions secrets required:
 
 ---
 
+## Seeding the service catalogue
+
+An environment reporting `Found 0 active services` cannot route requests: triage
+classifies a request against a service, and there is nothing to classify it as.
+Same for a missing branch.
+
+```bash
+cd /srv/ethree10/ethree10
+pnpm bootstrap:catalog --dry-run   # report what is missing
+pnpm bootstrap:catalog             # create it
+```
+
+Creates only branches, departments and services — no users, clients or requests.
+Safe against production and safe to re-run: every write is an upsert keyed on
+slug, archived rows are reactivated rather than duplicated, and a service's
+name and description are never overwritten once an operator has edited them.
+
+**Do not use `pnpm db:seed` for this.** That also creates demo people and sample
+work, and is for local development only.
+
 ## Common commands
 
 ### Logs

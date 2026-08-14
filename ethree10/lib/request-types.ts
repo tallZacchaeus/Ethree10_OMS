@@ -174,3 +174,27 @@ export function labelForTaskType(value: string): string {
 export function isOtherTaskType(value: string): boolean {
   return TASK_TYPE_BY_VALUE.get(value)?.isOther ?? false;
 }
+
+/**
+ * Client-facing blurb per service. Shared by the seed and the catalog
+ * bootstrap so production and demo data cannot describe a service differently.
+ */
+export const SERVICE_BLURBS: Record<string, string> = {
+  graphic_design: "Flyers, social graphics, decks and print pieces that look like you.",
+  video_production: "Filming and editing — events, testimonies, promos and highlight reels.",
+  photography: "Event, portrait and documentary photography, edited and ready to publish.",
+  content_copywriting: "Words that land: articles, scripts, newsletters and web copy.",
+  social_media: "Planning, producing and running your social channels.",
+  branding: "Logo, colours, typography and the guidelines to keep it consistent.",
+  branded_email: "Newsletters and email campaigns designed and set up to send.",
+  flyer_poster: "A single flyer, poster or banner, print- and screen-ready.",
+  website: "A website built for your audience — fast, mobile-friendly and easy to update.",
+  web_application: "A web app for a specific job: portals, dashboards and member areas.",
+  mobile_app: "An Android or iOS app, from first sketch through to the app stores.",
+  ui_ux_design: "Screens and flows designed and tested before anything gets built.",
+  software_automation: "Internal tools and automations that remove repetitive manual work.",
+  survey_form: "Forms and surveys that collect clean data you can actually use.",
+  registration_qr: "Registration links and QR codes for events and sign-ups.",
+  landing_page: "A single focused page for a campaign, event or launch.",
+  budget_request: "Costed proposals and budget planning for a piece of work.",
+};

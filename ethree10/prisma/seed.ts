@@ -1,5 +1,5 @@
 import { PrismaClient, Role, RequestStage, Urgency, TaskStatus, TaskPriority } from "@prisma/client";
-import { DEFAULT_TEAMS, DEFAULT_DEPARTMENTS, TASK_TYPES, TEAM_SLUGS } from "../lib/request-types";
+import { DEFAULT_TEAMS, DEFAULT_DEPARTMENTS, TASK_TYPES, TEAM_SLUGS, SERVICE_BLURBS } from "../lib/request-types";
 import { generatePublicToken } from "../lib/utils/codes";
 
 const prisma = new PrismaClient();
@@ -8,25 +8,6 @@ const prisma = new PrismaClient();
  * Client-facing service descriptions. These appear on the public services page,
  * so they are written for a ministry partner or NGO, not for internal staff.
  */
-const SERVICE_BLURBS: Record<string, string> = {
-  graphic_design: "Flyers, social graphics, decks and print pieces that look like you.",
-  video_production: "Filming and editing — events, testimonies, promos and highlight reels.",
-  photography: "Event, portrait and documentary photography, edited and ready to publish.",
-  content_copywriting: "Words that land: articles, scripts, newsletters and web copy.",
-  social_media: "Planning, producing and running your social channels.",
-  branding: "Logo, colours, typography and the guidelines to keep it consistent.",
-  branded_email: "Newsletters and email campaigns designed and set up to send.",
-  flyer_poster: "A single flyer, poster or banner, print- and screen-ready.",
-  website: "A website built for your audience — fast, mobile-friendly and easy to update.",
-  web_application: "A web app for a specific job: portals, dashboards and member areas.",
-  mobile_app: "An Android or iOS app, from first sketch through to the app stores.",
-  ui_ux_design: "Screens and flows designed and tested before anything gets built.",
-  software_automation: "Internal tools and automations that remove repetitive manual work.",
-  survey_form: "Forms and surveys that collect clean data you can actually use.",
-  registration_qr: "Registration links and QR codes for events and sign-ups.",
-  landing_page: "A single focused page for a campaign, event or launch.",
-  budget_request: "Costed proposals and budget planning for a piece of work.",
-};
 
 async function main() {
   console.log("Seeding database…");
