@@ -1,6 +1,6 @@
 # Plan — service-based assignment with branch-head approval
 
-**Status:** steps 1–4 complete (branch validation; capability model; proposal and approval; automatic proposal). Step 5 — rollout — outstanding, see §7.
+**Status:** complete. All five steps implemented. §11 is the rollout runbook; the remaining work is recording capabilities against real people, which is a judgement call rather than a code change.
 **Date:** 2026-08-14
 
 Three things, in one flow:
@@ -298,3 +298,50 @@ both branches hold an agency-wide role. The "Cross-team solution" service is a
 routing placeholder — a service with `teamId: null` that stays unrouted until
 triaged — not a collaboration mechanism. Worth its own plan if cross-branch work
 is a real pattern rather than an occasional hand-off.
+
+---
+
+## 11. Rollout runbook
+
+The code is inert until capabilities exist. With none recorded, no proposal is
+made, so nothing about assignment changes — that is deliberate, and it means
+this can be merged well before anyone is ready to use it.
+
+### Order of operations
+
+1. **Make sure the service catalogue exists.** Auto-proposal matches on a
+   service, so an environment with none can never propose. On the VPS:
+   `pnpm bootstrap:catalog --dry-run`, then without the flag.
+
+2. **Record who can deliver what.** Settings → Service Catalog, per service.
+   "Suggest from skills" proposes people whose recorded skills match; the direct
+   picker covers everyone else. Start with the services that actually receive
+   work rather than trying to complete the matrix in one sitting.
+
+3. **Watch the coverage panel.** Branch Dashboard → Workload shows how many of
+   the branch's services have somebody recorded, and names the ones that do not.
+   That number going up is the rollout.
+
+4. **Let it run.** Nothing needs enabling. The first task created for a covered
+   service will produce a proposal, which appears in the branch head's queue on
+   Assignments.
+
+### What to expect in the first weeks
+
+- **Proposals will look obvious at first.** With little load data, ranking is
+  mostly capability level, so the most senior capable person keeps coming up.
+  That corrects itself as open task counts diverge.
+- **Uncovered services stay manual**, exactly as before this work. Nobody is
+  blocked; they simply get no suggestion.
+- **The approval queue should not grow.** A proposal nobody decides on is work
+  nobody is doing, since the task stays unassigned. If the queue is filling up,
+  that is a signal about the branch head's bandwidth rather than about the
+  feature.
+
+### If it proposes badly
+
+The ranking is deliberately simple and lives in one pure function,
+`server/services/assignee-ranking.ts`, with unit tests describing the intended
+order. Change it there rather than at the call site, and the tests will tell you
+what you changed.
+
