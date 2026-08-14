@@ -249,15 +249,17 @@ export const LIFECYCLE: HelpStep[] = [
       "The branch head submits ₦1,800,000 — ₦1,400,000 billed to Lightbearers, ₦400,000 expected agency cost including stock photography. Every Chief Executive is notified. She approves it with the note \"Approved; keep photography under ₦400k.\" Only now can Finance raise an invoice.",
   },
   {
-    title: "6 · Work is broken into tasks and assigned",
+    title: "6 · Work is broken into tasks, proposed, and approved",
     detail:
-      "Leads create tasks and assign them. Work can start before the budget is approved — only money is gated, never delivery.",
+      "Leads create tasks and put forward who should do each one. That is a proposal, not the assignment: the branch head approves it, and only then is the task really assigned. Where the service records who can deliver it, the system proposes the best-placed person itself — most capable first, then whoever is least loaded. Work can start before the budget is approved; only money is gated, never delivery.",
+    requires: ["The task's service has somebody recorded who can deliver it, for an automatic proposal"],
     then: [
-      "The assignee is emailed the brief, deadline, priority and a direct link",
-      "The task appears in their My Work",
+      "Until it is approved the task is assigned to nobody and appears in no one's My Work",
+      "Once approved, the assignee is emailed the brief, deadline, priority and a direct link",
+      "Declining sends it back with a reason, and the task stays unassigned",
     ],
     example:
-      "The department lead creates four tasks — \"Homepage wireframe\", \"Events page build\", \"Content migration\", \"Accessibility pass\" — and assigns the first to a designer with an estimate of 12 hours, due 5 November. It lands in that designer's My Work and in their inbox.",
+      "The department lead creates four tasks. For \"Homepage wireframe\" the system proposes the designer — expert at that service, two open tasks — and notes who else it considered. It waits in the branch head's approval queue; nobody is working on it yet. The branch head approves, and only then does it appear in the designer's My Work. Had the branch head created and proposed it themselves, it would have been approved on the spot: there is no point asking someone to approve their own decision.",
   },
   {
     title: "7 · The task is done and submitted for review",
@@ -621,9 +623,11 @@ export const ROLE_GUIDES: RoleGuide[] = [
         ],
       },
       {
-        heading: "Assigning work well",
+        heading: "Approving assignments",
         body:
-          "Check Workload before you assign — it is calculated from real estimates and logged hours, not self-reports. The moment you assign someone, they are emailed the brief, project, priority, deadline, estimated effort and acceptance criteria, with a direct link. Re-saving a task does not re-notify; only a real change of assignee does.",
+          "Work is proposed to you, not assigned around you. A department lead putting someone forward, or the system proposing from who can deliver the service, creates a proposal that waits in your queue on Assignments — and the task belongs to nobody until you decide. Approving is what actually assigns it and emails the brief; declining sends it back with your reason. When you propose someone yourself it is approved immediately, because asking you to approve your own decision would make the whole step meaningless.",
+        example:
+          "\"Homepage wireframe · Auto-proposed: expert at this service · 2 open tasks · also considered Kelechi Obi.\" You can see why that person and who else was in the frame, so approving is a judgement rather than a rubber stamp.",
       },
       {
         heading: "Delivering to the client",
@@ -640,7 +644,7 @@ export const ROLE_GUIDES: RoleGuide[] = [
       "You lead a department inside a branch — Engineering inside Tech & Product, or Video & Photography inside Digital Media, for example. You report to your branch head. Your focus is the flow of your department's work: who is doing what, whether they are overloaded, and whether what they produce is good enough to go up.",
     home: "Branch Dashboard, then Assignments",
     can: [
-      "Assign and re-assign your department's work",
+      "Put people forward for your department's work — the branch head approves it",
       "Review submitted work and request revisions",
       "Create and update projects your department owns",
       "Move requests along their lifecycle",
@@ -688,7 +692,7 @@ export const ROLE_GUIDES: RoleGuide[] = [
     label: "Team Member",
     tagline: "Does the work.",
     summary:
-      "You deliver. Your app is deliberately small — most days you will use My Work and nothing else. You do not have to hunt for what you have been given: you are emailed the moment work is assigned to you.",
+      "You deliver. Your app is deliberately small — most days you will use My Work and nothing else. You do not have to hunt for what you have been given: you are emailed the moment work is assigned to you. Nothing reaches you until a branch head has approved it, so anything in My Work is genuinely yours to start.",
     home: "My Work",
     can: [
       "See and work the tasks assigned to you",
