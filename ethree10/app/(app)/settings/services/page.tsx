@@ -4,6 +4,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CapabilityPanel } from "./capability-panel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,6 +35,6 @@ export default function ServiceCatalogPage() {
         <Button type="submit" disabled={create.isPending}>Add service</Button>
       </form>
     </CardContent></Card>
-    <div className="grid gap-4 md:grid-cols-2">{services.map((service) => <Card key={service.id}><CardHeader><CardTitle className="flex items-center justify-between text-lg"><span>{service.name}</span><Badge variant={service.isActive ? "default" : "secondary"}>{service.isActive ? "Active" : "Inactive"}</Badge></CardTitle></CardHeader><CardContent className="space-y-2 text-sm"><p>{service.description || "No description"}</p><p><strong>Routes to:</strong> {service.team?.name || "Agency fallback"}</p><p><strong>SLA:</strong> {service.defaultSlaHours ? `${service.defaultSlaHours} hours` : "Not set"}</p><p><strong>Requests:</strong> {service._count.requests}</p></CardContent></Card>)}</div>
+    <div className="grid gap-4 md:grid-cols-2">{services.map((service) => <Card key={service.id}><CardHeader><CardTitle className="flex items-center justify-between text-lg"><span>{service.name}</span><Badge variant={service.isActive ? "default" : "secondary"}>{service.isActive ? "Active" : "Inactive"}</Badge></CardTitle></CardHeader><CardContent className="space-y-2 text-sm"><p>{service.description || "No description"}</p><p><strong>Routes to:</strong> {service.team?.name || "Agency fallback"}</p><p><strong>SLA:</strong> {service.defaultSlaHours ? `${service.defaultSlaHours} hours` : "Not set"}</p><p><strong>Requests:</strong> {service._count.requests}</p><CapabilityPanel serviceId={service.id} /></CardContent></Card>)}</div>
   </div>;
 }
