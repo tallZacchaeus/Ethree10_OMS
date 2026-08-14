@@ -3,6 +3,8 @@ import { TRPCError } from "@trpc/server";
 import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { assertLeadIsActiveMember } from "@/server/services/org-structure";
+import { NotificationService } from "@/server/services/notification";
+import { NotificationAudience } from "@/server/services/notification-audience";
 
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -32,7 +34,7 @@ export const subunitsRouter = router({
         where: { id: input.teamId },
       });
       if (!dept) throw new TRPCError({ code: "NOT_FOUND" });
-      return ctx.db.subUnit.create({
+      const created = await ctx.db.subUnit.create({
         data: {
           teamId: input.teamId,
           name: input.name,
@@ -40,6 +42,21 @@ export const subunitsRouter = router({
           description: input.description,
         },
       });
+      await NotificationService.createMany(
+        [
+          ...(await NotificationAudience.agencyWide(ctx.userId)),
+          ...(await NotificationAudience.branchLead(input.teamId, ctx.userId)),
+        ],
+        {
+          kind: "department_created",
+          title: `New department: ${created.name}`,
+          body: `Added under ${dept.name}.`,
+          link: "/teams",
+          entityType: "SubUnit",
+          entityId: created.id,
+        },
+      );
+      return created;
     }),
 
   update: protectedProcedure
@@ -60,7 +77,31 @@ export const subunitsRouter = router({
       // Slug left alone on rename — it is unique per branch and used as a
       // stable handle, the same reasoning as on Team.
       const { id, ...data } = input;
-      return ctx.db.subUnit.update({ where: { id }, data });
+      const before = await ctx.db.subUnit.findUnique({ where: { id }, select: { leadId: true } });
+      const subUnit = await ctx.db.subUnit.update({ where: { id }, data });
+
+      if (input.leadId !== undefined && before?.leadId !== subUnit.leadId) {
+        await NotificationService.createMany(
+          [
+            ...NotificationAudience.subject(subUnit.leadId, ctx.userId),
+            ...(await NotificationAudience.branchLead(subUnit.teamId, ctx.userId)),
+          ],
+          {
+            kind: "department_lead_assigned",
+            title: subUnit.leadId
+              ? `Department lead set: ${subUnit.name}`
+              : `Department lead cleared: ${subUnit.name}`,
+            body: subUnit.leadId
+              ? "You assign and review this department's work."
+              : "The department currently has no lead.",
+            link: "/teams",
+            entityType: "SubUnit",
+            entityId: subUnit.id,
+            allowDuplicate: true,
+          },
+        );
+      }
+      return subUnit;
     }),
 
   archive: protectedProcedure
@@ -95,9 +136,24 @@ export const subunitsRouter = router({
         });
       }
 
-      return ctx.db.subUnit.update({
+      const archived = await ctx.db.subUnit.update({
         where: { id: input.id },
         data: { archivedAt: new Date() },
       });
+      await NotificationService.createMany(
+        [
+          ...(await NotificationAudience.agencyWide(ctx.userId)),
+          ...(await NotificationAudience.branchLead(archived.teamId, ctx.userId)),
+        ],
+        {
+          kind: "department_archived",
+          title: `Department archived: ${archived.name}`,
+          body: "The department is no longer part of the active structure.",
+          link: "/teams",
+          entityType: "SubUnit",
+          entityId: archived.id,
+        },
+      );
+      return archived;
     }),
 });

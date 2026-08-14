@@ -3,6 +3,8 @@ import { TRPCError } from "@trpc/server";
 import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { assertLeadIsActiveMember, resolveLeads } from "@/server/services/org-structure";
+import { NotificationService } from "@/server/services/notification";
+import { NotificationAudience } from "@/server/services/notification-audience";
 
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -75,7 +77,7 @@ export const teamsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await ctx.authorize("team.create");
-      return ctx.db.team.create({
+      const team = await ctx.db.team.create({
         data: {
           name: input.name,
           slug: slugify(input.name),
@@ -84,6 +86,15 @@ export const teamsRouter = router({
           icon: input.icon,
         },
       });
+      await NotificationService.createMany(await NotificationAudience.agencyWide(ctx.userId), {
+        kind: "branch_created",
+        title: `New branch: ${team.name}`,
+        body: "A branch was added to the agency structure.",
+        link: "/teams",
+        entityType: "Team",
+        entityId: team.id,
+      });
+      return team;
     }),
 
   update: protectedProcedure
@@ -112,7 +123,31 @@ export const teamsRouter = router({
       // The slug is deliberately left alone on rename: it is @unique, and
       // `publicCategoryLabel` on the marketing site keys off it.
       const { id, ...data } = input;
-      return ctx.db.team.update({ where: { id }, data });
+      const before = await ctx.db.team.findUnique({ where: { id }, select: { leadId: true } });
+      const team = await ctx.db.team.update({ where: { id }, data });
+
+      // Only when the lead actually changes. Renaming or recolouring a branch
+      // is not something to put in anyone's inbox.
+      if (input.leadId !== undefined && before?.leadId !== team.leadId) {
+        await NotificationService.createMany(
+          [
+            ...NotificationAudience.subject(team.leadId, ctx.userId),
+            ...(await NotificationAudience.agencyWide(ctx.userId)),
+          ],
+          {
+            kind: "branch_lead_assigned",
+            title: team.leadId ? `Branch lead set: ${team.name}` : `Branch lead cleared: ${team.name}`,
+            body: team.leadId
+              ? "You are responsible for this branch's delivery, routing and reviews."
+              : "The branch currently has no lead.",
+            link: "/teams",
+            entityType: "Team",
+            entityId: team.id,
+            allowDuplicate: true,
+          },
+        );
+      }
+      return team;
     }),
 
   archive: protectedProcedure
@@ -148,9 +183,18 @@ export const teamsRouter = router({
         });
       }
 
-      return ctx.db.team.update({
+      const archived = await ctx.db.team.update({
         where: { id: input.id },
         data: { archivedAt: new Date() },
       });
+      await NotificationService.createMany(await NotificationAudience.agencyWide(ctx.userId), {
+        kind: "branch_archived",
+        title: `Branch archived: ${archived.name}`,
+        body: "The branch is no longer part of the active agency structure.",
+        link: "/teams",
+        entityType: "Team",
+        entityId: archived.id,
+      });
+      return archived;
     }),
 });

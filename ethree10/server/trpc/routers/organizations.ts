@@ -5,6 +5,9 @@ import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { db } from "@/server/db/client";
 import { assertRoleSetAllowed } from "@/server/auth/role-guard";
+import { NotificationService } from "@/server/services/notification";
+import { NotificationAudience } from "@/server/services/notification-audience";
+import { ROLE_LABELS } from "@/server/auth/role-groups";
 
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -68,7 +71,7 @@ export const organizationsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await ctx.authorize("organization.create");
-      return ctx.db.organization.create({
+      const organization = await ctx.db.organization.create({
         data: {
           name: input.name,
           slug: slugify(input.name),
@@ -76,16 +79,34 @@ export const organizationsRouter = router({
           description: input.description,
         },
       });
+      await NotificationService.createMany(await NotificationAudience.agencyWide(ctx.userId), {
+        kind: "client_created",
+        title: `New client: ${organization.name}`,
+        body: input.isExternal ? "External client organisation added." : "Client organisation added.",
+        link: `/organizations/${organization.id}`,
+        entityType: "Organization",
+        entityId: organization.id,
+      });
+      return organization;
     }),
 
   archiveOrganization: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.authorize("organization.archive");
-      return ctx.db.organization.update({
+      const organization = await ctx.db.organization.update({
         where: { id: input.id },
         data: { archivedAt: new Date() },
       });
+      await NotificationService.createMany(await NotificationAudience.agencyWide(ctx.userId), {
+        kind: "client_archived",
+        title: `Client archived: ${organization.name}`,
+        body: "The client organisation is no longer active.",
+        link: "/organizations",
+        entityType: "Organization",
+        entityId: organization.id,
+      });
+      return organization;
     }),
 
   // Invite a member. organizationId set = client member of that org; null = agency staff.
@@ -108,7 +129,7 @@ export const organizationsRouter = router({
         update: {},
       });
       await assertRoleSetAllowed(user.id, input.role);
-      return ctx.db.membership.create({
+      const membership = await ctx.db.membership.create({
         data: {
           userId: user.id,
           role: input.role,
@@ -119,6 +140,24 @@ export const organizationsRouter = router({
           acceptedAt: new Date(),
         },
       });
+
+      await NotificationService.createMany(
+        [
+          ...NotificationAudience.subject(user.id, ctx.userId),
+          ...(await NotificationAudience.administrators(ctx.userId)),
+        ],
+        {
+          kind: "member_invited",
+          title: `${user.name} joined as ${ROLE_LABELS[input.role]}`,
+          body: "Agency access has been granted.",
+          link: "/members",
+          entityType: "Membership",
+          entityId: membership.id,
+          allowDuplicate: true,
+        },
+      );
+
+      return membership;
     }),
 
   removeMember: protectedProcedure

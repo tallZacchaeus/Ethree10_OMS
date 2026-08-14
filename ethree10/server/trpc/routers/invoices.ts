@@ -12,6 +12,8 @@ import { ReceiptService } from "@/server/services/receipt";
 import { BudgetService } from "@/server/services/budget";
 import { EmailService } from "@/server/notifications/email";
 import { AuditService } from "@/server/services/audit";
+import { NotificationService } from "@/server/services/notification";
+import { NotificationAudience } from "@/server/services/notification-audience";
 function generateCode() {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
 }
@@ -157,6 +159,21 @@ export const invoicesRouter = router({
         entityId: invoice.id,
         after: { to: input.email, emailed: sent },
       });
+      await NotificationService.createMany(
+        await NotificationAudience.moneyOversight(ctx.userId),
+        {
+          kind: "invoice_sent",
+          title: `Invoice ${invoice.code} sent`,
+          body: `${invoice.currency} ${invoice.amount.toString()} to ${input.email}${
+            sent ? "" : " — the email could not be delivered"
+          }`,
+          link: "/invoices",
+          entityType: "Invoice",
+          entityId: invoice.id,
+          allowDuplicate: true,
+        },
+      );
+
       return { emailed: sent, publicUrl: invoicePublicUrl(invoice.code) };
     }),
 
