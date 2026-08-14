@@ -4,6 +4,9 @@ import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { Role, type SkillLevel } from "@prisma/client";
 import { requireAgencyAction } from "@/server/services/agency";
+import { NotificationService } from "@/server/services/notification";
+import { NotificationAudience } from "@/server/services/notification-audience";
+import { ROLE_LABELS } from "@/server/auth/role-groups";
 import { assertRoleSetAllowed } from "@/server/auth/role-guard";
 
 const skillLevelOrder: Record<SkillLevel, number> = {
@@ -131,7 +134,12 @@ export const membersRouter = router({
         }
       }
 
-      return ctx.db.$transaction(async (tx) => {
+      const previous = await ctx.db.membership.findUnique({
+        where: { id: input.membershipId },
+        select: { role: true },
+      });
+
+      const updated = await ctx.db.$transaction(async (tx) => {
         await tx.user.update({
           where: { id: membership.userId },
           data: { name: input.name },
@@ -160,6 +168,29 @@ export const membersRouter = router({
           },
         });
       });
+
+      // Only on an actual role change. Renaming someone or moving them between
+      // departments is not a permission event, and notifying on it would bury
+      // the one message here that genuinely matters.
+      if (previous && previous.role !== input.role) {
+        await NotificationService.createMany(
+          [
+            ...NotificationAudience.subject(membership.userId, ctx.userId),
+            ...(await NotificationAudience.administrators(ctx.userId)),
+          ],
+          {
+            kind: "member_role_changed",
+            title: `Role changed to ${ROLE_LABELS[input.role]}`,
+            body: `${updated.user.name} is now ${ROLE_LABELS[input.role]} (was ${ROLE_LABELS[previous.role]}).`,
+            link: "/members",
+            entityType: "Membership",
+            entityId: updated.id,
+            allowDuplicate: true,
+          },
+        );
+      }
+
+      return updated;
     }),
 
   removeMembership: protectedProcedure
@@ -180,10 +211,30 @@ export const membersRouter = router({
           message: "You cannot remove your own member access.",
         });
       }
-      return ctx.db.membership.update({
+      const removed = await ctx.db.membership.update({
         where: { id: input.membershipId },
         data: { removedAt: new Date() },
       });
+
+      // The person losing access is told, and so are the administrators — a
+      // membership disappearing with no record is how access disputes start.
+      await NotificationService.createMany(
+        [
+          ...NotificationAudience.subject(membership.userId, ctx.userId),
+          ...(await NotificationAudience.administrators(ctx.userId)),
+        ],
+        {
+          kind: "member_removed",
+          title: "Agency access removed",
+          body: "A membership was removed. Speak to an Agency Admin if this is unexpected.",
+          link: "/members",
+          entityType: "Membership",
+          entityId: removed.id,
+          allowDuplicate: true,
+        },
+      );
+
+      return removed;
     }),
 
   searchBySkill: protectedProcedure

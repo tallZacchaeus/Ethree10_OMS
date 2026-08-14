@@ -3,6 +3,7 @@ import { Prisma, type ProposalStatus } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { AuditService } from "@/server/services/audit";
 import { NotificationService } from "@/server/services/notification";
+import { NotificationAudience } from "@/server/services/notification-audience";
 import { ProjectService } from "@/server/services/project";
 import { AuthorizationService } from "@/server/services/authorization";
 
@@ -201,6 +202,21 @@ export class ProposalService {
       where: { id: args.proposalId },
       data: { status: "accepted", acceptedAt: new Date(), acceptedById: args.actorId },
     });
+
+    // The kind existed but nothing ever emitted it: a proposal could be
+    // accepted and the people who would act on it were never told.
+    await NotificationService.createMany(
+      await NotificationAudience.agencyWide(args.actorId),
+      {
+        kind: "proposal_accepted",
+        title: `Proposal accepted: ${before.title ?? updated.id}`,
+        body: "The client accepted the proposal — the work can be scoped and scheduled.",
+        link: before.request ? `/requests/${before.request.id}` : "/projects",
+        entityType: "Proposal",
+        entityId: updated.id,
+        allowDuplicate: true,
+      },
+    );
 
     const organizationId = before.request?.organizationId || before.project?.organizationId;
     if (organizationId) {

@@ -1223,6 +1223,34 @@ enum NotificationKind {
   approval_requested
   integration_degraded
   csat_received
+  // ── Money ────────────────────────────────────────────────────────────────
+  invoice_sent
+  invoice_overdue
+  payment_received
+  receipt_issued
+  expense_requested
+  expense_paid
+  budget_decided
+  // ── People ───────────────────────────────────────────────────────────────
+  member_invited
+  member_role_changed
+  member_removed
+  // ── Agency structure ─────────────────────────────────────────────────────
+  branch_created
+  branch_archived
+  branch_lead_assigned
+  department_created
+  department_archived
+  department_lead_assigned
+  client_created
+  client_archived
+  // ── Delivery artefacts ───────────────────────────────────────────────────
+  deliverable_created
+  deliverable_version_added
+  contributors_changed
+  // ── Enquiries ────────────────────────────────────────────────────────────
+  lead_received
+  lead_converted
 }
 
 model Notification {

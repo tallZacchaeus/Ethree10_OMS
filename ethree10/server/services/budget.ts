@@ -5,6 +5,7 @@ import { AuditService } from "@/server/services/audit";
 import { ReceiptService } from "@/server/services/receipt";
 import { requireAgencyAction } from "@/server/services/agency";
 import { NotificationService } from "@/server/services/notification";
+import { NotificationAudience } from "@/server/services/notification-audience";
 import { DelegationService } from "@/server/services/delegation";
 import { captureCriticalFailure } from "@/lib/observability";
 
@@ -226,10 +227,25 @@ export class BudgetService {
       after: { status: args.decision, note: args.note ?? null },
     });
 
-    if (budget.submittedById) {
+    // The submitter needs to know, but so does everyone waiting on the money:
+    // an approval unblocks invoicing and spend for the whole project team.
+    await NotificationService.createMany(
+      await NotificationAudience.projectTeam(budget.projectId, actorId),
+      {
+        kind: "budget_decided",
+        title: `Budget ${args.decision} — ${budget.project.name}`,
+        body: `${budget.currency} ${budget.amount.toString()}${args.note ? ` · ${args.note}` : ""}`,
+        link: `/projects/${budget.projectId}`,
+        entityType: "Budget",
+        entityId: budget.id,
+        allowDuplicate: true,
+      },
+    );
+
+    if (budget.submittedById && budget.submittedById !== actorId) {
       await NotificationService.create({
         userId: budget.submittedById,
-        kind: "approval_requested",
+        kind: "budget_decided",
         title: `Budget ${args.decision}`,
         body: `${budget.project.name} — ${budget.currency} ${budget.amount.toString()}${
           args.note ? ` · ${args.note}` : ""
@@ -324,6 +340,30 @@ export class BudgetService {
       throw error;
     }
 
+    // Money landing is the event the whole agency waits on, so it goes to
+    // Finance and the executives rather than only the person who clicked.
+    const moneyAudience = await NotificationAudience.moneyOversight(actorId);
+    await NotificationService.createMany(moneyAudience, {
+      kind: "payment_received",
+      title: `Payment received — ${invoice.code}`,
+      body: `${invoice.currency} ${invoice.amount.toString()} confirmed${
+        args.paymentRef ? ` · ref ${args.paymentRef}` : ""
+      }`,
+      link: `/invoices`,
+      entityType: "Invoice",
+      entityId: invoice.id,
+      allowDuplicate: true,
+    });
+    await NotificationService.createMany(moneyAudience, {
+      kind: "receipt_issued",
+      title: `Receipt ${receipt.code} issued`,
+      body: `For invoice ${invoice.code}.`,
+      link: `/receipts`,
+      entityType: "Receipt",
+      entityId: receipt.id,
+      allowDuplicate: true,
+    });
+
     await AuditService.log({
       actorId,
       action: "invoice.paymentConfirmed",
@@ -386,6 +426,19 @@ export class BudgetService {
       after: { amount: args.amount, projectId: args.projectId },
     });
 
+    // Finance are the only people who can pay this, so they are the only people
+    // for whom it is actionable. Without this the request sat until somebody
+    // happened to open the Expenses screen.
+    await NotificationService.createMany(await NotificationAudience.finance(actorId), {
+      kind: "expense_requested",
+      title: "Expense awaiting payment",
+      body: `${args.description} — ${budget.currency} ${args.amount.toLocaleString()}`,
+      link: "/expenses",
+      entityType: "Expense",
+      entityId: expense.id,
+      allowDuplicate: true,
+    });
+
     return expense;
   }
 
@@ -434,7 +487,7 @@ export class BudgetService {
 
     await NotificationService.create({
       userId: expense.requestedById,
-      kind: "approval_requested",
+      kind: "expense_paid",
       title: "Expense paid",
       body: `${expense.description} — ${expense.currency} ${expense.amount.toString()}`,
       link: `/expenses`,

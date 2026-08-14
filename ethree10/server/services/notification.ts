@@ -6,7 +6,12 @@ import { TwilioService } from "@/server/notifications/twilio";
 const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 60 minutes
 
 // Kinds that also send an email by default (task_due_soon is in-app only).
-const EMAIL_KINDS = new Set<NotificationKind>([
+//
+// Every kind added for the "notify on all activities" work emails by default.
+// tests/unit/notification-coverage.test.ts asserts that, so a new kind cannot
+// be added and silently default to in-app only. Anyone who finds a kind noisy
+// can turn its email off per-kind in Settings; the in-app record remains.
+export const EMAIL_KINDS = new Set<NotificationKind>([
   "request_submitted",
   "request_assigned",
   "request_state_changed",
@@ -20,6 +25,34 @@ const EMAIL_KINDS = new Set<NotificationKind>([
   "approval_requested",
   "integration_degraded",
   "csat_received",
+  // Money
+  "invoice_sent",
+  "invoice_overdue",
+  "payment_received",
+  "receipt_issued",
+  "expense_requested",
+  "expense_paid",
+  "budget_decided",
+  // People
+  "member_invited",
+  "member_role_changed",
+  "member_removed",
+  // Agency structure
+  "branch_created",
+  "branch_archived",
+  "branch_lead_assigned",
+  "department_created",
+  "department_archived",
+  "department_lead_assigned",
+  "client_created",
+  "client_archived",
+  // Delivery artefacts
+  "deliverable_created",
+  "deliverable_version_added",
+  "contributors_changed",
+  // Enquiries
+  "lead_received",
+  "lead_converted",
 ]);
 
 type DeliveryPreferences = {

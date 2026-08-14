@@ -3,6 +3,7 @@ import { Prisma, type TaskStatus, type TaskPriority } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { AuditService } from "@/server/services/audit";
 import { NotificationService } from "@/server/services/notification";
+import { NotificationAudience } from "@/server/services/notification-audience";
 import { EmailService } from "@/server/notifications/email";
 import { IntegrationService } from "@/server/integrations/core/service";
 import { generateCode } from "@/lib/utils/codes";
@@ -832,5 +833,67 @@ export class TaskService {
       });
     }
     return task;
+  }
+
+  /**
+   * Daily sweep for work approaching or past its due date.
+   *
+   * Both `task_due_soon` and `task_overdue` existed as notification kinds from
+   * the start but nothing ever emitted them — a task could sail past its
+   * deadline and the only way to notice was to look. Runs from the reports
+   * worker; see workers/index.ts.
+   *
+   * Dedup is left ON deliberately here: this runs every day against the same
+   * tasks, and the hour-long window plus a per-day schedule means one reminder
+   * per task per run rather than a pile-up.
+   */
+  static async notifyDueAndOverdue(now = new Date()): Promise<{ dueSoon: number; overdue: number }> {
+    const soon = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    const open: { notIn: TaskStatus[] } = { notIn: ["done", "cancelled"] };
+
+    const dueSoon = await db.task.findMany({
+      where: { status: open, dueDate: { gte: now, lte: soon } },
+      select: { id: true, title: true, dueDate: true, assigneeUserId: true, projectId: true },
+    });
+
+    const overdue = await db.task.findMany({
+      where: { status: open, dueDate: { lt: now } },
+      select: { id: true, title: true, dueDate: true, assigneeUserId: true, projectId: true },
+    });
+
+    for (const task of dueSoon) {
+      if (!task.assigneeUserId) continue;
+      await NotificationService.create({
+        userId: task.assigneeUserId,
+        kind: "task_due_soon",
+        title: `Due soon: ${task.title}`,
+        body: `Due ${task.dueDate?.toDateString() ?? "shortly"}.`,
+        link: `/tasks/${task.id}`,
+        entityType: "Task",
+        entityId: task.id,
+      });
+    }
+
+    for (const task of overdue) {
+      // Overdue goes wider than the assignee: the lead chasing delivery needs
+      // it too, and an assignee who has gone quiet is exactly the case where
+      // telling only them achieves nothing.
+      const recipients = new Set<string>();
+      if (task.assigneeUserId) recipients.add(task.assigneeUserId);
+      if (task.projectId) {
+        for (const id of await NotificationAudience.projectTeam(task.projectId)) recipients.add(id);
+      }
+      if (recipients.size === 0) continue;
+      await NotificationService.createMany(Array.from(recipients), {
+        kind: "task_overdue",
+        title: `Overdue: ${task.title}`,
+        body: `Was due ${task.dueDate?.toDateString() ?? "earlier"}.`,
+        link: `/tasks/${task.id}`,
+        entityType: "Task",
+        entityId: task.id,
+      });
+    }
+
+    return { dueSoon: dueSoon.length, overdue: overdue.length };
   }
 }

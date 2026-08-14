@@ -96,9 +96,9 @@ export const UNIVERSAL_RULES: HelpSection[] = [
   {
     heading: "When the system will contact you, and how",
     body:
-      "You are notified when work is assigned to you, when a task you own is due soon or overdue, when someone replies on something you are responsible for, when a client comments or accepts delivery, when a budget needs your approval, and when a report you are accountable for is finalized. Notifications appear on the bell in the top bar and in full at Notifications; most also send an email. You can turn individual kinds of email off in Settings — the in-app record always remains, so turning email off never means missing something entirely.",
+      "The system tells you about anything you are accountable for. Work assigned to you; a task of yours due within two days or already late; replies and mentions; client comments and delivery decisions; budgets awaiting approval and the decision that follows; invoices sent, paid, overdue, and receipts issued; expenses raised and paid; people joining, changing role or losing access; branches, departments and clients created, archived or given a new lead; deliverables and new revisions on work you are reviewing; enquiries arriving and being converted; and reports you are accountable for being finalized. Notifications appear on the bell in the top bar and in full at Notifications, and each one also sends an email by default. Every kind can be switched off individually in Settings — the in-app record always remains, so turning email off never means missing something entirely.",
     example:
-      "A client replies on REQ-2026-0042 at 14:10. The branch head, the project manager and the Agency Admins each get a bell notification and an email within a minute. Two separate replies produce two separate notifications — repeat messages are never silently merged.",
+      "A client replies on REQ-2026-0042 at 14:10. The branch head, the project manager and the Agency Admins each get a bell notification and an email within a minute. Two separate replies produce two separate notifications — repeat messages are never silently merged. You are never notified about your own actions: confirming a payment tells Finance and the executives, not you.",
   },
   {
     heading: "Finding things quickly",

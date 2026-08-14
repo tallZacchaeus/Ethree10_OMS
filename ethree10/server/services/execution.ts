@@ -6,6 +6,9 @@ import type {
 } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { AuditService } from "@/server/services/audit";
+import type { NotificationKind } from "@prisma/client";
+import { NotificationService } from "@/server/services/notification";
+import { NotificationAudience } from "@/server/services/notification-audience";
 
 export class ExecutionService {
   static async setContributors(args: {
@@ -89,6 +92,16 @@ export class ExecutionService {
       entityId: task.id,
       after: { contributors: result.map((item) => ({ userId: item.userId, role: item.contributionRole })) },
     });
+    // Being added as a contributor is how someone finds out they are expected
+    // to work on something they were not assigned.
+    await ExecutionService.notifyTaskAudience(args.taskId, args.actorId, {
+      kind: "contributors_changed",
+      title: "Contributors updated",
+      body: `${args.contributors.length} ${args.contributors.length === 1 ? "person is" : "people are"} now credited on this task.`,
+      entityType: "Task",
+      entityId: args.taskId,
+    });
+
     return result;
   }
 
@@ -214,6 +227,21 @@ export class ExecutionService {
       entityId: deliverable.id,
       after: { taskId: args.taskId, kind: args.kind, visibility: args.visibility, revision: 1 },
     });
+
+    // A deliverable is what a review is performed against, so the reviewing
+    // lead needs to know one exists — previously it appeared silently and was
+    // only found by opening the task.
+    await ExecutionService.notifyTaskAudience(args.taskId, args.actorId, {
+      kind: "deliverable_created",
+      title: `Deliverable added: ${args.title}`,
+      body:
+        args.visibility === "client"
+          ? "Marked client-visible — it will appear on the client's tracking link."
+          : "Internal deliverable.",
+      entityType: "Deliverable",
+      entityId: deliverable.id,
+    });
+
     return deliverable;
   }
 
@@ -242,6 +270,17 @@ export class ExecutionService {
         },
       });
       await tx.deliverable.update({ where: { id: current.id }, data: { currentRevision: revision } });
+      return { version, taskId: current.taskId, title: current.title, revision };
+    }).then(async ({ version, taskId, title, revision }) => {
+      // A new revision is usually a response to review feedback, so the person
+      // who asked for the change is exactly who needs to know it landed.
+      await ExecutionService.notifyTaskAudience(taskId, args.actorId, {
+        kind: "deliverable_version_added",
+        title: `${title} — revision ${revision}`,
+        body: args.notes?.trim() || "A new version was submitted.",
+        entityType: "Deliverable",
+        entityId: args.deliverableId,
+      });
       return version;
     });
   }
@@ -274,6 +313,40 @@ export class ExecutionService {
         },
       },
       orderBy: [{ dueDate: "asc" }, { priority: "desc" }, { createdAt: "asc" }],
+    });
+  }
+
+  /**
+   * Everyone who should hear about an artefact on a task: whoever is doing the
+   * work, and whoever will review it. Resolved once here so the three call
+   * sites below cannot drift apart.
+   */
+  private static async notifyTaskAudience(
+    taskId: string,
+    actorId: string,
+    args: { kind: NotificationKind; title: string; body: string; entityType: string; entityId: string },
+  ) {
+    const task = await db.task.findUnique({
+      where: { id: taskId },
+      select: { id: true, title: true, assigneeUserId: true, projectId: true },
+    });
+    if (!task) return;
+
+    const recipients = new Set<string>();
+    if (task.assigneeUserId) recipients.add(task.assigneeUserId);
+    if (task.projectId) {
+      for (const id of await NotificationAudience.projectTeam(task.projectId, actorId)) {
+        recipients.add(id);
+      }
+    }
+    recipients.delete(actorId);
+    if (recipients.size === 0) return;
+
+    await NotificationService.createMany(Array.from(recipients), {
+      ...args,
+      body: `${task.title} — ${args.body}`,
+      link: `/tasks/${task.id}`,
+      allowDuplicate: true,
     });
   }
 }

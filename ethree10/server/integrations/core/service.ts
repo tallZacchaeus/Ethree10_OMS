@@ -8,6 +8,7 @@ import { encryptSecret, decryptSecret } from "@/server/integrations/core/crypto"
 import { getAdapter, tryGetAdapter } from "@/server/integrations/core/registry";
 import type { AdapterConfig } from "@/server/integrations/core/types";
 import { planeStatusFromGroup } from "@/server/integrations/plane";
+import { NotificationAudience } from "@/server/services/notification-audience";
 
 function buildAdapterConfig(integration: Integration): AdapterConfig {
   const secrets = JSON.parse(
@@ -140,7 +141,12 @@ export class IntegrationService {
   }
 
   private static async markStatus(id: string, ok: boolean, error?: string) {
-    await db.integration.update({
+    const before = await db.integration.findUnique({
+      where: { id },
+      select: { status: true, provider: true },
+    });
+
+    const integration = await db.integration.update({
       where: { id },
       data: {
         status: ok ? "active" : "degraded",
@@ -148,6 +154,23 @@ export class IntegrationService {
         lastSyncedAt: ok ? new Date() : undefined,
       },
     });
+
+    // Only on the transition into degraded. A failing integration retries on a
+    // schedule, so notifying on every failure would send the same alert all day
+    // — the useful signal is the moment it stops working.
+    if (!ok && before?.status !== "degraded") {
+      await NotificationService.createMany(
+        await NotificationAudience.administrators(),
+        {
+          kind: "integration_degraded",
+          title: `${integration.provider} integration is failing`,
+          body: error ?? "Sync error — tasks may not be mirroring to the external tool.",
+          link: "/integrations",
+          entityType: "Integration",
+          entityId: integration.id,
+        },
+      );
+    }
   }
 
   /** Outbound: mirror a newly created task into the external tool. */

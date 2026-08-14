@@ -2,6 +2,8 @@ import { TRPCError } from "@trpc/server";
 import type { LeadStatus } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { AuditService } from "@/server/services/audit";
+import { NotificationService } from "@/server/services/notification";
+import { NotificationAudience } from "@/server/services/notification-audience";
 
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -26,7 +28,28 @@ export class LeadService {
     message: string;
     source?: string;
   }) {
-    return db.lead.create({ data: input });
+    const lead = await db.lead.create({ data: input });
+
+    // Enquiries arrive from the public site with nobody watching. Finance and
+    // the admins own follow-up, so they are told rather than left to discover
+    // it on the Enquiries screen.
+    await NotificationService.createMany(
+      [
+        ...(await NotificationAudience.finance()),
+        ...(await NotificationAudience.administrators()),
+      ],
+      {
+        kind: "lead_received",
+        title: `New enquiry from ${input.name}`,
+        body: input.organization ? `${input.organization} — ${input.message.slice(0, 120)}` : input.message.slice(0, 140),
+        link: "/leads",
+        entityType: "Lead",
+        entityId: lead.id,
+        allowDuplicate: true,
+      },
+    );
+
+    return lead;
   }
 
   static async list(status?: LeadStatus) {
@@ -93,6 +116,15 @@ export class LeadService {
       entityType: "Lead",
       entityId: args.leadId,
       after: { organizationId: organization.id, requester: args.requesterEmail },
+    });
+
+    await NotificationService.createMany(await NotificationAudience.agencyWide(args.actorId), {
+      kind: "lead_converted",
+      title: `Enquiry converted: ${organization.name}`,
+      body: "An enquiry became a client organisation.",
+      link: `/organizations/${organization.id}`,
+      entityType: "Organization",
+      entityId: organization.id,
     });
 
     return { organization };

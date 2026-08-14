@@ -3,6 +3,8 @@ import QRCode from "qrcode";
 import { db } from "@/server/db/client";
 import { uploadFile } from "@/lib/storage";
 import { InvoiceDocument, type InvoiceLineItem } from "@/server/documents/invoice-pdf";
+import { NotificationService } from "@/server/services/notification";
+import { NotificationAudience } from "@/server/services/notification-audience";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -61,10 +63,34 @@ export class InvoiceService {
    * Returns the number of invoices transitioned. Intended for a daily job.
    */
   static async markOverdue(now: Date = new Date()): Promise<number> {
-    const result = await db.invoice.updateMany({
+    // Read the rows first: updateMany returns a count, and a count cannot tell
+    // anyone WHICH invoice slipped. An overdue invoice nobody is told about is
+    // the same as one nobody chases.
+    const due = await db.invoice.findMany({
       where: { status: "sent", dueAt: { not: null, lt: now } },
+      select: { id: true, code: true, amount: true, currency: true, dueAt: true },
+    });
+    if (due.length === 0) return 0;
+
+    const result = await db.invoice.updateMany({
+      where: { id: { in: due.map((invoice) => invoice.id) } },
       data: { status: "overdue" },
     });
+
+    const audience = await NotificationAudience.moneyOversight();
+    for (const invoice of due) {
+      await NotificationService.createMany(audience, {
+        kind: "invoice_overdue",
+        title: `Invoice ${invoice.code} is overdue`,
+        body: `${invoice.currency} ${invoice.amount.toString()}, due ${
+          invoice.dueAt ? invoice.dueAt.toDateString() : "earlier"
+        }.`,
+        link: "/invoices",
+        entityType: "Invoice",
+        entityId: invoice.id,
+      });
+    }
+
     return result.count;
   }
 }

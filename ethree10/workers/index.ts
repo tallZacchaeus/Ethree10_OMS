@@ -2,6 +2,7 @@ import { Worker } from "bullmq";
 import { redisConnection, queues } from "./queues";
 import { ReportService } from "../server/services/report";
 import { InvoiceService } from "../server/services/invoice";
+import { TaskService } from "../server/services/task";
 import pino from "pino";
 import { captureCriticalFailure, initMonitoring, recordJobSuccess } from "../lib/observability";
 
@@ -34,6 +35,10 @@ const reportsWorker = new Worker(
     if (job.name === "mark-overdue-invoices") {
       const count = await InvoiceService.markOverdue();
       logger.info({ count }, "Marked overdue invoices");
+    }
+    if (job.name === "task-due-reminders") {
+      const counts = await TaskService.notifyDueAndOverdue();
+      logger.info(counts, "Sent task due/overdue reminders");
     }
   },
   { connection: redisConnection },
@@ -92,6 +97,15 @@ queues.reports.add("mark-overdue-invoices", {}, {
     tz: "Africa/Lagos",
   }
 }).catch(err => logger.error({ err }, "Failed to schedule overdue-invoice job"));
+
+// Remind on work due within 48h, and chase anything already late. 07:00 local,
+// so it lands before the working day rather than overnight.
+queues.reports.add("task-due-reminders", {}, {
+  repeat: {
+    pattern: "0 7 * * *",
+    tz: "Africa/Lagos",
+  }
+}).catch(err => logger.error({ err }, "Failed to schedule task reminder job"));
 
 process.on("SIGTERM", async () => {
   await Promise.all([
