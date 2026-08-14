@@ -32,6 +32,7 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "bootstrap:catalog": "tsx scripts/bootstrap-catalog.ts",
     "db:studio": "prisma studio",
     "worker": "tsx workers/index.ts",
     "db:deploy": "prisma migrate deploy",

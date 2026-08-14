@@ -1,3 +1,5 @@
+import { DEFAULT_TEAMS } from "./request-types";
+
 export type ReadinessStatus = "pass" | "warn" | "fail";
 
 export type ReadinessCheck = {
@@ -204,9 +206,14 @@ export function evaluateDatabaseReadiness(counts: DatabaseReadinessCounts): Read
   return [
     check(
       "data.teams",
-      "Canonical teams",
-      counts.teams >= 2 ? "pass" : "fail",
-      `Found ${counts.teams} active teams; expected Product Development and Brands & Communications.`,
+      "Canonical branches",
+      counts.teams >= DEFAULT_TEAMS.length ? "pass" : "fail",
+      // Names come from DEFAULT_TEAMS rather than being written out here. This
+      // message previously named "Product Development" and "Brands &
+      // Communications", which the agency renamed to Digital Media and Tech &
+      // Product — so a real failure was reported against branches that no
+      // longer exist, and anyone acting on it would have created the wrong two.
+      `Found ${counts.teams} active branches; expected ${DEFAULT_TEAMS.length}: ${DEFAULT_TEAMS.map((t) => t.name).join(" and ")}.`,
     ),
     check(
       "data.team-heads",
