@@ -10,6 +10,16 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { Check, X, UserCheck } from "lucide-react";
 
+interface Rationale {
+  chosen?: { name?: string; reason?: string };
+  runnersUp?: Array<{ name: string; reason: string }>;
+}
+
+/** `rationale` is Json on the row, so it arrives untyped. */
+function rationaleOf(value: unknown): Rationale | null {
+  return value && typeof value === "object" ? (value as Rationale) : null;
+}
+
 /**
  * Assignments waiting on the branch head.
  *
@@ -103,6 +113,23 @@ export function ApprovalQueue() {
                   {item.task.project ? ` · ${item.task.project.name}` : ""}
                   {item.task.dueDate ? ` · due ${new Date(item.task.dueDate).toDateString()}` : ""}
                 </p>
+                {rationaleOf(item.rationale) && (
+                  // Why this person, and who else was considered. Approving
+                  // without that is guessing, and a branch head asked to guess
+                  // will eventually just approve everything.
+                  <p className="text-xs text-muted-foreground">
+                    {item.proposedById ? "Suggested" : "Auto-proposed"}:{" "}
+                    {rationaleOf(item.rationale)?.chosen?.reason}
+                    {(rationaleOf(item.rationale)?.runnersUp?.length ?? 0) > 0 && (
+                      <>
+                        {" · also considered "}
+                        {rationaleOf(item.rationale)
+                          ?.runnersUp?.map((r) => r.name)
+                          .join(", ")}
+                      </>
+                    )}
+                  </p>
+                )}
               </div>
               <div className="flex shrink-0 gap-2">
                 <Button
