@@ -73,6 +73,7 @@ model User {
   delegationsGranted      BudgetApprovalDelegation[] @relation("DelegationGrantedBy")
   delegationsHeld         BudgetApprovalDelegation[] @relation("DelegationDelegate")
   delegationsRevoked      BudgetApprovalDelegation[] @relation("DelegationRevokedBy")
+  serviceCapabilities     ServiceCapability[]        @relation("UserServiceCapabilities")
 
   @@index([email])
 }
@@ -219,8 +220,9 @@ model Service {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  team     Team?     @relation(fields: [teamId], references: [id])
-  requests Request[]
+  team         Team?               @relation(fields: [teamId], references: [id])
+  requests     Request[]
+  capabilities ServiceCapability[]
 
   @@index([teamId])
   @@index([isActive])
@@ -264,6 +266,34 @@ enum SkillLevel {
   intermediate
   advanced
   expert
+}
+
+/// An explicit statement that a person can deliver a service.
+///
+/// Explicit rather than inferred from skills: "can handle Video Production" is a
+/// decision a lead makes, not something to guess from a skill list, and it is
+/// the record an assignment is justified against later. Skills are what someone
+/// knows; capability is what they are cleared to deliver. `suggestFromSkills`
+/// bridges the two without conflating them.
+///
+/// See docs/service-assignment-plan.md §4.1.
+model ServiceCapability {
+  id          String     @id @default(cuid())
+  userId      String
+  serviceId   String
+  level       SkillLevel @default(intermediate)
+  /// Cleared rather than deleted, so a past assignment stays explicable.
+  revokedAt   DateTime?
+  grantedById String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  user    User    @relation("UserServiceCapabilities", fields: [userId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, serviceId])
+  @@index([serviceId, revokedAt])
+  @@index([userId, revokedAt])
 }
 
 model UserSkill {

@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { Urgency } from "@prisma/client";
+import { SkillLevel, Urgency } from "@prisma/client";
 import { router, publicProcedure } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { db } from "@/server/db/client";
 import { getAgencyAuthContext, requireAgencyAction } from "@/server/services/agency";
+import { CapabilityService } from "@/server/services/capability";
 
 const serviceInput = z.object({
   name: z.string().trim().min(2),
@@ -65,4 +66,66 @@ export const servicesRouter = router({
       const { id, ...data } = input;
       return db.service.update({ where: { id }, data });
     }),
+
+  // ── Capability: who can deliver what ─────────────────────────────────────
+  // Step 2 of docs/service-assignment-plan.md. Read is open to anyone who can
+  // read services; recording it reuses `member.updateSkills`, which branch
+  // leads already hold.
+
+  capableOf: protectedProcedure
+    .input(z.object({ serviceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await requireAgencyAction(ctx.userId, "service.read");
+      return CapabilityService.forService(input.serviceId);
+    }),
+
+  capabilitiesOfUser: protectedProcedure
+    .input(z.object({ userId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await requireAgencyAction(ctx.userId, "service.read");
+      return CapabilityService.forUser(input.userId);
+    }),
+
+  /** The full matrix, including services nobody can currently deliver. */
+  capabilityMatrix: protectedProcedure
+    .input(z.object({ teamId: z.string().nullish() }).optional())
+    .query(async ({ ctx, input }) => {
+      await requireAgencyAction(ctx.userId, "service.read");
+      return CapabilityService.matrixForBranch(input?.teamId ?? null);
+    }),
+
+  /** People whose existing skills suggest they could deliver this service. */
+  capabilitySuggestions: protectedProcedure
+    .input(z.object({ serviceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await requireAgencyAction(ctx.userId, "member.updateSkills");
+      return CapabilityService.suggestFromSkills(input.serviceId);
+    }),
+
+  grantCapability: protectedProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        serviceId: z.string(),
+        level: z.nativeEnum(SkillLevel).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      CapabilityService.grant({
+        actorId: ctx.userId,
+        userId: input.userId,
+        serviceId: input.serviceId,
+        level: input.level,
+      }),
+    ),
+
+  revokeCapability: protectedProcedure
+    .input(z.object({ userId: z.string(), serviceId: z.string() }))
+    .mutation(async ({ ctx, input }) =>
+      CapabilityService.revoke({
+        actorId: ctx.userId,
+        userId: input.userId,
+        serviceId: input.serviceId,
+      }),
+    ),
 });
