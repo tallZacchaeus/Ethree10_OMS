@@ -1,6 +1,6 @@
 # Plan — service-based assignment with branch-head approval
 
-**Status:** steps 1–2 complete (branch validation; capability model). Steps 3–5 outstanding — see §7.
+**Status:** steps 1–3 complete (branch validation; capability model; proposal and approval). Steps 4–5 outstanding — see §7.
 **Date:** 2026-08-14
 
 Three things, in one flow:

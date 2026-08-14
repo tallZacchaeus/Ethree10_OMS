@@ -6,6 +6,7 @@ import { protectedProcedure } from "../procedures";
 import { posthogServer } from "@/lib/posthog";
 import { db } from "@/server/db/client";
 import { TaskService } from "@/server/services/task";
+import { AssignmentService } from "@/server/services/assignment";
 import { ProjectService } from "@/server/services/project";
 import { requireAgencyAction, getAgencyAuthContext } from "@/server/services/agency";
 import { can } from "@/server/auth/permissions";
@@ -113,15 +114,23 @@ export const tasksRouter = router({
       return TaskService.update({ actorId: ctx.userId, taskId: id, patch });
     }),
 
+  /**
+   * Propose an assignee.
+   *
+   * Kept as `assign` so existing callers do not break, but it no longer assigns
+   * directly: it creates a proposal, which the branch head decides on. When the
+   * caller could have approved it anyway, it is approved on the spot — see
+   * AssignmentService.propose.
+   */
   assign: protectedProcedure
     .input(z.object({ taskId: z.string(), assigneeUserId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await loadTaskForRead(ctx.userId, input.taskId);
       await requireAgencyAction(ctx.userId, "task.assign");
-      const result = await TaskService.assign({
+      const result = await AssignmentService.propose({
         actorId: ctx.userId,
         taskId: input.taskId,
-        assigneeUserId: input.assigneeUserId,
+        assigneeId: input.assigneeUserId,
       });
 
       posthogServer.capture({
@@ -282,4 +291,43 @@ export const tasksRouter = router({
       }
       return TaskService.resolveBlocker({ actorId: ctx.userId, taskId: input.taskId });
     }),
+
+  // ── Assignment approval ──────────────────────────────────────────────────
+  // See docs/service-assignment-plan.md §5.
+
+  /** The proposal awaiting a decision on a task, if any. */
+  pendingAssignment: protectedProcedure
+    .input(z.object({ taskId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await loadTaskForRead(ctx.userId, input.taskId);
+      return AssignmentService.pendingFor(input.taskId);
+    }),
+
+  /** The branch head's approval queue. */
+  pendingAssignments: protectedProcedure
+    .input(z.object({ branchId: z.string().nullish() }).optional())
+    .query(async ({ ctx, input }) => {
+      await requireAgencyAction(ctx.userId, "task.read");
+      return AssignmentService.pendingForBranch(input?.branchId ?? null);
+    }),
+
+  approveAssignment: protectedProcedure
+    .input(z.object({ assignmentId: z.string(), note: z.string().max(500).optional() }))
+    .mutation(async ({ ctx, input }) =>
+      AssignmentService.approve({
+        actorId: ctx.userId,
+        assignmentId: input.assignmentId,
+        note: input.note,
+      }),
+    ),
+
+  rejectAssignment: protectedProcedure
+    .input(z.object({ assignmentId: z.string(), note: z.string().trim().min(3).max(500) }))
+    .mutation(async ({ ctx, input }) =>
+      AssignmentService.reject({
+        actorId: ctx.userId,
+        assignmentId: input.assignmentId,
+        note: input.note,
+      }),
+    ),
 });

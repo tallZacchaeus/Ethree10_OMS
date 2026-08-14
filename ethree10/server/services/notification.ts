@@ -53,6 +53,10 @@ export const EMAIL_KINDS = new Set<NotificationKind>([
   // Enquiries
   "lead_received",
   "lead_converted",
+  // Assignment approval
+  "assignment_proposed",
+  "assignment_approved",
+  "assignment_rejected",
 ]);
 
 type DeliveryPreferences = {

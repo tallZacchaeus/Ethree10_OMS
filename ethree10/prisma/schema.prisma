@@ -74,6 +74,7 @@ model User {
   delegationsHeld         BudgetApprovalDelegation[] @relation("DelegationDelegate")
   delegationsRevoked      BudgetApprovalDelegation[] @relation("DelegationRevokedBy")
   serviceCapabilities     ServiceCapability[]        @relation("UserServiceCapabilities")
+  taskAssignments         TaskAssignment[]           @relation("TaskAssignmentAssignee")
 
   @@index([email])
 }
@@ -564,6 +565,7 @@ model Task {
   dependencies    TaskDependency[]  @relation("TaskDeps")
   dependents      TaskDependency[]  @relation("TaskDependents")
   contributors    TaskContributor[]
+  assignments     TaskAssignment[]
   deliverables    Deliverable[]
   reviews         TaskReview[]
 
@@ -572,6 +574,46 @@ model Task {
   @@index([assigneeUserId])
   @@index([status])
   @@index([dueDate])
+}
+
+/// A proposed or decided assignment of a task to a person.
+///
+/// Separate from `Task.assigneeUserId` on purpose. That column stays the single
+/// answer to "who is doing this" and is written **only** when an assignment is
+/// approved, so every existing query keeps working. This table is the record of
+/// what was proposed, by whom, and what the branch head decided — a rejection
+/// and its reason survive rather than being overwritten by the next proposal.
+///
+/// See docs/service-assignment-plan.md §4.2.
+model TaskAssignment {
+  id           String               @id @default(cuid())
+  taskId       String
+  assigneeId   String
+  status       TaskAssignmentStatus @default(proposed)
+  /// Null when the system proposed it automatically.
+  proposedById String?
+  proposedAt   DateTime             @default(now())
+  decidedById  String?
+  decidedAt    DateTime?
+  decisionNote String?
+  /// Why this person: capability, load and skills as they were when proposed.
+  /// Six months on, "why was this given to them" is answerable from the record
+  /// rather than reconstructed.
+  rationale    Json?
+
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignee User @relation("TaskAssignmentAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, status])
+  @@index([assigneeId, status])
+}
+
+enum TaskAssignmentStatus {
+  proposed
+  approved
+  rejected
+  /// Replaced by a newer proposal before anyone decided on it.
+  superseded
 }
 
 model TaskContributor {
@@ -1281,6 +1323,10 @@ enum NotificationKind {
   // ── Enquiries ────────────────────────────────────────────────────────────
   lead_received
   lead_converted
+  // ── Assignment approval ──────────────────────────────────────────────────
+  assignment_proposed
+  assignment_approved
+  assignment_rejected
 }
 
 model Notification {
