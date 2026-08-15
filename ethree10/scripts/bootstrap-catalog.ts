@@ -68,6 +68,13 @@ async function main() {
           },
         });
         teamIdBySlug.set(team.slug, row.id);
+      } else {
+        // A dry run has to model the branch it *would* create. Without this,
+        // every department and service under a missing branch reports as
+        // "skipped — branch not present", and the preview under-reports the
+        // real plan by sixteen rows. A dry run that misrepresents the plan is
+        // worse than no dry run at all.
+        teamIdBySlug.set(team.slug, `dry-run:${team.slug}`);
       }
       report("create", team.name);
     } else {
@@ -184,14 +191,23 @@ async function main() {
     report("ok", "Cross-team solution");
   }
 
-  const activeTeams = await db.team.count({ where: { archivedAt: null } });
+  // Canonical slugs only, matching scripts/check-readiness.ts. Counting every
+  // active team instead reported 2 where readiness reported 1, because this
+  // environment also has a team outside the canonical set — so the summary
+  // answered a different question from the one it exists to answer.
+  const activeTeams = await db.team.count({
+    where: { archivedAt: null, slug: { in: DEFAULT_TEAMS.map((team) => team.slug) } },
+  });
   const activeServices = await db.service.count({ where: { isActive: true } });
 
   console.log(
     `\n${created} created, ${restored} reactivated, ${unchanged} already correct` +
       (dryRun ? " (dry run — nothing written)" : ""),
   );
-  console.log(`Active branches: ${activeTeams}  ·  Active services: ${activeServices}`);
+  console.log(
+    `Canonical branches: ${activeTeams}/${DEFAULT_TEAMS.length}  ·  Active services: ${activeServices}` +
+      (dryRun ? "  (unchanged — dry run)" : ""),
+  );
 
   if (!dryRun && (activeTeams < DEFAULT_TEAMS.length || activeServices === 0)) {
     console.error("\nReadiness would still fail. Check the skipped lines above.");
