@@ -79,6 +79,14 @@ Safe against production and safe to re-run: every write is an upsert keyed on
 slug, archived rows are reactivated rather than duplicated, and a service's
 name and description are never overwritten once an operator has edited them.
 
+Or run it from GitHub without SSH access: **Actions → Bootstrap catalog → Run
+workflow**. It defaults to a dry run; untick that to apply. The run prints the
+two readiness checks before and after, so it shows whether it actually achieved
+anything rather than only that it exited cleanly.
+
+It is deliberately manual-only — an environment's catalogue is not something a
+merge should decide.
+
 **Do not use `pnpm db:seed` for this.** That also creates demo people and sample
 work, and is for local development only.
 
