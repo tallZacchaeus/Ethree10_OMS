@@ -1,0 +1,56 @@
+name: Bootstrap catalog
+
+# Creates the canonical branches, departments and services on the VPS.
+#
+# Manual only. This writes to the production database, so it must never run off
+# a push — an environment's catalogue is not something a merge should decide.
+#
+# Safe to re-run: every write is an upsert keyed on slug, archived rows are
+# reactivated rather than duplicated, and a service's name and description are
+# never overwritten once an operator has edited them. It creates only structure
+# — never users, clients or requests. See scripts/bootstrap-catalog.ts.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Report what would change without writing anything"
+        type: boolean
+        default: true
+
+env:
+  SSH_USER: root
+
+jobs:
+  bootstrap:
+    name: ${{ inputs.dry_run && 'Dry run' || 'Apply' }} catalog bootstrap
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install SSH key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/ethree10_deploy_key
+          chmod 600 ~/.ssh/ethree10_deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Report current readiness
+        run: |
+          set -euo pipefail
+          # Before-and-after on the two checks this fixes, so the run itself
+          # shows whether it achieved anything rather than only that it exited 0.
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
+            "cd /srv/ethree10/ethree10 && pnpm check:readiness:db 2>&1 | grep -E 'Canonical branches|Service catalog'" || true
+
+      - name: Bootstrap catalog
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
+            "cd /srv/ethree10/ethree10 && pnpm bootstrap:catalog ${{ inputs.dry_run && '--dry-run' || '' }}"
+
+      - name: Report readiness afterwards
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
+            "cd /srv/ethree10/ethree10 && pnpm check:readiness:db 2>&1 | grep -E 'Canonical branches|Service catalog'" || true
