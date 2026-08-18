@@ -60,7 +60,20 @@ describe("launch readiness", () => {
     expect(failures).toContain("env.https");
     expect(failures).toContain("integrations.secret");
     expect(failures).toContain("runtime.node");
-    expect(failures).toContain("payments.paystack");
+  });
+
+  it("warns rather than fails when Paystack keys are missing", () => {
+    // Online payment is not switched on. A missing key cannot take money badly
+    // — PaystackService throws in production — so failing here only stripped
+    // the deploy of its smoke test and backup verification.
+    const checks = evaluateEnvironmentReadiness(
+      { ...READY_ENV, PAYSTACK_SECRET_KEY: "", NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: "" },
+      { production: true, nodeVersion: "v24.18.0" },
+    );
+
+    const paystack = checks.find((item) => item.key === "payments.paystack");
+    expect(paystack?.status).toBe("warn");
+    expect(summarizeReadiness(checks).failures).toBe(0);
   });
 
   it("summarizes database readiness from seed-derived counts", () => {

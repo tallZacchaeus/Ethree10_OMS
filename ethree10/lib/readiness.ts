@@ -166,15 +166,23 @@ export function evaluateEnvironmentReadiness(
     ),
   );
 
+  // A warning, never a failure. Online card payment is not switched on yet, and
+  // PaystackService already throws in production when the key is absent, so a
+  // missing key cannot quietly take money — it can only stop a feature nobody
+  // is using. Failing here instead blocked the whole readiness gate, which took
+  // the post-deploy smoke test, security-header check and backup verification
+  // down with it: an unused payment key was silently costing us the checks that
+  // tell us production is alive. Turn this back into a failure the day invoices
+  // are actually collected online.
   const paystackMissing = ["PAYSTACK_SECRET_KEY", "NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY"].filter((key) => isPlaceholder(env[key]));
   checks.push(
     check(
       "payments.paystack",
       "Paystack keys",
-      paystackMissing.length === 0 ? "pass" : production ? "fail" : "warn",
+      paystackMissing.length === 0 ? "pass" : "warn",
       paystackMissing.length === 0
         ? "Paystack server and public keys are configured."
-        : `Configure before paid invoices: ${paystackMissing.join(", ")}`,
+        : `Online payment is off until these are set: ${paystackMissing.join(", ")}. Invoices can still be issued and marked paid manually.`,
     ),
   );
 
