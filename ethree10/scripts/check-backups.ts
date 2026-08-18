@@ -84,30 +84,59 @@ async function listBackupFiles(directory: string): Promise<BackupFile[]> {
   return files;
 }
 
-async function checkTarget(target: BackupTarget) {
-  const latest = selectLatestBackup(await listBackupFiles(target.directory));
+export type TargetReport = {
+  name: string;
+  ok: boolean;
+  detail: string;
+};
+
+/**
+ * Report every target, never throw. A stale uploads archive used to reject
+ * first and take the whole run down with it, so the database line — the one
+ * that actually matters — was never printed. "Uploads are stale" and "we have
+ * no database backup" are very different emergencies and the output has to be
+ * able to tell them apart.
+ */
+export async function checkTarget(target: BackupTarget, now = new Date()): Promise<TargetReport> {
+  let latest;
+  try {
+    latest = selectLatestBackup(await listBackupFiles(target.directory));
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return { name: target.name, ok: false, detail: `cannot read ${target.directory}: ${reason}` };
+  }
+
   if (!latest) {
-    throw new Error(`${target.name} backup directory has no files: ${target.directory}`);
+    return { name: target.name, ok: false, detail: `no files in ${target.directory}` };
   }
 
-  const status = evaluateBackupFreshness(latest, target);
+  const status = evaluateBackupFreshness(latest, target, now);
+  const facts = `${status.path} age=${status.ageHours.toFixed(1)}h (limit ${target.maxAgeHours}h) size=${status.size} bytes`;
+
   if (!status.fresh || !status.largeEnough) {
-    throw new Error(
-      `${target.name} backup check failed: ${status.path} age=${status.ageHours.toFixed(1)}h size=${status.size} bytes`,
-    );
+    const why = [
+      !status.fresh ? "stale" : null,
+      !status.largeEnough ? `smaller than ${target.minSizeBytes} bytes` : null,
+    ]
+      .filter(Boolean)
+      .join(" and ");
+    return { name: target.name, ok: false, detail: `${why}: ${facts}` };
   }
 
-  return {
-    name: target.name,
-    path: status.path,
-    ageHours: Number(status.ageHours.toFixed(2)),
-    size: status.size,
-  };
+  return { name: target.name, ok: true, detail: facts };
 }
 
 async function main() {
-  const results = await Promise.all(defaultBackupTargets().map((target) => checkTarget(target)));
-  console.log(JSON.stringify({ status: "ok", backups: results }, null, 2));
+  const reports = await Promise.all(defaultBackupTargets().map((target) => checkTarget(target)));
+
+  for (const report of reports) {
+    console.log(`${report.ok ? "OK  " : "FAIL"} ${report.name}: ${report.detail}`);
+  }
+
+  const failed = reports.filter((report) => !report.ok);
+  if (failed.length > 0) {
+    throw new Error(`${failed.length} of ${reports.length} backup targets failed: ${failed.map((r) => r.name).join(", ")}`);
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
