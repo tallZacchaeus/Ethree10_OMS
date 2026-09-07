@@ -2,6 +2,7 @@ import type { NextAuthOptions } from "next-auth";
 import type { Adapter, AdapterUser, AdapterAccount, VerificationToken } from "next-auth/adapters";
 import EmailProvider from "next-auth/providers/email";
 import GoogleProvider from "next-auth/providers/google";
+import { devLoginEnabled } from "@/server/auth/dev-login";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { Resend } from "resend";
 import { db } from "@/server/db/client";
@@ -151,7 +152,11 @@ export const authConfig: NextAuthOptions = {
       clientId: env.AUTH_GOOGLE_ID ?? "",
       clientSecret: env.AUTH_GOOGLE_SECRET ?? "",
     }),
-    ...(process.env.NODE_ENV === "development" || process.env["E2E_TEST_AUTH"] === "true"
+    ...(devLoginEnabled({
+      NODE_ENV: process.env.NODE_ENV,
+      E2E_TEST_AUTH: process.env["E2E_TEST_AUTH"],
+      NEXT_PUBLIC_APP_URL: process.env["NEXT_PUBLIC_APP_URL"],
+    })
       ? [
           CredentialsProvider({
             id: "credentials",

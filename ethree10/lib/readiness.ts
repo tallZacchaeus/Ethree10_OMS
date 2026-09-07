@@ -1,3 +1,4 @@
+import { devLoginRisk } from "@/server/auth/dev-login";
 import { DEFAULT_TEAMS } from "./request-types";
 
 export type ReadinessStatus = "pass" | "warn" | "fail";
@@ -183,6 +184,24 @@ export function evaluateEnvironmentReadiness(
       paystackMissing.length === 0
         ? "Paystack server and public keys are configured."
         : `Online payment is off until these are set: ${paystackMissing.join(", ")}. Invoices can still be issued and marked paid manually.`,
+    ),
+  );
+
+  // The provider this guards against signs anyone in from an email alone. The
+  // code refuses it on a production domain regardless, so this is defence in
+  // depth — but a deploy carrying the variable is a misconfiguration serious
+  // enough to stop, not to mention in passing.
+  const devLoginWarning = devLoginRisk({
+    NODE_ENV: env["NODE_ENV"] ?? (production ? "production" : undefined),
+    E2E_TEST_AUTH: env["E2E_TEST_AUTH"],
+    NEXT_PUBLIC_APP_URL: env["NEXT_PUBLIC_APP_URL"],
+  });
+  checks.push(
+    check(
+      "auth.dev-login",
+      "Password-less dev login",
+      devLoginWarning ? "fail" : "pass",
+      devLoginWarning ?? "The dev-only credentials provider cannot be enabled here.",
     ),
   );
 

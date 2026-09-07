@@ -5,6 +5,8 @@ import { InvoiceStatus, PaymentMethod } from "@prisma/client";
 import { router } from "../trpc";
 import { protectedProcedure } from "../procedures";
 import { publicProcedure } from "../trpc";
+import { enforcePublicRateLimit } from "@/server/security/public-rate-limit";
+import { clientIp } from "@/server/security/client-ip";
 import { db } from "@/server/db/client";
 import { getAgencyAuthContext, requireAgencyAction } from "@/server/services/agency";
 import { InvoiceService, invoicePublicUrl } from "@/server/services/invoice";
@@ -53,12 +55,35 @@ export const invoicesRouter = router({
 
   getByCode: publicProcedure
     .input(z.object({ code: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      // Enumeration guard. The code is the only secret protecting this data
+      // (see the billing-document branch in app/api/files), so a caller must
+      // not be able to walk the space. Keyed on the caller, not the code —
+      // keying on the code gives every guess its own fresh window.
+      const ip = clientIp(ctx.headers);
+      await enforcePublicRateLimit({
+        action: "invoice-lookup",
+        secret: ip,
+        limit: 20,
+        windowSeconds: 60,
+      });
+
       const invoice = await db.invoice.findUnique({
         where: { code: input.code },
         include: { organization: true, project: true },
       });
-      if (!invoice) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!invoice) {
+        // A miss is the signal that someone is guessing. Recorded so a run of
+        // them is visible rather than silently absorbed by the limiter.
+        await AuditService.log({
+          actorId: null,
+          action: "invoice.lookup.miss",
+          entityType: "Invoice",
+          entityId: input.code,
+          ip,
+        });
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
       return invoice;
     }),
 
