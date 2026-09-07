@@ -1,0 +1,110 @@
+name: Run backups
+
+# Takes a backup now, and optionally installs the cron schedule.
+#
+# Manual only. Unlike "Backup diagnostics", this one WRITES: it runs the backup
+# scripts on the VPS and can edit root's crontab. Both are additive — a backup
+# creates a new dated file, and the schedule install appends only entries it
+# does not already find — but neither is a read, so this is deliberately a
+# separate workflow rather than a flag on the diagnostics one.
+#
+# Why it exists: diagnostics proved the scripts and containers are healthy and
+# that nothing schedules them. No crontab for root, no systemd timer — so the
+# database went 66 days without a backup while every part of the machinery
+# worked. This closes that without needing a shell.
+on:
+  workflow_dispatch:
+    inputs:
+      run_backups:
+        description: "Run backup-db.sh and backup-minio.sh now"
+        type: boolean
+        default: true
+      install_schedule:
+        description: "Install cron entries (daily DB 02:00, weekly uploads Sun 03:00)"
+        type: boolean
+        default: false
+
+env:
+  SSH_USER: root
+
+jobs:
+  backup:
+    name: Back up the VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install SSH key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/ethree10_deploy_key
+          chmod 600 ~/.ssh/ethree10_deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Run backups now
+        if: ${{ inputs.run_backups }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" bash -s <<'REMOTE'
+          set -uo pipefail
+          rc=0
+
+          # Both run even if the first fails. They are independent, and learning
+          # about only one broken backup per attempt is what made this take
+          # three rounds to diagnose in the first place.
+          echo "===== Database ====="
+          if bash /srv/ethree10/backup-db.sh; then echo "database: OK"; else echo "database: FAILED"; rc=1; fi
+
+          echo
+          echo "===== Uploads ====="
+          if bash /srv/ethree10/backup-minio.sh; then echo "uploads: OK"; else echo "uploads: FAILED"; rc=1; fi
+
+          echo
+          echo "===== Newest files on disk ====="
+          ls -la --time-style=long-iso /srv/ethree10/backups/db/ 2>&1 | tail -3 || true
+          ls -la --time-style=long-iso /srv/ethree10/backups/minio/ 2>&1 | tail -3 || true
+
+          exit $rc
+          REMOTE
+
+      - name: Install the cron schedule
+        if: ${{ inputs.install_schedule }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" bash -s <<'REMOTE'
+          set -euo pipefail
+          LOG=/var/log/ethree10-backup.log
+          DB_LINE="0 2 * * * /srv/ethree10/backup-db.sh >> $LOG 2>&1"
+          MINIO_LINE="0 3 * * 0 /srv/ethree10/backup-minio.sh >> $LOG 2>&1"
+
+          echo "===== crontab before ====="
+          crontab -l 2>/dev/null || echo "(none)"
+
+          # Append only what is missing, preserving every existing line. A
+          # crontab that already had entries must come out the other side with
+          # those entries intact — this must never become a replace.
+          current=$(crontab -l 2>/dev/null || true)
+          updated="$current"
+          for line in "$DB_LINE" "$MINIO_LINE"; do
+            if printf '%s\n' "$current" | grep -qF -- "$line"; then
+              echo "already scheduled: $line"
+            else
+              updated=$(printf '%s\n%s\n' "$updated" "$line")
+              echo "adding: $line"
+            fi
+          done
+
+          # Strip the blank line an empty starting crontab would leave behind.
+          printf '%s\n' "$updated" | sed '/^$/d' | crontab -
+
+          echo
+          echo "===== crontab after ====="
+          crontab -l
+          REMOTE
+
+      - name: Report backup state
+        if: always()
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
+            "cd /srv/ethree10/ethree10 && pnpm check:backups" || true
