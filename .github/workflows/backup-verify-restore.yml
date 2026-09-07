@@ -1,0 +1,144 @@
+name: Verify backup restores
+
+# Proves the newest database backup can actually be restored, and that what
+# comes back is the whole database rather than a fragment.
+#
+# `check:backups` only ever proved a file exists, is recent, and is over a
+# kilobyte. A truncated dump satisfies all three and restores to nothing — it
+# looks like safety right up to the moment you need it. This restores the file
+# for real and compares its row counts against live production.
+#
+# Production is never written to. The restore target is a scratch database
+# named `ethree10_restore_check_<run id>`, created for the run and dropped on
+# exit including on failure; the only statements aimed at the production
+# database are SELECT count(*). Two guards below refuse to proceed if the
+# scratch name is ever anything but that pattern.
+on:
+  workflow_dispatch:
+  schedule:
+    # Fridays 05:00 UTC — after Thursday night's dump, before the working week
+    # ends, so a bad backup is discovered while someone is around to fix it.
+    - cron: "0 5 * * 5"
+
+env:
+  SSH_USER: root
+
+jobs:
+  verify:
+    name: Restore the newest dump and compare
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install SSH key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/ethree10_deploy_key
+          chmod 600 ~/.ssh/ethree10_deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Restore into a scratch database and compare row counts
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
+            "RUN_ID=${{ github.run_id }} bash -s" <<'REMOTE'
+          set -uo pipefail
+
+          CONTAINER=ethree10-postgres-1
+          PGUSER_NAME=ethree10
+          PROD_DB=ethree10_prod
+          SCRATCH="ethree10_restore_check_${RUN_ID}"
+          BACKUP_DIR=/srv/ethree10/backups/db
+
+          # Two independent guards. The scratch name is constructed above and
+          # not taken from input, but a database drop is not the place to rely
+          # on that staying true.
+          case "$SCRATCH" in
+            ethree10_restore_check_*) ;;
+            *) echo "FATAL: scratch name '$SCRATCH' is not a restore-check name"; exit 1 ;;
+          esac
+          if [ "$SCRATCH" = "$PROD_DB" ]; then
+            echo "FATAL: scratch name equals the production database"; exit 1
+          fi
+
+          psql_in() { docker exec -i "$CONTAINER" psql -U "$PGUSER_NAME" -d "$1" -tAq; }
+          psql_q()  { docker exec "$CONTAINER" psql -U "$PGUSER_NAME" -d "$1" -tAc "$2" 2>/dev/null; }
+
+          cleanup() {
+            echo
+            echo "===== Cleaning up ====="
+            docker exec "$CONTAINER" dropdb --if-exists -U "$PGUSER_NAME" "$SCRATCH" \
+              && echo "dropped $SCRATCH" \
+              || echo "WARNING: could not drop $SCRATCH — remove it by hand"
+          }
+          trap cleanup EXIT
+
+          echo "===== Newest backup ====="
+          FILE=$(ls -1t "$BACKUP_DIR"/*.sql.gz 2>/dev/null | head -1)
+          if [ -z "${FILE:-}" ]; then echo "FAIL: no dump files in $BACKUP_DIR"; exit 1; fi
+          ls -la --time-style=long-iso "$FILE"
+
+          echo
+          echo "===== Restoring into $SCRATCH ====="
+          if ! docker exec "$CONTAINER" createdb -U "$PGUSER_NAME" "$SCRATCH"; then
+            echo "FAIL: could not create the scratch database"; exit 1
+          fi
+
+          # Deliberately not ON_ERROR_STOP. A dump can carry harmless noise —
+          # GRANTs for roles that do not exist here — and aborting on the first
+          # would report a healthy backup as broken. Errors are counted and
+          # shown; the row comparison below is what decides the verdict.
+          ERRLOG=$(mktemp)
+          gunzip -c "$FILE" | psql_in "$SCRATCH" 2>"$ERRLOG"
+          ERRORS=$(grep -c "^ERROR:" "$ERRLOG" 2>/dev/null || echo 0)
+          echo "restore completed with $ERRORS error line(s)"
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "--- first 10 ---"; grep "^ERROR:" "$ERRLOG" | head -10
+          fi
+          rm -f "$ERRLOG"
+
+          echo
+          echo "===== Row counts: restored backup vs live production ====="
+          printf '%-16s %12s %12s   %s\n' "TABLE" "BACKUP" "PRODUCTION" "VERDICT"
+
+          FAILED=0
+          STALE_LIST=0
+          EMPTY_TABLES=""
+          for T in User Organization Membership Team Service Request Project Task Invoice Receipt; do
+            B=$(psql_q "$SCRATCH" "SELECT count(*) FROM \"$T\"" || echo "")
+            P=$(psql_q "$PROD_DB" "SELECT count(*) FROM \"$T\"" || echo "")
+            B=${B:-missing}; P=${P:-missing}
+
+            if [ "$B" = "missing" ] && [ "$P" = "missing" ]; then
+              # Absent from production too, so this is a stale table list in
+              # this workflow, not a bad backup. Still fails — but says why,
+              # rather than accusing the backup of losing a table nobody has.
+              VERDICT="NOT IN SCHEMA — update this workflow"; FAILED=1; STALE_LIST=1
+            elif [ "$B" = "missing" ]; then
+              VERDICT="TABLE MISSING FROM BACKUP"; FAILED=1
+            elif [ "$P" != "missing" ] && [ "$P" -gt 0 ] 2>/dev/null && [ "$B" -eq 0 ] 2>/dev/null; then
+              # The truncation signal: production holds rows, the backup holds none.
+              VERDICT="EMPTY IN BACKUP"; FAILED=1; EMPTY_TABLES="$EMPTY_TABLES $T"
+            elif [ "$B" = "$P" ]; then
+              VERDICT="match"
+            else
+              # Drift is expected — the dump is older than now. Informational.
+              VERDICT="differs (backup is older)"
+            fi
+            printf '%-16s %12s %12s   %s\n' "$T" "$B" "$P" "$VERDICT"
+          done
+
+          echo
+          if [ "$STALE_LIST" -ne 0 ]; then
+            echo "FAIL: this workflow checks a table that no longer exists in the schema."
+            echo "The backup may be fine — fix the table list above and re-run."
+            exit 1
+          fi
+          if [ "$FAILED" -ne 0 ]; then
+            echo "FAIL: the backup does not contain the whole database.${EMPTY_TABLES:+ Empty:$EMPTY_TABLES}"
+            echo "A dump that restores to nothing is worse than no dump, because it reads as safety."
+            exit 1
+          fi
+
+          echo "PASS: the newest backup restores, and every table that holds rows in production holds rows in the backup."
+          REMOTE
