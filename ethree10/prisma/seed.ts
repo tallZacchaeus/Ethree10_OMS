@@ -368,7 +368,7 @@ async function main() {
   }
 
   // ── Demo Project (approved request) ──────────────────────────────────
-  const approvedRequest = await prisma.request.upsert({
+  const inProgressRequest = await prisma.request.upsert({
     where: { code: `REQ-${codeYear}-0002` },
     update: {},
     create: {
@@ -395,7 +395,7 @@ async function main() {
     update: {},
     create: {
       code: `PRJ-${codeYear}-0001`,
-      requestId: approvedRequest.id,
+      requestId: inProgressRequest.id,
       organizationId: r4c.id,
       agencyTeamId: productTech.id,
       name: "R4C Event Booking Platform",
@@ -431,10 +431,38 @@ async function main() {
     },
   });
 
+  // A request genuinely at the approved stage, with no project yet — approved
+  // means the work is agreed and the project has not been opened. It exists
+  // because the Proposals tab only renders for scoping, proposal or approved,
+  // and until now the seed had neither: one request at submitted and one at
+  // in_progress. So no seeded request could reach that tab, and any test
+  // touching it had to build its own fixture.
+  const approvedRequest = await prisma.request.upsert({
+    where: { code: `REQ-${codeYear}-0003` },
+    update: {},
+    create: {
+      code: `REQ-${codeYear}-0003`,
+      publicToken: generatePublicToken(),
+      publicTokenExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+      organizationId: r4c.id,
+      submittedById: superAdmin.id,
+      requesterName: "Pastor Emeka Nwankwo",
+      requesterEmail: "emeka@reach4christ.org",
+      title: "Annual report design and print",
+      description:
+        "Design and produce the 2026 annual report. Scope agreed; awaiting project kickoff.",
+      projectType: "creative",
+      urgency: Urgency.medium,
+      stage: RequestStage.approved,
+      routedTeamId: digitalMedia.id,
+    },
+  });
+
   console.log("Seed complete.");
   console.log(`  demo request: ${demoRequest.code}`);
   console.log(`  demo tracking link: /track/${demoRequest.publicToken ?? demoToken}`);
   console.log(`  demo project: ${demoProject.code}`);
+  console.log(`  approved request (proposals tab): ${approvedRequest.code}`);
   console.log("");
   console.log("  Test accounts — sign in via Quick Login (Local Dev), no password:");
   console.log(`    super_admin      ${superAdmin.email}`);
