@@ -16,7 +16,11 @@ on:
   workflow_dispatch:
     inputs:
       restore_email:
-        description: "Email to restore. Blank lists who is affected without changing anything."
+        description: "Email whose removed membership to restore. Blank lists who is affected."
+        type: string
+        required: false
+      reactivate_user_email:
+        description: "Email whose deactivated ACCOUNT to reactivate (a separate lockout)."
         type: string
         required: false
 
@@ -42,7 +46,10 @@ jobs:
           set -euo pipefail
           ARGS=""
           if [ -n "${{ inputs.restore_email }}" ]; then
-            ARGS="--restore ${{ inputs.restore_email }}"
+            ARGS="$ARGS --restore ${{ inputs.restore_email }}"
+          fi
+          if [ -n "${{ inputs.reactivate_user_email }}" ]; then
+            ARGS="$ARGS --reactivate-user ${{ inputs.reactivate_user_email }}"
           fi
           ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
             "cd /srv/ethree10/ethree10 && pnpm memberships $ARGS"

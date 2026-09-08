@@ -174,3 +174,13 @@ Run everything with **`pnpm verify`** — starts compose, creates the test datab
 - i18n scaffolding is in `lib/i18n.ts` with a `useTranslation` hook at `lib/hooks/use-translation.ts`.
 - The `@` path alias resolves to the project root (configured in both `tsconfig.json` and `vitest.config.ts`).
 - Prisma schema changes always require `pnpm db:generate` before TypeScript will compile.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
