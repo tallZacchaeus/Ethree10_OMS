@@ -192,11 +192,85 @@ async function reactivateUser(email: string) {
   }
 }
 
+/**
+ * Give one account the same access another one has (or had).
+ *
+ * Written for a mistyped domain: olayeyeisrael@r4cgloabl.org holds the
+ * membership, olayeyeisrael@r4cglobal.org is the address that exists. Copying
+ * the shape rather than retyping the role, branch and department means the new
+ * account gets exactly what the old one had and nothing more — no chance of
+ * fat-fingering a role upward.
+ *
+ * Additive and idempotent. It never touches the source, so the mistyped record
+ * stays removed and auditable.
+ */
+async function inviteCopyingFrom(newEmail: string, sourceEmail: string) {
+  const target = await db.user.findUnique({ where: { email: newEmail }, select: { id: true } });
+  if (!target) {
+    console.log(`No user with email "${newEmail}". They must sign in once before access can be granted.`);
+    return;
+  }
+
+  // Removed memberships included: the source is usually removed, which is the
+  // whole reason this is being run.
+  const sources = await db.membership.findMany({
+    where: { user: { email: sourceEmail } },
+    include: INCLUDE,
+  });
+  if (sources.length === 0) {
+    console.log(`No membership found for "${sourceEmail}" to copy.`);
+    return;
+  }
+
+  for (const source of sources) {
+    const existing = await db.membership.findFirst({
+      where: {
+        userId: target.id,
+        role: source.role,
+        teamId: source.teamId,
+        subUnitId: source.subUnitId,
+      },
+    });
+
+    if (existing && !existing.removedAt) {
+      console.log(`= ${newEmail} already has ${source.role}${source.team ? ` on ${source.team.name}` : ""}`);
+      continue;
+    }
+
+    if (existing) {
+      await db.membership.update({
+        where: { id: existing.id },
+        data: { removedAt: null, acceptedAt: new Date() },
+      });
+      console.log(`+ restored ${newEmail} — ${describe({ ...source, removedAt: null })}`);
+      continue;
+    }
+
+    const created = await db.membership.create({
+      data: {
+        userId: target.id,
+        role: source.role,
+        teamId: source.teamId,
+        subUnitId: source.subUnitId,
+        title: source.title,
+        invitedAt: new Date(),
+        acceptedAt: new Date(),
+      },
+      include: INCLUDE,
+    });
+    console.log(`+ granted ${newEmail} — ${describe(created)}`);
+  }
+
+  console.log(`\nThe source account "${sourceEmail}" was not modified.`);
+}
+
 async function main() {
   const email = arg("restore");
   const membershipId = arg("restore-id");
 
   const reactivateEmail = arg("reactivate-user");
+  const inviteEmail = arg("invite");
+  const copyFrom = arg("copy-from");
 
   if (email || membershipId) {
     await restore(
@@ -206,6 +280,13 @@ async function main() {
   }
   if (reactivateEmail) {
     await reactivateUser(reactivateEmail.trim().toLowerCase());
+    console.log();
+  }
+  if (inviteEmail || copyFrom) {
+    if (!inviteEmail || !copyFrom) {
+      throw new Error("--invite and --copy-from must be given together.");
+    }
+    await inviteCopyingFrom(inviteEmail.trim().toLowerCase(), copyFrom.trim().toLowerCase());
     console.log();
   }
   await listRemoved();
