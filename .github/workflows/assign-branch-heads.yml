@@ -14,12 +14,14 @@ name: Branch heads
 on:
   workflow_dispatch:
     inputs:
-      digital_media_lead:
-        description: "Email of the Digital Media branch head (leave blank to report only)"
-        type: string
-        required: false
-      tech_product_lead:
-        description: "Email of the Tech & Product branch head (leave blank to report only)"
+      assignments:
+        # Free-form rather than one input per branch. The first version hardcoded
+        # "digital-media" and "tech-product" from the canonical list, and running
+        # the report showed production actually has three branches, one of which
+        # ("product-tech-team") is where the real Product/Tech staff sit. A tool
+        # that can only address the branches someone assumed exist is no use for
+        # finding out that the assumption was wrong.
+        description: "slug=email pairs, comma separated. Blank reports only. e.g. digital-media=a@x.com,product-tech-team=b@x.com"
         type: string
         required: false
 
@@ -28,7 +30,7 @@ env:
 
 jobs:
   branch-heads:
-    name: ${{ (inputs.digital_media_lead != '' || inputs.tech_product_lead != '') && 'Assign branch heads' || 'Report branch heads' }}
+    name: ${{ inputs.assignments != '' && 'Assign branch heads' || 'Report branch heads' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -44,11 +46,15 @@ jobs:
         run: |
           set -euo pipefail
           ARGS=""
-          if [ -n "${{ inputs.digital_media_lead }}" ]; then
-            ARGS="$ARGS --set digital-media=${{ inputs.digital_media_lead }}"
-          fi
-          if [ -n "${{ inputs.tech_product_lead }}" ]; then
-            ARGS="$ARGS --set tech-product=${{ inputs.tech_product_lead }}"
+          RAW="${{ inputs.assignments }}"
+          if [ -n "$RAW" ]; then
+            # Split on commas; each pair is validated by the script, which
+            # refuses an unknown branch or an unknown user rather than guessing.
+            IFS=',' read -ra PAIRS <<< "$RAW"
+            for pair in "${PAIRS[@]}"; do
+              trimmed="$(echo "$pair" | xargs)"
+              [ -n "$trimmed" ] && ARGS="$ARGS --set $trimmed"
+            done
           fi
           if [ -z "$ARGS" ]; then ARGS="--dry-run"; fi
 
