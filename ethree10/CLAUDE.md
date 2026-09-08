@@ -100,7 +100,7 @@ Client data is grouped by `organizationId`. Clients have no accounts at all.
 
 ### Auth
 
-Auth.js v5 with a custom adapter (`server/auth/config.ts`). The adapter maps operations onto the `User` + `OAuthAccount` models instead of the standard Auth.js table names. Providers: Resend magic-link, Google OAuth, and a dev-only `Credentials` provider that auto-creates/logs in any email without sending mail.
+Auth.js (`next-auth` v4) with a custom adapter (`server/auth/config.ts`). The adapter maps operations onto the `User` + `OAuthAccount` models instead of the standard Auth.js table names. Providers: Resend magic-link, Google OAuth, and a dev-only `Credentials` provider that auto-creates/logs in any email without sending mail.
 
 Sessions use JWT strategy. The JWT callback copies `user.id` into `token.userId`; the session callback copies it to `session.user.id`. There is no second factor.
 
