@@ -1,0 +1,75 @@
+name: Merge branches
+
+# Moves everything off one branch onto another, then gives the survivor a
+# canonical name and slug. Writes to the production database.
+#
+# It exists because the catalogue bootstrap was told the agency's second branch
+# is "Tech & Product" (`tech-product`) when the real one is "Product/Tech Team"
+# (`product-tech-team`). It created the branch the check expected instead of the
+# one that exists, leaving the departments and the whole service catalogue on a
+# branch with no staff and no lead, while the seven real people sat elsewhere.
+#
+# Manual only, and dry_run defaults to true: this re-parents memberships,
+# requests and projects, so the plan should be read before it runs. Nothing is
+# deleted — the emptied branch is archived and its slug suffixed, which both
+# preserves it for audit and frees the canonical slug for the survivor. Every
+# write happens in one transaction, because a half-merged agency is worse than
+# an un-merged one.
+on:
+  workflow_dispatch:
+    inputs:
+      from_slug:
+        description: "Branch to empty and archive"
+        type: string
+        required: true
+      into_slug:
+        description: "Branch that absorbs it and survives"
+        type: string
+        required: true
+      rename_to:
+        description: "New display name for the survivor (optional)"
+        type: string
+        required: false
+      new_slug:
+        description: "New slug for the survivor (optional)"
+        type: string
+        required: false
+      dry_run:
+        description: "Report the plan without writing"
+        type: boolean
+        default: true
+
+env:
+  SSH_USER: root
+
+jobs:
+  merge:
+    name: ${{ inputs.dry_run && 'Plan branch merge' || 'Merge branches' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install SSH key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/ethree10_deploy_key
+          chmod 600 ~/.ssh/ethree10_deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Merge
+        run: |
+          set -euo pipefail
+          ARGS="--from ${{ inputs.from_slug }} --into ${{ inputs.into_slug }}"
+          if [ -n "${{ inputs.rename_to }}" ]; then ARGS="$ARGS --rename-to '${{ inputs.rename_to }}'"; fi
+          if [ -n "${{ inputs.new_slug }}" ]; then ARGS="$ARGS --slug ${{ inputs.new_slug }}"; fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
+            "cd /srv/ethree10/ethree10 && pnpm merge:branches $ARGS"
+
+      - name: Readiness afterwards
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
+            "cd /srv/ethree10/ethree10 && pnpm check:readiness:db 2>&1 | grep -E 'Canonical branches|Team heads|Service catalog'" || true
