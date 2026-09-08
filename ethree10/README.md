@@ -15,22 +15,20 @@ The most important architectural strength is the separation of major business st
 
 The biggest platform-wide weakness is not structural. It is experiential. Most pages still present records, lists, and counts rather than helping users make the next operational decision. The next major product step is to evolve E310 from a record-keeping platform into a decision-support platform.
 
-### Overall platform assessment
+### Where this actually stands
 
-| Category | Score |
-|---|:---:|
-| Product Vision | **9.9/10** |
-| Information Architecture | **9.8/10** |
-| Enterprise Architecture | **9.9/10** |
-| Operations Design | **10.0/10** |
-| Commercial Design | **9.3/10** |
-| Governance | **9.9/10** |
-| Scalability | **9.9/10** |
-| UX | **9.1/10** |
-| UI | **9.0/10** |
-| AI Readiness | **9.8/10** |
+Scores were removed. They read as a finished assessment of a system that has
+never carried real work: production holds two requests, two projects and zero
+tasks, invoices and receipts. What the platform can do is better judged from
+`ethree10/docs/remediation-plan.md`, which lists the open gaps by phase, and
+from the audit that produced it.
 
-**Overall Platform Score: 9.7/10**
+The domain model and the money governance are genuinely strong — the budget
+approval gate and separation of duties are carefully built and now covered by
+tests that run in CI. The weakest areas are the ones that show records rather
+than helping anyone decide what to do next, and that is the next substantial
+piece of product work rather than a defect to fix.
+
 
 ## Audit Scope
 
