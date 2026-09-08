@@ -242,7 +242,11 @@ export default function IntegrationsPage() {
       )}
 
       <div className="pt-8 border-t space-y-4">
-        <h3 className="text-lg font-medium">Available Providers</h3>
+        <h3 className="text-lg font-medium">Not built yet</h3>
+        <p className="text-sm text-muted-foreground">
+          Plane is the only integration that exists. These are not configurable, scheduled or
+          committed to — they are listed so you know they are absent rather than hidden.
+        </p>
         <div className="grid gap-4 sm:grid-cols-3">
           <Card className="opacity-50 border-dashed">
             <CardHeader>
@@ -250,7 +254,7 @@ export default function IntegrationsPage() {
               <CardDescription>Issue tracking built for speed</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="secondary" size="sm" disabled>Coming Soon</Button>
+              <Button variant="secondary" size="sm" disabled>Not available</Button>
             </CardContent>
           </Card>
           
@@ -260,7 +264,7 @@ export default function IntegrationsPage() {
               <CardDescription>Software development tool</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="secondary" size="sm" disabled>Coming Soon</Button>
+              <Button variant="secondary" size="sm" disabled>Not available</Button>
             </CardContent>
           </Card>
         </div>
