@@ -1,0 +1,48 @@
+name: Memberships
+
+# Find and restore removed agency memberships.
+#
+# Removing a member is a soft delete, but nothing in the app could undo it, and
+# the unique constraint on Membership — (userId, role, teamId, subUnitId) —
+# ignores removedAt, so re-inviting the same person to the same role failed on
+# the constraint. Access could be taken away and not given back, and the person
+# vanished from every screen so you could not even see who was affected.
+#
+# The product fix ships alongside this. The workflow exists because people are
+# locked out now and should not wait for a deploy.
+#
+# With no email it reports and writes nothing.
+on:
+  workflow_dispatch:
+    inputs:
+      restore_email:
+        description: "Email to restore. Blank lists who is affected without changing anything."
+        type: string
+        required: false
+
+env:
+  SSH_USER: root
+
+jobs:
+  memberships:
+    name: ${{ inputs.restore_email != '' && 'Restore membership' || 'List locked-out people' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install SSH key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/ethree10_deploy_key
+          chmod 600 ~/.ssh/ethree10_deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Report or restore
+        run: |
+          set -euo pipefail
+          ARGS=""
+          if [ -n "${{ inputs.restore_email }}" ]; then
+            ARGS="--restore ${{ inputs.restore_email }}"
+          fi
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
+            "cd /srv/ethree10/ethree10 && pnpm memberships $ARGS"

@@ -129,17 +129,44 @@ export const organizationsRouter = router({
         update: {},
       });
       await assertRoleSetAllowed(user.id, input.role);
-      const membership = await ctx.db.membership.create({
-        data: {
+
+      // Membership is unique on (userId, role, teamId, subUnitId) and that
+      // constraint does not include removedAt. So a person who was removed
+      // still occupies the slot, and inviting them back to the same role and
+      // branch used to fail on the unique constraint — the natural way to
+      // restore someone was the one thing that could not work. Reactivate the
+      // existing row instead.
+      const previous = await ctx.db.membership.findFirst({
+        where: {
           userId: user.id,
           role: input.role,
-          teamId: input.teamId,
-          subUnitId: input.subUnitId,
-          title: input.title,
-          invitedAt: new Date(),
-          acceptedAt: new Date(),
+          teamId: input.teamId ?? null,
+          subUnitId: input.subUnitId ?? null,
+          removedAt: { not: null },
         },
       });
+
+      const membership = previous
+        ? await ctx.db.membership.update({
+            where: { id: previous.id },
+            data: {
+              removedAt: null,
+              title: input.title ?? previous.title,
+              invitedAt: new Date(),
+              acceptedAt: new Date(),
+            },
+          })
+        : await ctx.db.membership.create({
+            data: {
+              userId: user.id,
+              role: input.role,
+              teamId: input.teamId,
+              subUnitId: input.subUnitId,
+              title: input.title,
+              invitedAt: new Date(),
+              acceptedAt: new Date(),
+            },
+          });
 
       await NotificationService.createMany(
         [
@@ -164,6 +191,24 @@ export const organizationsRouter = router({
     .input(z.object({ membershipId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.authorize("organization.removeMember");
+
+      // members.removeMembership has always refused self-removal; this path did
+      // not, so the same action was safe through one route and a way to lock
+      // yourself out through the other.
+      const membership = await ctx.db.membership.findFirst({
+        where: { id: input.membershipId, removedAt: null },
+        select: { userId: true },
+      });
+      if (!membership) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found." });
+      }
+      if (membership.userId === ctx.userId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "You cannot remove your own member access.",
+        });
+      }
+
       return ctx.db.membership.update({
         where: { id: input.membershipId },
         data: { removedAt: new Date() },
