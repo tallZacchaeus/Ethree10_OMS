@@ -61,16 +61,35 @@ test.describe("Task assign and complete flow", () => {
   });
 
   test("request proposals tab exposes staff actions", async ({ page }) => {
+    // The Proposals tab only renders for requests in scoping, proposal or
+    // approved. The seed has none: its "approvedRequest" is actually in
+    // in_progress. So the test makes its own rather than depending on a
+    // fixture that does not exist, and removes it afterwards.
     const prisma = new PrismaClient();
-    const request = await prisma.request
-      .findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } })
-      .finally(() => prisma.$disconnect());
-    expect(request, "seeded request").not.toBeNull();
+    const organization = await prisma.organization.findFirst({ select: { id: true } });
+    expect(organization, "seeded organization").not.toBeNull();
 
-    await signInAsSeededUser(page, "admin.ops@ethree10.r4c.global");
-    await page.goto(`/requests/${request!.id}`);
-    await page.getByRole("tab", { name: "Proposals" }).click();
-    await expect(page.getByRole("button", { name: "Create Proposal" })).toBeVisible();
+    const request = await prisma.request.create({
+      data: {
+        code: `REQ-E2E-PROPOSALS-${Date.now()}`,
+        organizationId: organization!.id,
+        title: "E2E proposals tab fixture",
+        description: "Created by task-completion.spec.ts; safe to delete.",
+        projectType: "creative",
+        stage: "approved",
+      },
+      select: { id: true },
+    });
+
+    try {
+      await signInAsSeededUser(page, "admin.ops@ethree10.r4c.global");
+      await page.goto(`/requests/${request.id}`);
+      await page.getByRole("tab", { name: "Proposals" }).click();
+      await expect(page.getByRole("button", { name: "Create Proposal" })).toBeVisible();
+    } finally {
+      await prisma.request.delete({ where: { id: request.id } });
+      await prisma.$disconnect();
+    }
   });
 
   test("team execution area exposes assignments, workload, and reviews", async ({ page }) => {
