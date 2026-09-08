@@ -64,7 +64,7 @@ The app uses three Next.js route groups in `app/`:
 
 - `(marketing)/` — public marketing site (home, services, about, contact, public request form, public invoice viewer). Uses `ClientMarketingNav`.
 - `(auth)/` — login and magic-link-sent pages. No sidebar.
-- `(app)/` — the authenticated OMS application. Staff only. All pages here require session; the layout enforces auth and MFA.
+- `(app)/` — the authenticated OMS application. Staff only. All pages here require session; the layout enforces auth. **There is no MFA** — it was removed, and `/settings/security` says so. The `mfaEnabled` / `mfaSecret` / `mfaRecoveryCodes` columns on `User` are unused residue, and the `auth` router's MFA methods all throw.
 
 ### Organisation model
 
@@ -86,7 +86,7 @@ The models keep their old names for now; the UI and roles use Branch/Department.
 
 ### Data access
 
-Staff queries are **agency-global** — there is no `scopedDb`, no `workspaceId`, and no `x-workspace-id` header. Use the `db` singleton from `server/db/client.ts`. Where a role should only see part of the agency, scope explicitly (see `visibleTeamIds` in `server/trpc/routers/requests.ts`, which limits non-agency-wide roles to their own branches).
+Staff queries are **agency-global** — there is no `workspaceId` and no `x-workspace-id` header. Use the `db` singleton from `server/db/client.ts`. (`scopedDb` did still exist, attached to every tRPC context, scoping reads but not writes and with a `membership` scope that could not run; it has now been deleted.) Where a role should only see part of the agency, scope explicitly (see `visibleTeamIds` in `server/trpc/routers/requests.ts`, which limits non-agency-wide roles to their own branches).
 
 Client data is grouped by `organizationId`. Clients have no accounts at all.
 
@@ -102,7 +102,9 @@ Client data is grouped by `organizationId`. Clients have no accounts at all.
 
 Auth.js v5 with a custom adapter (`server/auth/config.ts`). The adapter maps operations onto the `User` + `OAuthAccount` models instead of the standard Auth.js table names. Providers: Resend magic-link, Google OAuth, and a dev-only `Credentials` provider that auto-creates/logs in any email without sending mail.
 
-Sessions use JWT strategy. The JWT callback copies `user.id` into `token.userId`; the session callback copies it to `session.user.id`. MFA is enforced at the `(app)` layout level using a `mfa-verified` cookie.
+Sessions use JWT strategy. The JWT callback copies `user.id` into `token.userId`; the session callback copies it to `session.user.id`. There is no second factor.
+
+The dev `Credentials` provider signs anyone in from an email alone. It is available outside production, and inside a production build **only** when `E2E_TEST_AUTH=true` *and* the app is serving on loopback — see `server/auth/dev-login.ts`. Readiness fails a production deploy carrying that variable.
 
 ### RBAC
 
@@ -114,7 +116,7 @@ The eight roles:
 
 | Role | Purpose |
 |---|---|
-| `super_admin` | Technical platform owner. Escape hatch, not operational. |
+| `super_admin` | Technical platform owner. Escape hatch, not operational. Granted by the `User.isSuperAdmin` **boolean**, which short-circuits `can()`; its `ROLE_PERMISSIONS` entry is deliberately empty, so the membership role on its own grants nothing. See `tests/unit/super-admin.test.ts`. |
 | `chief_executive` | Overall head. Agency-wide read, comments, and the **only** role that can approve a budget. No delivery writes. |
 | `chief_operating_officer` | Second to the Chief Executive. Runs operations agency-wide. A strict superset of `agency_admin`, `branch_head` and `department_lead`: it alone may create/archive branches, archive departments and client orgs, delete requests/projects/tasks, and manage integrations. Never approves budgets by role (delegation only — see `docs/coo-role-plan.md`) and never confirms payments. |
 | `agency_admin` | Runs operations and configuration: people, services, skills, routing, assignment, review. **Cannot** reshape the agency (create/archive branches, archive departments or client orgs), delete records, or manage integrations — those are the COO's. No budget approval or payments. |
@@ -132,7 +134,7 @@ All of it lives in `server/services/budget.ts`. Two rules:
 
 Receipts are only ever created by `confirmInvoicePayment`. Do not call `ReceiptService.issueForInvoice` directly from a router — that is exactly the bypass that existed before.
 
-Verify with `pnpm tsx scripts/verify-governance.ts` (24 assertions against a live DB).
+Verify with `pnpm verify:governance` (24 assertions against a live DB). `pnpm check:reconciliation` reports invoices and receipts that disagree — paid with no receipt, receipt with no payment, amount mismatch.
 
 See `../GOVERNANCE-AND-JOURNEYS.md` for the full model and per-role journeys.
 
@@ -145,9 +147,8 @@ See `../GOVERNANCE-AND-JOURNEYS.md` for the full model and per-role journeys.
 Integration secrets are AES-256-GCM encrypted at rest via `INTEGRATION_SECRET_KEY`. The integration layer lives in `server/integrations/`:
 - `core/` — registry, service base, crypto, type definitions
 - `plane/` — outbound task create/update + inbound webhook handler
-- `trello/` — Trello adapter
 
-Webhooks for Plane, Stripe, and Paystack are at `app/api/webhooks/`.
+**Plane is the only adapter.** There is no Trello adapter and no Stripe webhook, whatever the integrations page's "Coming Soon" tiles imply. Webhooks for Plane and Paystack are at `app/api/webhooks/`.
 
 ### PDF generation
 
@@ -159,9 +160,12 @@ Reports and proposals are rendered to PDF using `@react-pdf/renderer`. Server-si
 
 ### Testing
 
-- Unit tests: `tests/unit/` — Vitest, node environment, `@` alias resolved to project root. Currently covers authorization logic and env validation.
+Run everything with **`pnpm verify`** — starts compose, creates the test database and bucket, migrates, then runs all three suites.
+
+- Unit tests: `tests/unit/` — Vitest, node environment, `@` alias resolved to project root. 22 files covering authorization, readiness, notification coverage, code allocation, dev-login gating and more.
 - E2E tests: `tests/e2e/` — Playwright, Chromium. Configured to spin up `pnpm dev:next` automatically unless `CI=true`. Base URL defaults to `http://localhost:3000` or `PLAYWRIGHT_BASE_URL`.
-- Integration tests: `tests/integration/` — Vitest, separate from unit tests (not included in default `pnpm test` run).
+- Integration tests: `tests/integration/` — Vitest, real Postgres + MinIO, separate from the default `pnpm test` run but **now run in CI**. They cover RBAC, money governance and receipt idempotency. Until recently they ran nowhere: excluded from CI, and defaulting to a database URL naming one developer's account on a port compose does not publish.
+- Docs tests: `tests/docs/` — assert the runbooks describe what the scripts actually do. Run in CI.
 
 ### Key conventions
 
