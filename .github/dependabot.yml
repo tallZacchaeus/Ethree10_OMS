@@ -1,0 +1,35 @@
+version: 2
+
+# Weekly, grouped. Ungrouped Dependabot on a project this size opens a dozen
+# PRs a week, which get batch-merged unread or ignored entirely — neither of
+# which is review. Patch and minor updates arrive as one PR per ecosystem;
+# majors come separately because those are the ones that need thought.
+updates:
+  - package-ecosystem: npm
+    directory: /ethree10
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      patch-and-minor:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Next majors are a scheduled piece of work, not a drive-by PR: there is
+      # one production box and no staging. Phase 6 of docs/remediation-plan.md.
+      - dependency-name: next
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react-dom
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

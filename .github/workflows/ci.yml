@@ -76,6 +76,120 @@ jobs:
           DIRECT_URL: postgresql://postgres:postgres@localhost:5432/oms
       - run: pnpm test
 
+  test-docs:
+    name: Docs Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ethree10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: ethree10/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:docs
+
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    # These cover RBAC, money governance and receipt idempotency — the most
+    # security-critical code in the repo. They were excluded from CI while also
+    # being unrunnable locally (the default database URL named one developer's
+    # account on a port compose does not publish), so they ran nowhere at all.
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ethree10_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      minio:
+        image: bitnami/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+    defaults:
+      run:
+        working-directory: ethree10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5433/ethree10_test?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5433/ethree10_test?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5433/ethree10_test?schema=public
+      AUTH_SECRET: ci-test-secret-32-chars-long-enoughx
+      AUTH_URL: http://localhost:3000
+      NEXTAUTH_URL: http://localhost:3000
+      RESEND_API_KEY: re_ci_test_key
+      EMAIL_FROM: noreply@test.com
+      REDIS_URL: redis://localhost:6379
+      INTEGRATION_SECRET_KEY: ${{ secrets.INTEGRATION_SECRET_KEY || 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }}
+      STORAGE_ENDPOINT: http://127.0.0.1:9000
+      STORAGE_ACCESS_KEY: minioadmin
+      STORAGE_SECRET_KEY: minioadmin
+      STORAGE_BUCKET: ethree10-test
+      STORAGE_PUBLIC_URL: http://localhost:3000/api/files
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_STORAGE_URL: http://localhost:3000/api/files
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: ethree10/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - run: pnpm prisma migrate deploy
+      - name: Wait for MinIO
+        run: |
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:9000/minio/health/live && exit 0
+            sleep 2
+          done
+          echo "MinIO did not become ready"; exit 1
+      - run: pnpm ensure:bucket
+      - run: pnpm test:integration
+
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    # Advisory for now: there is a backlog of 61 findings (3 critical, 30 high)
+    # to clear in Phase 6, and a blocking gate today would just be switched off.
+    # Flip continue-on-error once that backlog is down.
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: ethree10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: ethree10/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level high
+
   test-e2e:
     name: E2E Tests
     runs-on: ubuntu-latest

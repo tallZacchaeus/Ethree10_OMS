@@ -42,6 +42,7 @@ const stamp = () => `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 
 describe("Org administration: roles, leads, structure, skills", () => {
   let admin: User;
+  let coo: User;
   let head: User;
   let staffer: User;
   let branch: Team;
@@ -62,11 +63,15 @@ describe("Org administration: roles, leads, structure, skills", () => {
     const makeUser = (label: string) =>
       db.user.create({ data: { email: `${label}-${suffix}@ethree10.com`, name: label } });
     admin = await makeUser("admin");
+    coo = await makeUser("coo");
     head = await makeUser("head");
     staffer = await makeUser("staffer");
 
     await db.membership.create({
       data: { userId: admin.id, role: "agency_admin", acceptedAt: new Date() },
+    });
+    await db.membership.create({
+      data: { userId: coo.id, role: "chief_operating_officer", acceptedAt: new Date() },
     });
     const headMembership = await db.membership.create({
       data: { userId: head.id, role: "branch_head", teamId: branch.id, acceptedAt: new Date() },
@@ -85,7 +90,7 @@ describe("Org administration: roles, leads, structure, skills", () => {
   });
 
   afterAll(async () => {
-    const userIds = [admin?.id, head?.id, staffer?.id].filter(Boolean) as string[];
+    const userIds = [admin?.id, coo?.id, head?.id, staffer?.id].filter(Boolean) as string[];
     if (userIds.length) {
       await db.userSkill.deleteMany({ where: { userId: { in: userIds } } });
       await db.membership.deleteMany({ where: { userId: { in: userIds } } });
@@ -227,8 +232,14 @@ describe("Org administration: roles, leads, structure, skills", () => {
   });
 
   describe("archiving", () => {
+    // Reshaping the agency is the COO's, not the agency admin's. These tests
+    // used to run as `admin` and passed when agency_admin still held
+    // team.archive and subunit.archive; narrowing that role so the COO
+    // outranks it made them wrong, and nobody noticed because the suite ran
+    // neither in CI nor, thanks to a hardcoded database URL, on any machine
+    // but its author's. Each case now asserts both halves of the boundary.
     it("refuses to archive a branch that still has people", async () => {
-      const caller = getCaller(admin.id);
+      const caller = getCaller(coo.id);
       await expect(caller.teams.archive({ id: branch.id })).rejects.toThrow(/still has/i);
 
       const stillActive = await db.team.findUnique({
@@ -238,8 +249,14 @@ describe("Org administration: roles, leads, structure, skills", () => {
       expect(stillActive?.archivedAt).toBeNull();
     });
 
+    it("does not let an agency admin archive a branch", async () => {
+      await expect(getCaller(admin.id).teams.archive({ id: branch.id })).rejects.toThrow(
+        /team\.archive/i,
+      );
+    });
+
     it("archives an empty department, and it stops being listed", async () => {
-      const caller = getCaller(admin.id);
+      const caller = getCaller(coo.id);
       const suffix = stamp();
       const empty = await db.subUnit.create({
         data: { teamId: branch.id, name: `Empty ${suffix}`, slug: `empty-${suffix}` },
@@ -254,8 +271,14 @@ describe("Org administration: roles, leads, structure, skills", () => {
     });
 
     it("refuses to archive a department that still has people", async () => {
-      const caller = getCaller(admin.id);
+      const caller = getCaller(coo.id);
       await expect(caller.subunits.archive({ id: department.id })).rejects.toThrow(/still has/i);
+    });
+
+    it("does not let an agency admin archive a department", async () => {
+      await expect(getCaller(admin.id).subunits.archive({ id: department.id })).rejects.toThrow(
+        /subunit\.archive/i,
+      );
     });
   });
 
