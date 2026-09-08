@@ -148,9 +148,39 @@ export class TaskService {
   }
 
   /** Candidate assignees for a sub-unit, ranked by current load (best fit first). */
-  static async candidates(subUnitId: string) {
+  /**
+   * Who can be offered this work.
+   *
+   * This used to take a subUnitId and filter on it alone, which made the picker
+   * far narrower than the rule it is picking for. checkAssignmentEligibility
+   * asks only for an accepted membership of the project's BRANCH — so anyone
+   * attached to a branch but not to a department was eligible and invisible,
+   * and the picker showed "no members" while the assignment would have been
+   * accepted. It also excluded department_lead outright, so a department's own
+   * lead could never be given work, and it ignored acceptedAt, so it could
+   * offer someone whose membership the eligibility check would then reject.
+   *
+   * Now: department members when a department is given, otherwise everyone in
+   * the branch. Same population the rule allows.
+   */
+  static async candidates(scope: { subUnitId?: string | null; teamId?: string | null }) {
+    const where =
+      scope.subUnitId
+        ? { subUnitId: scope.subUnitId }
+        : scope.teamId
+          ? { teamId: scope.teamId }
+          : null;
+
+    if (!where) return [];
+
     const memberships = await db.membership.findMany({
-      where: { subUnitId, removedAt: null, role: { in: ["team_member", "branch_head"] } },
+      where: {
+        ...where,
+        removedAt: null,
+        acceptedAt: { not: null },
+        role: { in: ["team_member", "department_lead", "branch_head"] },
+        user: { deactivatedAt: null },
+      },
       select: {
         user: {
           select: {

@@ -8,30 +8,38 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 
 /**
- * Picks an assignee from a sub-unit's members, surfacing each candidate's
- * current open-task load and top skills to support smart routing.
+ * Picks an assignee, showing each candidate's open-task load and top skills.
+ *
+ * A department narrows the list; it is not required. This used to refuse to
+ * open at all without one — "Select a sub-unit first" — while the rule behind
+ * assignment only ever asked for membership of the project's branch. So anyone
+ * attached to a branch but not a department could be assigned by the server and
+ * never offered by the interface, which is what made assignment feel broken.
  */
 export function AssigneePicker({
   subUnitId,
+  projectId,
   value,
   onChange,
 }: {
   subUnitId: string | null | undefined;
+  /** Falls back to the project's branch when no department is chosen. */
+  projectId?: string | null;
   value: string | null | undefined;
   onChange: (userId: string) => void;
 }) {
   const { data: candidates, isLoading } = trpc.tasks.candidates.useQuery(
-    { subUnitId: subUnitId ?? "" },
-    { enabled: Boolean(subUnitId) },
+    { subUnitId: subUnitId ?? null, projectId: projectId ?? null },
+    { enabled: Boolean(subUnitId || projectId) },
   );
 
   const selected = candidates?.find((c) => c.id === value);
 
-  if (!subUnitId) {
+  if (!subUnitId && !projectId) {
     return (
       <Button variant="outline" className="w-full justify-start" disabled>
         <UserPlus className="h-4 w-4" />
-        Select a sub-unit first
+        Choose a project first
       </Button>
     );
   }
@@ -51,9 +59,14 @@ export function AssigneePicker({
         {isLoading ? (
           <p className="p-3 text-sm text-muted-foreground">Loading candidates…</p>
         ) : !candidates || candidates.length === 0 ? (
-          <p className="p-3 text-sm text-muted-foreground">
-            No members in this sub-unit yet.
-          </p>
+          <div className="space-y-1 p-3 text-sm">
+            <p className="font-medium">Nobody can be assigned this yet.</p>
+            <p className="text-muted-foreground">
+              Work can only go to someone with an accepted membership of the branch that owns this
+              project. {subUnitId ? "Try clearing the department to see the whole branch, or add" : "Add"}{" "}
+              people to the branch under People.
+            </p>
+          </div>
         ) : (
           <ul className="max-h-72 overflow-y-auto">
             {candidates.map((c) => (
