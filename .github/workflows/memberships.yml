@@ -39,6 +39,14 @@ on:
         description: "Email whose active memberships to remove. Soft and undoable via restore."
         type: string
         required: false
+      change_email_from:
+        description: "Correct an address in place, keeping all history. Needs change_email_to."
+        type: string
+        required: false
+      change_email_to:
+        description: "The corrected address."
+        type: string
+        required: false
 
 env:
   SSH_USER: root
@@ -78,6 +86,12 @@ jobs:
           fi
           if [ -n "${{ inputs.remove_email }}" ]; then
             ARGS="$ARGS --remove ${{ inputs.remove_email }}"
+          fi
+          if [ -n "${{ inputs.change_email_from }}" ]; then
+            ARGS="$ARGS --change-email ${{ inputs.change_email_from }}"
+          fi
+          if [ -n "${{ inputs.change_email_to }}" ]; then
+            ARGS="$ARGS --to ${{ inputs.change_email_to }}"
           fi
           ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
             "cd /srv/ethree10/ethree10 && pnpm memberships $ARGS"
