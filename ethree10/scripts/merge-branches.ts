@@ -33,6 +33,7 @@ function arg(name: string): string | null {
 }
 
 const dryRun = process.argv.includes("--dry-run");
+const resolveCollisions = process.argv.includes("--resolve-collisions");
 
 async function main() {
   const fromSlug = arg("from");
@@ -91,13 +92,95 @@ async function main() {
   const collisions = movingSubUnits.filter((s) => targetSubUnitSlugs.has(s.slug));
 
   if (collisions.length > 0) {
-    console.log("COLLISIONS — these departments exist on both branches:");
-    for (const c of collisions) console.log(`  ! ${c.name} (${c.slug})`);
-    console.log(
-      "\nMerging would violate the unique constraint on (teamId, slug). Rename or archive one side first.",
-    );
-    process.exitCode = 1;
-    return;
+    console.log("COLLISIONS — these departments exist on both branches:\n");
+
+    // Which side is real? A department is only safely archivable when nothing
+    // points at it. Three models reference a SubUnit — Membership, Task and
+    // Integration — plus its own lead. Reporting all four is the difference
+    // between "pick one" and knowing which one somebody is actually using.
+    const resolvable: Array<{ archive: { id: string; name: string; slug: string }; side: string }> = [];
+    let unresolvable = 0;
+
+    for (const collision of collisions) {
+      const targetTwin = await db.subUnit.findFirst({
+        where: { teamId: target.id, slug: collision.slug },
+      });
+      if (!targetTwin) continue;
+
+      const describe = async (dept: { id: string; leadId?: string | null; createdAt?: Date }) => {
+        const [members, tasks, integrations] = await Promise.all([
+          db.membership.count({ where: { subUnitId: dept.id, removedAt: null } }),
+          db.task.count({ where: { subUnitId: dept.id } }),
+          db.integration.count({ where: { subUnitId: dept.id } }),
+        ]);
+        const empty = members === 0 && tasks === 0 && integrations === 0 && !dept.leadId;
+        return { members, tasks, integrations, lead: Boolean(dept.leadId), empty };
+      };
+
+      const sourceFull = await db.subUnit.findUniqueOrThrow({ where: { id: collision.id } });
+      const sourceInfo = await describe(sourceFull);
+      const targetInfo = await describe(targetTwin);
+
+      const line = (label: string, i: typeof sourceInfo, created: Date) =>
+        `      ${label}: ${i.members} members, ${i.tasks} tasks, ${i.integrations} integrations, ` +
+        `${i.lead ? "has a lead" : "no lead"}, created ${created.toISOString().slice(0, 10)}` +
+        `${i.empty ? "   <- empty" : ""}`;
+
+      console.log(`  ! ${collision.name} (${collision.slug})`);
+      console.log(line(`on ${source.name}`, sourceInfo, sourceFull.createdAt));
+      console.log(line(`on ${target.name}`, targetInfo, targetTwin.createdAt));
+
+      // Only ever archive a department nothing points at. If both are empty the
+      // source copy goes, because the target branch is the one that survives.
+      if (sourceInfo.empty) {
+        resolvable.push({ archive: sourceFull, side: source.name });
+      } else if (targetInfo.empty) {
+        resolvable.push({ archive: targetTwin, side: target.name });
+      } else {
+        unresolvable++;
+        console.log("      both sides are in use — a person has to decide this one");
+      }
+      console.log();
+    }
+
+    if (!resolveCollisions) {
+      console.log("Merging would violate the unique constraint on (teamId, slug).");
+      if (unresolvable === 0 && resolvable.length === collisions.length) {
+        console.log(
+          `Every collision has one empty side. Re-run with --resolve-collisions to archive ${resolvable.length} empty department(s) and continue.`,
+        );
+      } else {
+        console.log("Resolve the departments in use by hand, then re-run.");
+      }
+      process.exitCode = 1;
+      return;
+    }
+
+    if (unresolvable > 0) {
+      console.log(
+        `Refusing: ${unresolvable} collision(s) have content on both sides. --resolve-collisions only ever archives a department nothing points at.`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    console.log(`Resolving ${resolvable.length} collision(s) by archiving the empty side:`);
+    for (const { archive, side } of resolvable) {
+      const supersededSlug = `${archive.slug}-superseded-${new Date().toISOString().slice(0, 10)}`;
+      console.log(`  archive "${archive.name}" on ${side} → slug ${supersededSlug}`);
+      if (!dryRun) {
+        await db.subUnit.update({
+          where: { id: archive.id },
+          data: { slug: supersededSlug, archivedAt: new Date() },
+        });
+      }
+    }
+    console.log();
+
+    if (dryRun) {
+      console.log("Dry run — nothing written. Re-run without --dry-run to apply.");
+      return;
+    }
   }
 
   const archivedSlug = `${source.slug}-merged-${new Date().toISOString().slice(0, 10)}`;
