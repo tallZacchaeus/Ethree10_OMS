@@ -157,6 +157,13 @@ export const requestsRouter = router({
         },
         take: input.limit,
         orderBy: { createdAt: "desc" },
+        // The list showed "Assigned"/"Unassigned" because it had no team name
+        // to show. Naming the branch is what lets a reader tell whether a row
+        // is theirs without opening it.
+        include: {
+          routedTeam: { select: { id: true, name: true } },
+          organization: { select: { id: true, name: true } },
+        },
       });
     }),
 
