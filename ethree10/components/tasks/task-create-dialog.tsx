@@ -142,9 +142,14 @@ export function TaskCreateDialog({
             <Label>Assignee</Label>
             <AssigneePicker
               subUnitId={subUnitId}
+              projectId={projectId}
               value={assigneeUserId}
               onChange={setAssigneeUserId}
             />
+            <p className="text-xs text-muted-foreground">
+              Anyone in the branch that owns this project. Choosing a department narrows the list —
+              it is not required.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

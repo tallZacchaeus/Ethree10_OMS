@@ -220,8 +220,11 @@ export default function ProjectDetailPage() {
             title="No tasks yet"
             description={
               isAgencyStaff
-                ? "Add the first task to start executing this project."
-                : "Your lead has not broken this project into tasks yet."
+                ? "Work is assigned to tasks, not to projects — so nobody can be given this until " +
+                  "there is at least one. Add a task, or apply a template to create a set at once. " +
+                  "You can assign it to anyone in this project's branch."
+                : "Your lead has not broken this project into tasks yet. Once they do, anything for " +
+                  "you will appear in My Work."
             }
             action={isAgencyStaff ? <Button onClick={() => setCreating(true)}>Add task</Button> : undefined}
           />

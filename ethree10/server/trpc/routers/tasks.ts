@@ -59,11 +59,26 @@ export const tasksRouter = router({
       });
     }),
 
+  /**
+   * Who can be assigned. Takes a project so the branch is available as the
+   * fallback scope — a department narrows the list, it is not required to have
+   * one, because eligibility is decided at branch level.
+   */
   candidates: protectedProcedure
-    .input(z.object({ subUnitId: z.string() }))
+    .input(z.object({ subUnitId: z.string().nullish(), projectId: z.string().nullish() }))
     .query(async ({ ctx, input }) => {
       await requireAgencyAction(ctx.userId, "task.assign");
-      return TaskService.candidates(input.subUnitId);
+
+      let teamId: string | null = null;
+      if (input.projectId) {
+        const project = await ctx.db.project.findUnique({
+          where: { id: input.projectId },
+          select: { agencyTeamId: true },
+        });
+        teamId = project?.agencyTeamId ?? null;
+      }
+
+      return TaskService.candidates({ subUnitId: input.subUnitId, teamId });
     }),
 
   create: protectedProcedure
