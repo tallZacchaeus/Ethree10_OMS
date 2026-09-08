@@ -29,11 +29,13 @@ export const membersRouter = router({
       return ctx.db.position.create({ data: { name: input.name, description: input.description } });
     }),
   list: protectedProcedure
-    .input(z.object({}).optional())
-    .query(async ({ ctx }) => {
+    // `includeRemoved` exists so a removed member can be found again. Without
+    // it they vanish from every screen, which is why nobody could restore them.
+    .input(z.object({ includeRemoved: z.boolean().optional() }).optional())
+    .query(async ({ ctx, input }) => {
       await requireAgencyAction(ctx.userId, "member.read");
       const memberships = await ctx.db.membership.findMany({
-        where: { removedAt: null },
+        where: input?.includeRemoved ? {} : { removedAt: null },
       include: {
         user: {
           select: {
@@ -235,6 +237,73 @@ export const membersRouter = router({
       );
 
       return removed;
+    }),
+
+  /**
+   * Put a removed membership back.
+   *
+   * Removal is a soft delete, so the row survives — but nothing in the app
+   * could clear `removedAt`, and re-inviting the person hit the unique
+   * constraint on (userId, role, teamId, subUnitId) because that constraint
+   * ignores removedAt. Access could be taken away and not given back.
+   */
+  reactivateMembership: protectedProcedure
+    .input(z.object({ membershipId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAgencyAction(ctx.userId, "organization.removeMember");
+
+      const membership = await ctx.db.membership.findFirst({
+        where: { id: input.membershipId, removedAt: { not: null } },
+        select: { id: true, userId: true, role: true, teamId: true, subUnitId: true },
+      });
+      if (!membership) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No removed membership with that id. It may already be active.",
+        });
+      }
+
+      // Restoring must not create two active rows claiming the same slot.
+      const conflict = await ctx.db.membership.findFirst({
+        where: {
+          userId: membership.userId,
+          role: membership.role,
+          teamId: membership.teamId,
+          subUnitId: membership.subUnitId,
+          removedAt: null,
+          id: { not: membership.id },
+        },
+      });
+      if (conflict) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            "This person already has an active membership for that role and branch, so there is nothing to restore.",
+        });
+      }
+
+      const restored = await ctx.db.membership.update({
+        where: { id: membership.id },
+        data: { removedAt: null, acceptedAt: new Date() },
+      });
+
+      await NotificationService.createMany(
+        [
+          ...NotificationAudience.subject(membership.userId, ctx.userId),
+          ...(await NotificationAudience.administrators(ctx.userId)),
+        ],
+        {
+          kind: "member_invited",
+          title: "Agency access restored",
+          body: "Your access has been reinstated.",
+          link: "/members",
+          entityType: "Membership",
+          entityId: restored.id,
+          allowDuplicate: true,
+        },
+      );
+
+      return restored;
     }),
 
   searchBySkill: protectedProcedure
