@@ -264,12 +264,77 @@ async function inviteCopyingFrom(newEmail: string, sourceEmail: string) {
   console.log(`\nThe source account "${sourceEmail}" was not modified.`);
 }
 
+/**
+ * Every account whose email contains a substring, with what access it holds.
+ *
+ * Exists because a mistyped domain is invisible to every other report here: a
+ * typo'd address that is an ACTIVE member is not removed, not membership-less
+ * and not deactivated, so nothing flagged it. The person works normally and
+ * every email the system sends them bounces.
+ *
+ * Read-only.
+ */
+async function searchByEmail(fragment: string) {
+  const users = await db.user.findMany({
+    where: { email: { contains: fragment, mode: "insensitive" } },
+    select: {
+      email: true,
+      name: true,
+      deactivatedAt: true,
+      memberships: {
+        select: {
+          role: true,
+          removedAt: true,
+          team: { select: { name: true } },
+          subUnit: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: { email: "asc" },
+  });
+
+  console.log(`\n=== Accounts matching "${fragment}" ===\n`);
+  if (users.length === 0) {
+    console.log("None.");
+    return;
+  }
+
+  for (const u of users) {
+    const active = u.memberships.filter((m) => !m.removedAt);
+    const removed = u.memberships.filter((m) => m.removedAt);
+    const state = u.deactivatedAt
+      ? "DEACTIVATED"
+      : active.length > 0
+        ? "active"
+        : removed.length > 0
+          ? "removed"
+          : "no membership";
+    console.log(`  ${u.email}  [${state}]`);
+    for (const m of active) {
+      console.log(
+        `      active:  ${m.role}${m.team ? ` · ${m.team.name}` : ""}${m.subUnit ? ` / ${m.subUnit.name}` : ""}`,
+      );
+    }
+    for (const m of removed) {
+      console.log(
+        `      removed: ${m.role}${m.team ? ` · ${m.team.name}` : ""}${m.subUnit ? ` / ${m.subUnit.name}` : ""}`,
+      );
+    }
+  }
+
+  console.log(
+    `\n${users.length} account(s). An "active" one with a mistyped domain still works in the app, ` +
+      `but every email sent to it bounces.`,
+  );
+}
+
 async function main() {
   const email = arg("restore");
   const membershipId = arg("restore-id");
 
   const reactivateEmail = arg("reactivate-user");
   const inviteEmail = arg("invite");
+  const emailLike = arg("email-like");
   const copyFrom = arg("copy-from");
 
   if (email || membershipId) {
@@ -289,6 +354,11 @@ async function main() {
     await inviteCopyingFrom(inviteEmail.trim().toLowerCase(), copyFrom.trim().toLowerCase());
     console.log();
   }
+  if (emailLike) {
+    await searchByEmail(emailLike.trim());
+    return;
+  }
+
   await listRemoved();
   await listDeactivated();
 }

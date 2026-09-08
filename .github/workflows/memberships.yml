@@ -31,6 +31,10 @@ on:
         description: "Email whose role/branch/department to copy. Not modified."
         type: string
         required: false
+      email_like:
+        description: "List accounts whose email contains this text, with their access. Read-only."
+        type: string
+        required: false
 
 env:
   SSH_USER: root
@@ -64,6 +68,9 @@ jobs:
           fi
           if [ -n "${{ inputs.copy_from_email }}" ]; then
             ARGS="$ARGS --copy-from ${{ inputs.copy_from_email }}"
+          fi
+          if [ -n "${{ inputs.email_like }}" ]; then
+            ARGS="$ARGS --email-like ${{ inputs.email_like }}"
           fi
           ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
             "cd /srv/ethree10/ethree10 && pnpm memberships $ARGS"
