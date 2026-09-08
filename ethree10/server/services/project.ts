@@ -6,15 +6,19 @@ import { AuditService } from "@/server/services/audit";
 import { NotificationService } from "@/server/services/notification";
 import { getAgencyAuthContext } from "@/server/services/agency";
 import { can } from "@/server/auth/permissions";
-import { generateCode } from "@/lib/utils/codes";
+import { generateCode, parseCode } from "@/lib/utils/codes";
+import { allocateWithCode } from "@/server/services/code-allocator";
 import { EmailService } from "@/server/notifications/email";
 
+/** Highest project code in use this year, plus one. See nextTaskSeq for why not a count. */
 async function nextProjectSeq(): Promise<number> {
   const year = new Date().getUTCFullYear();
-  const count = await db.project.count({
-    where: { createdAt: { gte: new Date(Date.UTC(year, 0, 1)) } },
+  const latest = await db.project.findFirst({
+    where: { code: { startsWith: `PRJ-${year}-` } },
+    orderBy: { code: "desc" },
+    select: { code: true },
   });
-  return count + 1;
+  return (latest ? parseCode(latest.code)?.seq ?? 0 : 0) + 1;
 }
 
 export class ProjectService {

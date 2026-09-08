@@ -311,8 +311,17 @@ export class BudgetService {
       );
     }
 
-    const updated = await db.invoice.update({
-      where: { id: invoice.id },
+    // The paymentConfirmedAt check above is a read, and this is the write; two
+    // confirmations arriving together both pass the check and both proceed.
+    // Scoping the update to rows that are still unconfirmed closes that: the
+    // second one matches nothing, and updateMany reports zero rather than
+    // silently overwriting who confirmed the payment and when.
+    //
+    // The receipt was already safe — invoiceId is unique — but the losing call
+    // still re-sent the notifications and wrote a second audit entry, so the
+    // record showed a payment confirmed twice by different people.
+    const claimed = await db.invoice.updateMany({
+      where: { id: invoice.id, paymentConfirmedAt: null },
       data: {
         status: "paid",
         paidAt: new Date(),
@@ -321,6 +330,12 @@ export class BudgetService {
         paymentConfirmedAt: new Date(),
       },
     });
+
+    if (claimed.count === 0) {
+      throw governanceError("This payment has already been confirmed.");
+    }
+
+    const updated = await db.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
 
     // Receipt is issued only after confirmation — internal record and audit proof.
     // If this throws, the invoice is already marked paid, so the mismatch has to
