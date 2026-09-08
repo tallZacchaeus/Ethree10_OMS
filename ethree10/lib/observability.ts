@@ -52,7 +52,10 @@ export type CriticalJob =
   | "receipt-issuance"
   | "notification-worker"
   | "integration-sync"
-  | "file-storage";
+  | "file-storage"
+  // Unhandled render failures caught by the route error boundaries.
+  | "app-route-error"
+  | "global-error";
 
 /**
  * Report a failure in a critical path. Always logs; also reports to Sentry when
