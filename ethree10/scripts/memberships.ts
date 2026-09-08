@@ -127,9 +127,76 @@ async function restore(target: { email?: string; membershipId?: string }) {
   }
 }
 
+/**
+ * The second way an account stops working, and the quieter one.
+ *
+ * `User.deactivatedAt` is set only by the Auth.js adapter's deleteUser hook and
+ * is cleared by nothing. Sign-in does not check it, so the person logs in and
+ * the app looks normal — but assignment, delegation, capability and report
+ * recipients all exclude them. Nothing explains why, to them or to a lead
+ * wondering where they went in the assignee list.
+ */
+async function listDeactivated() {
+  const deactivated = await db.user.findMany({
+    where: { deactivatedAt: { not: null } },
+    select: {
+      email: true,
+      name: true,
+      deactivatedAt: true,
+      memberships: { where: { removedAt: null }, select: { role: true } },
+    },
+    orderBy: { deactivatedAt: "desc" },
+  });
+
+  console.log("\n=== Deactivated accounts ===\n");
+  if (deactivated.length === 0) {
+    console.log("None. Nobody is locked out this way.");
+    return;
+  }
+
+  console.log(`${deactivated.length} deactivated account(s):\n`);
+  for (const u of deactivated) {
+    const roles = u.memberships.map((m) => m.role).join(", ") || "no active membership";
+    console.log(`  ${u.email} — ${roles}`);
+    console.log(`      deactivated ${u.deactivatedAt?.toISOString().slice(0, 10)}`);
+    // Worth stating: they can still sign in, which is why this does not look
+    // like a locked-out account from their side.
+    console.log(`      can sign in, cannot be assigned work`);
+  }
+  console.log(`\nReactivate with:  pnpm memberships --reactivate-user <email>`);
+}
+
+async function reactivateUser(email: string) {
+  const user = await db.user.findUnique({
+    where: { email },
+    select: { id: true, email: true, deactivatedAt: true },
+  });
+
+  if (!user) {
+    console.log(`No user with email "${email}".`);
+    return;
+  }
+  if (!user.deactivatedAt) {
+    console.log(`${user.email} is not deactivated — nothing to do.`);
+    return;
+  }
+
+  await db.user.update({ where: { id: user.id }, data: { deactivatedAt: null } });
+  console.log(`+ reactivated: ${user.email}`);
+
+  // Reactivating the account does not grant access on its own; that is the
+  // membership's job, and the two lockouts are independent.
+  const active = await db.membership.count({ where: { userId: user.id, removedAt: null } });
+  if (active === 0) {
+    console.log("  note: they still have no active membership, so they cannot do anything yet.");
+  }
+}
+
 async function main() {
   const email = arg("restore");
   const membershipId = arg("restore-id");
+
+  const reactivateEmail = arg("reactivate-user");
 
   if (email || membershipId) {
     await restore(
@@ -137,7 +204,12 @@ async function main() {
     );
     console.log();
   }
+  if (reactivateEmail) {
+    await reactivateUser(reactivateEmail.trim().toLowerCase());
+    console.log();
+  }
   await listRemoved();
+  await listDeactivated();
 }
 
 main()
