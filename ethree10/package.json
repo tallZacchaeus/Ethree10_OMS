@@ -38,7 +38,11 @@
     "db:deploy": "prisma migrate deploy",
     "test:integration:prepare": "prisma migrate deploy",
     "test:all": "vitest run && vitest run --config vitest.docs.config.ts && vitest run --config vitest.integration.config.ts",
-    "test:docs": "vitest run --config vitest.docs.config.ts"
+    "test:docs": "vitest run --config vitest.docs.config.ts",
+    "verify": "bash scripts/verify.sh",
+    "ensure:bucket": "tsx scripts/ensure-bucket.ts",
+    "verify:governance": "tsx scripts/verify-governance.ts",
+    "audit:baseline": "tsx scripts/check-audit-baseline.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1058.0",

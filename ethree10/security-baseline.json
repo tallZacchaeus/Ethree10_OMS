@@ -1,0 +1,5 @@
+{
+  "critical": 3,
+  "high": 30,
+  "note": "Ceiling for known advisories. Lower it as Phase 6 clears them; never raise it here."
+}

@@ -77,7 +77,17 @@ describe('Phase 1 Verification: RBAC & Link-Only Client Model', () => {
   it('agency admins receive permitted agency-wide access', async () => {
     const ctx = await AuthorizationService.resolve(agencyAdmin.id);
     expect(can(ctx, 'team.read')).toBe(true);
-    expect(can(ctx, 'team.create')).toBe(true);
+    expect(can(ctx, 'service.manage')).toBe(true);
+  });
+
+  it('agency admins cannot reshape the agency — that is the COO', async () => {
+    // The boundary that makes chief_operating_officer outrank agency_admin.
+    // This assertion used to read `expect(can(ctx, 'team.create')).toBe(true)`
+    // and stopped being true the day the role was narrowed.
+    const ctx = await AuthorizationService.resolve(agencyAdmin.id);
+    expect(can(ctx, 'team.create')).toBe(false);
+    expect(can(ctx, 'team.archive')).toBe(false);
+    expect(can(ctx, 'subunit.archive')).toBe(false);
   });
 
   it('team heads can manage only their assigned teams', async () => {

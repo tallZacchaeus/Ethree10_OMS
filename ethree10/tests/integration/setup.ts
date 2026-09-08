@@ -15,11 +15,24 @@ if (typeof proc.loadEnvFile !== "function") {
   throw new Error("Node 20.12+ is required to run integration tests (process.loadEnvFile is unavailable).");
 }
 
-proc.loadEnvFile(resolve(process.cwd(), ".env"));
+// A local `.env` is a convenience, not a requirement. loadEnvFile throws when
+// the file is absent, which is the normal case in CI — so a missing file must
+// not be the reason the suite cannot run.
+try {
+  proc.loadEnvFile(resolve(process.cwd(), ".env"));
+} catch {
+  // No .env here. Everything below has a default or comes from the environment.
+}
 
+// Defaults to the database docker-compose.yml actually publishes. The previous
+// default named a specific developer's macOS account on port 5432, while compose
+// publishes 5433 — so the documented way to start local infrastructure produced
+// a database these tests did not look at, and nobody but that one developer
+// could run them. Combined with their absence from CI, the RBAC and governance
+// suites ran nowhere at all.
 const testDatabaseUrl =
   process.env["TEST_DATABASE_URL"] ??
-  "postgresql://zacchaeusjames@localhost:5432/ethree10_test?schema=public";
+  "postgresql://postgres:postgres@localhost:5433/ethree10_test?schema=public";
 
 // Applied after loadEnvFile so it always wins over whatever `.env` contained.
 process.env["DATABASE_URL"] = testDatabaseUrl;
