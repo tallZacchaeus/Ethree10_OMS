@@ -18,6 +18,7 @@ import { formatMoney, formatDate } from "@/lib/format";
 import { useToast } from "@/components/ui/use-toast";
 import { CreateProposalDialog } from "@/components/proposals/create-proposal-dialog";
 import { AnimatedItem, AnimatedSection } from "@/components/ui-ext/animated";
+import { useAgencyContext } from "@/components/providers/agency-provider";
 import { BRANCH_LEAD_ROLES } from "@/server/auth/role-groups";
 import type { Role } from "@prisma/client";
 
@@ -29,8 +30,9 @@ type ProposalRecord = {
 };
 
 export function ProposalsTab({ requestId }: { requestId: string }) {
-  const isSuperAdmin = false; // Stub
-  const roles: string[] = [];
+  // Was hardcoded false with an empty roles array, so every proposal action —
+  // create, send, accept, reject — was hidden from everyone.
+  const { isSuperAdmin, roles } = useAgencyContext();
   const { toast } = useToast();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [rejectionTarget, setRejectionTarget] = useState<ProposalRecord | null>(null);
