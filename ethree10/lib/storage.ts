@@ -49,3 +49,20 @@ export async function presignedUrl(key: string, expiresInSeconds = 3600): Promis
 export function publicUrl(key: string): string {
   return `${env.STORAGE_PUBLIC_URL}/${key}`;
 }
+
+/**
+ * The first bytes of a stored object, for verifying what it actually is.
+ *
+ * A ranged read: we never pull a 50 MB video to check its first sixteen bytes.
+ */
+export async function readHeadBytes(key: string, length = 16): Promise<Uint8Array> {
+  const response = await s3.send(
+    new GetObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Range: `bytes=0-${length - 1}`,
+    }),
+  );
+  const bytes = await response.Body?.transformToByteArray();
+  return bytes ?? new Uint8Array();
+}
