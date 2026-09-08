@@ -171,10 +171,11 @@ jobs:
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
-    # Advisory for now: there is a backlog of 61 findings (3 critical, 30 high)
-    # to clear in Phase 6, and a blocking gate today would just be switched off.
-    # Flip continue-on-error once that backlog is down.
-    continue-on-error: true
+    # A ratchet, not a gate. The known backlog (3 critical, 30 high) passes
+    # against security-baseline.json; a NEW critical or high fails. Blocking on
+    # the whole backlog would be red from day one, and a permanently red check
+    # is one people scroll past — so would marking this continue-on-error,
+    # which is the same thing in a different colour.
     defaults:
       run:
         working-directory: ethree10
@@ -189,7 +190,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: ethree10/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --audit-level high
+      - run: pnpm audit:baseline
 
   test-e2e:
     name: E2E Tests
