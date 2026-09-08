@@ -1,6 +1,8 @@
 "use client";
 
+
 import Link from "next/link";
+import { nextAction, isOverdue, formatAge } from "@/lib/request-triage";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
@@ -11,6 +13,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { RequestStage, Role } from "@prisma/client";
 import { REQUEST_ACCESS_ROLES } from "@/server/auth/role-groups";
 import { useAgencyContext } from "@/components/providers/agency-provider";
+
+
+/**
+ * Colour by what the row needs, not by what it is. "Blocked" earns attention;
+ * "done" should recede rather than compete with it.
+ */
+const NEXT_ACTION_TONE: Record<string, string> = {
+  blocked: "font-medium text-red-600 dark:text-red-400",
+  waiting: "font-medium text-amber-700 dark:text-amber-500",
+  active: "text-foreground",
+  done: "text-muted-foreground",
+};
 
 export default function RequestsPage() {
   const { roles, isSuperAdmin } = useAgencyContext();
@@ -108,10 +122,11 @@ export default function RequestsPage() {
                 <TableRow>
                   <TableHead>Code</TableHead>
                   <TableHead>Title</TableHead>
-                  <TableHead>Team</TableHead>
+                  <TableHead>Branch</TableHead>
+                  <TableHead>Next action</TableHead>
                   <TableHead>Urgency</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead>Age</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -124,10 +139,35 @@ export default function RequestsPage() {
                     <TableCell className="max-w-[24rem] truncate" title={req.title}>
                       {req.title}
                     </TableCell>
-                    <TableCell>{req.routedTeamId ? "Assigned" : "Unassigned"}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {req.routedTeam?.name ?? (
+                        <span className="text-muted-foreground">Unassigned</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {(() => {
+                        const action = nextAction(req);
+                        return (
+                          <span className={NEXT_ACTION_TONE[action.tone]}>{action.label}</span>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>{getUrgencyBadge(req.urgency)}</TableCell>
                     <TableCell>{getStageBadge(req.stage)}</TableCell>
-                    <TableCell className="whitespace-nowrap">{new Date(req.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell
+                      className="whitespace-nowrap tabular-nums"
+                      title={new Date(req.createdAt).toLocaleString()}
+                    >
+                      {isOverdue(req) ? (
+                        <span className="font-medium text-red-600 dark:text-red-400">
+                          {formatAge(new Date(req.createdAt))} overdue
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          {formatAge(new Date(req.createdAt))}
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Link href={`/requests/${req.id}`}>
                         <Button variant="ghost" size="sm">View</Button>
