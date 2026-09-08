@@ -62,6 +62,26 @@ describe("launch readiness", () => {
     expect(failures).toContain("runtime.node");
   });
 
+  it("fails production when the password-less dev login flag is set", () => {
+    // Defence in depth for the worst finding in the audit: the provider signs
+    // anyone in from an email alone, and this variable used to be its only gate.
+    const checks = evaluateEnvironmentReadiness(
+      { ...READY_ENV, E2E_TEST_AUTH: "true" },
+      { production: true, nodeVersion: "v24.18.0" },
+    );
+    const devLogin = checks.find((item) => item.key === "auth.dev-login");
+    expect(devLogin?.status).toBe("fail");
+    expect(devLogin?.detail).toContain("E2E_TEST_AUTH");
+  });
+
+  it("passes when the dev login flag is absent", () => {
+    const checks = evaluateEnvironmentReadiness(READY_ENV, {
+      production: true,
+      nodeVersion: "v24.18.0",
+    });
+    expect(checks.find((item) => item.key === "auth.dev-login")?.status).toBe("pass");
+  });
+
   it("warns rather than fails when Paystack keys are missing", () => {
     // Online payment is not switched on. A missing key cannot take money badly
     // — PaystackService throws in production — so failing here only stripped
