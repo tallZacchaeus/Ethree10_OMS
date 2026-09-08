@@ -2,7 +2,8 @@ import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { AuditService } from "@/server/services/audit";
-import { generateCode } from "@/lib/utils/codes";
+import { generateCode, parseCode } from "@/lib/utils/codes";
+import { allocateWithCode } from "@/server/services/code-allocator";
 
 export interface TemplateTaskDef {
   title: string;
@@ -10,6 +11,21 @@ export interface TemplateTaskDef {
   subUnitId?: string;
   estimatedHours?: number;
   dependenciesByIndex?: number[];
+}
+
+
+/**
+ * Highest task code in use this year, plus one. Mirrors the helper in
+ * task.ts — both must agree, because they allocate from the same space.
+ */
+async function nextTaskSeq(): Promise<number> {
+  const year = new Date().getUTCFullYear();
+  const latest = await db.task.findFirst({
+    where: { code: { startsWith: `TSK-${year}-` } },
+    orderBy: { code: "desc" },
+    select: { code: true },
+  });
+  return (latest ? parseCode(latest.code)?.seq ?? 0 : 0) + 1;
 }
 
 export class TemplateService {
@@ -59,25 +75,33 @@ export class TemplateService {
     
     // Create tasks first so we have their actual IDs
     const createdTasks = [];
-    let count = await db.task.count({ where: { projectId: args.projectId } });
 
     for (let i = 0; i < taskDefs.length; i++) {
       const def = taskDefs[i];
       if (!def) continue;
-      count++;
-      const code = generateCode("task", count);
-      
-      const created = await db.task.create({
-        data: {
-          code,
-          projectId: args.projectId,
-          title: def.title,
-          description: def.description,
-          subUnitId: def.subUnitId,
-          estimatedHours: def.estimatedHours ? new Prisma.Decimal(def.estimatedHours) : null,
-          status: "todo",
-          priority: "medium",
-        },
+
+      // Task codes are agency-wide for the year. This used to number them from
+      // a count of tasks *in this project*, so applying a template to the second
+      // project of any year asked for TSK-<year>-00001 — a code that already
+      // existed — and the unique constraint turned a valid action into a 500.
+      // allocateWithCode reads the real sequence and retries on collision, so
+      // applying several templates at once no longer races either.
+      const created = await allocateWithCode({
+        nextSeq: nextTaskSeq,
+        format: (seq) => generateCode("task", seq),
+        create: (code) =>
+          db.task.create({
+            data: {
+              code,
+              projectId: args.projectId,
+              title: def.title,
+              description: def.description,
+              subUnitId: def.subUnitId,
+              estimatedHours: def.estimatedHours ? new Prisma.Decimal(def.estimatedHours) : null,
+              status: "todo",
+              priority: "medium",
+            },
+          }),
       });
       createdTasks.push(created);
     }

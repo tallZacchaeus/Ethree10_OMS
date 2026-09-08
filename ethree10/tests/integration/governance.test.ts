@@ -220,6 +220,48 @@ describe("payment confirmation", () => {
       }),
     ).rejects.toThrow(/already been confirmed/i);
   });
+
+  it("lets exactly one of two simultaneous confirmations through", async () => {
+    // The sequential case above was always safe. This is the one that was not:
+    // the guard read paymentConfirmedAt and the update wrote it, with nothing
+    // in between, so two calls arriving together both passed the read and both
+    // proceeded — overwriting who confirmed the payment, sending the
+    // notifications twice and writing two audit entries. Scoping the update to
+    // rows still unconfirmed makes the database the arbiter.
+    const concurrent = await db.invoice.create({
+      data: {
+        code: `INV-RACE-${tag}`,
+        organizationId: project.organizationId,
+        projectId: project.id,
+        currency: "NGN",
+        amount: 250_000,
+        lineItems: [],
+      },
+    });
+
+    const attempt = () =>
+      BudgetService.confirmInvoicePayment(finance.id, {
+        invoiceId: concurrent.id,
+        paymentMethod: "bank_transfer",
+      });
+
+    const results = await Promise.allSettled([attempt(), attempt()]);
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason.message).toMatch(
+      /already been confirmed/i,
+    );
+
+    // And exactly one receipt, not two.
+    const receipts = await db.receipt.findMany({ where: { invoiceId: concurrent.id } });
+    expect(receipts).toHaveLength(1);
+
+    await db.receipt.deleteMany({ where: { invoiceId: concurrent.id } });
+    await db.invoice.delete({ where: { id: concurrent.id } });
+  });
 });
 
 describe("outbound spend", () => {

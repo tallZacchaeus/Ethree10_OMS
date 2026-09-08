@@ -8,7 +8,8 @@ import { NotificationAudience } from "@/server/services/notification-audience";
 import { AssignmentService } from "@/server/services/assignment";
 import { EmailService } from "@/server/notifications/email";
 import { IntegrationService } from "@/server/integrations/core/service";
-import { generateCode } from "@/lib/utils/codes";
+import { generateCode, parseCode } from "@/lib/utils/codes";
+import { allocateWithCode } from "@/server/services/code-allocator";
 import { captureCriticalFailure } from "@/lib/observability";
 
 /** Outbound integration sync is best-effort: it must never break local work. */
@@ -20,12 +21,21 @@ async function syncOutbound(fn: () => Promise<void>): Promise<void> {
   }
 }
 
+/**
+ * Next sequence number for this year's task codes.
+ *
+ * Reads the highest code in use rather than counting rows. A count silently
+ * repeats a number as soon as any task is deleted, and the repeat only surfaces
+ * as a unique-constraint 500 at the moment someone creates work.
+ */
 async function nextTaskSeq(): Promise<number> {
   const year = new Date().getUTCFullYear();
-  const count = await db.task.count({
-    where: { createdAt: { gte: new Date(Date.UTC(year, 0, 1)) } },
+  const latest = await db.task.findFirst({
+    where: { code: { startsWith: `TSK-${year}-` } },
+    orderBy: { code: "desc" },
+    select: { code: true },
   });
-  return count + 1;
+  return (latest ? parseCode(latest.code)?.seq ?? 0 : 0) + 1;
 }
 
 async function subUnitLeadId(subUnitId: string | null): Promise<string | null> {
@@ -198,24 +208,28 @@ export class TaskService {
     });
     if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found." });
 
-    const seq = await nextTaskSeq();
-    const task = await db.task.create({
-      data: {
-        code: generateCode("task", seq),
-        projectId: args.input.projectId,
-        subUnitId: args.input.subUnitId ?? null,
-        assigneeUserId: args.input.assigneeUserId ?? null,
-        title: args.input.title,
-        description: args.input.description ?? null,
-        acceptanceCriteria: args.input.acceptanceCriteria ?? null,
-        priority: args.input.priority ?? "medium",
-        estimatedHours:
-          args.input.estimatedHours !== undefined
-            ? new Prisma.Decimal(args.input.estimatedHours)
-            : null,
-        dueDate: args.input.dueDate ?? null,
-        serviceId: args.input.serviceId ?? project.request?.serviceId ?? null,
-      },
+    const task = await allocateWithCode({
+      nextSeq: nextTaskSeq,
+      format: (seq) => generateCode("task", seq),
+      create: (code) =>
+        db.task.create({
+          data: {
+            code,
+            projectId: args.input.projectId,
+            subUnitId: args.input.subUnitId ?? null,
+            assigneeUserId: args.input.assigneeUserId ?? null,
+            title: args.input.title,
+            description: args.input.description ?? null,
+            acceptanceCriteria: args.input.acceptanceCriteria ?? null,
+            priority: args.input.priority ?? "medium",
+            estimatedHours:
+              args.input.estimatedHours !== undefined
+                ? new Prisma.Decimal(args.input.estimatedHours)
+                : null,
+            dueDate: args.input.dueDate ?? null,
+            serviceId: args.input.serviceId ?? project.request?.serviceId ?? null,
+          },
+        }),
     });
 
     const contributors = args.input.contributors?.length
