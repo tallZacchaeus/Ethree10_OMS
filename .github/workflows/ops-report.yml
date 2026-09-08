@@ -1,0 +1,36 @@
+name: Ops report
+
+# Where the agency's work is: every request, its branch, its stage, whether it
+# became a project, and whether that project has tasks anyone can be assigned.
+#
+# Read-only. Every statement is a select; nothing is written.
+#
+# It exists because "which branch is this on, and how do I give it to someone"
+# could not be answered without signing in as several different people. The
+# delivery chain is request -> project -> task -> assignee, and a break anywhere
+# in it looks identical from the outside: nothing to do.
+on:
+  workflow_dispatch:
+
+env:
+  SSH_USER: root
+
+jobs:
+  report:
+    name: Report agency work
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install SSH key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/ethree10_deploy_key
+          chmod 600 ~/.ssh/ethree10_deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Report
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
+            "cd /srv/ethree10/ethree10 && pnpm ops:report"
