@@ -375,6 +375,64 @@ async function removeAccess(email: string) {
   console.log(`\nUndo with:  pnpm memberships --restore ${user.email}`);
 }
 
+/**
+ * Correct the address on an existing account.
+ *
+ * The right fix for a mistyped domain, and better than granting a second
+ * account: everything — memberships, task assignments, audit entries,
+ * notifications — hangs off userId, so changing the address in place preserves
+ * all of it. Creating a replacement instead leaves the person's history
+ * stranded under an address nobody uses.
+ *
+ * OAuthAccount links by (provider, providerAccountId) rather than email, so a
+ * Google sign-in survives this. Pending magic-link tokens do not — they are
+ * addressed to the old mailbox, so they are cleared rather than left to
+ * deliver a working link to an address that bounces.
+ */
+async function changeEmail(oldEmail: string, newEmail: string) {
+  const user = await db.user.findUnique({
+    where: { email: oldEmail },
+    select: { id: true, email: true, name: true },
+  });
+  if (!user) {
+    console.log(`No user with email "${oldEmail}".`);
+    return;
+  }
+
+  const clash = await db.user.findUnique({ where: { email: newEmail }, select: { id: true } });
+  if (clash) {
+    console.log(
+      `"${newEmail}" already exists as a separate account. Changing the address would collide, ` +
+        `so this is a merge rather than a rename — use --invite ${newEmail} --copy-from ${oldEmail} ` +
+        `and then --remove ${oldEmail}.`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  const [memberships, assignedTasks, auditEntries] = await Promise.all([
+    db.membership.count({ where: { userId: user.id, removedAt: null } }),
+    db.task.count({ where: { assigneeUserId: user.id } }),
+    db.auditLog.count({ where: { actorId: user.id } }),
+  ]);
+
+  await db.user.update({ where: { id: user.id }, data: { email: newEmail } });
+
+  // Addressed to the old mailbox, so they would deliver a working sign-in link
+  // to an address that bounces.
+  const stale = await db.verificationToken.deleteMany({ where: { identifier: oldEmail } });
+
+  console.log(`~ ${oldEmail}  ->  ${newEmail}`);
+  console.log(
+    `  carried over: ${memberships} active membership(s), ${assignedTasks} assigned task(s), ` +
+      `${auditEntries} audit entr(ies)`,
+  );
+  if (stale.count > 0) {
+    console.log(`  cleared ${stale.count} pending sign-in link(s) addressed to the old mailbox`);
+  }
+  console.log(`\nUndo with:  pnpm memberships --change-email ${newEmail} --to ${oldEmail}`);
+}
+
 async function main() {
   const email = arg("restore");
   const membershipId = arg("restore-id");
@@ -383,6 +441,8 @@ async function main() {
   const inviteEmail = arg("invite");
   const emailLike = arg("email-like");
   const removeEmail = arg("remove");
+  const changeEmailFrom = arg("change-email");
+  const changeEmailTo = arg("to");
   const copyFrom = arg("copy-from");
 
   if (email || membershipId) {
@@ -400,6 +460,13 @@ async function main() {
       throw new Error("--invite and --copy-from must be given together.");
     }
     await inviteCopyingFrom(inviteEmail.trim().toLowerCase(), copyFrom.trim().toLowerCase());
+    console.log();
+  }
+  if (changeEmailFrom || changeEmailTo) {
+    if (!changeEmailFrom || !changeEmailTo) {
+      throw new Error("--change-email and --to must be given together.");
+    }
+    await changeEmail(changeEmailFrom.trim().toLowerCase(), changeEmailTo.trim().toLowerCase());
     console.log();
   }
   if (removeEmail) {
