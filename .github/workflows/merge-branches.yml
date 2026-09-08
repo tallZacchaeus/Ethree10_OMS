@@ -34,6 +34,10 @@ on:
         description: "New slug for the survivor (optional)"
         type: string
         required: false
+      resolve_collisions:
+        description: "Archive a duplicate department when one side is provably empty"
+        type: boolean
+        default: false
       dry_run:
         description: "Report the plan without writing"
         type: boolean
@@ -62,6 +66,7 @@ jobs:
           ARGS="--from ${{ inputs.from_slug }} --into ${{ inputs.into_slug }}"
           if [ -n "${{ inputs.rename_to }}" ]; then ARGS="$ARGS --rename-to '${{ inputs.rename_to }}'"; fi
           if [ -n "${{ inputs.new_slug }}" ]; then ARGS="$ARGS --slug ${{ inputs.new_slug }}"; fi
+          if [ "${{ inputs.resolve_collisions }}" = "true" ]; then ARGS="$ARGS --resolve-collisions"; fi
           if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
 
           ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
