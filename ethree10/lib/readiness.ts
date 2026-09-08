@@ -205,15 +205,36 @@ export function evaluateEnvironmentReadiness(
     ),
   );
 
-  const optionalWarnings = ["NEXT_PUBLIC_POSTHOG_KEY", "SENTRY_DSN", "NEXT_PUBLIC_SENTRY_DSN"].filter((key) => isPlaceholder(env[key]));
+  // Split from a single "Observability keys" warning, which lumped error
+  // reporting together with product analytics and so said nothing about what
+  // each absence costs. Both stay warnings rather than failures: readiness is a
+  // hard gate on the deploy, and failing it here would skip the smoke test,
+  // security-header check and backup verification — trading the checks that
+  // confirm production is alive for a missing key. That is the exact trade the
+  // Paystack check used to make.
+  const sentryMissing = ["SENTRY_DSN", "NEXT_PUBLIC_SENTRY_DSN"].filter((key) => isPlaceholder(env[key]));
   checks.push(
     check(
-      "observability.keys",
-      "Observability keys",
-      optionalWarnings.length === 0 ? "pass" : "warn",
-      optionalWarnings.length === 0
-        ? "Analytics and error reporting keys are configured."
-        : `Recommended before launch: ${optionalWarnings.join(", ")}`,
+      "observability.sentry",
+      "Error reporting",
+      sentryMissing.length === 0 ? "pass" : "warn",
+      sentryMissing.length === 0
+        ? "Sentry is configured; unhandled errors are reported."
+        : `No Sentry DSN (${sentryMissing.join(", ")}). instrumentation.ts initialises but reports nowhere, so ` +
+          "the error boundaries and every captureCriticalFailure call — payment confirmation, receipt issuance, " +
+          "report delivery — are writing to a log nobody reads.",
+    ),
+  );
+
+  const analyticsMissing = ["NEXT_PUBLIC_POSTHOG_KEY"].filter((key) => isPlaceholder(env[key]));
+  checks.push(
+    check(
+      "observability.analytics",
+      "Product analytics",
+      analyticsMissing.length === 0 ? "pass" : "warn",
+      analyticsMissing.length === 0
+        ? "PostHog is configured."
+        : "No PostHog key. No product events are sent; the admin analytics page reports this rather than claiming otherwise.",
     ),
   );
 

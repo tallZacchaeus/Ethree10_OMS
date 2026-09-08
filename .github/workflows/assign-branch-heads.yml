@@ -1,0 +1,63 @@
+name: Branch heads
+
+# Reports who leads each branch, and sets a lead when told who.
+#
+# Readiness has warned "0/2 active teams have a lead assigned" since launch.
+# That is not cosmetic: the assignment flow routes every auto-proposal to the
+# branch head for approval, so with no lead the proposals have nobody to
+# approve them and the feature is inert.
+#
+# Manual only. With no emails supplied it reports and writes nothing, which is
+# also how you find out who the candidates are — the script will not pick a
+# head on its own, because that is a decision about people rather than a gap in
+# the data.
+on:
+  workflow_dispatch:
+    inputs:
+      digital_media_lead:
+        description: "Email of the Digital Media branch head (leave blank to report only)"
+        type: string
+        required: false
+      tech_product_lead:
+        description: "Email of the Tech & Product branch head (leave blank to report only)"
+        type: string
+        required: false
+
+env:
+  SSH_USER: root
+
+jobs:
+  branch-heads:
+    name: ${{ (inputs.digital_media_lead != '' || inputs.tech_product_lead != '') && 'Assign branch heads' || 'Report branch heads' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install SSH key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/ethree10_deploy_key
+          chmod 600 ~/.ssh/ethree10_deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Report or assign
+        run: |
+          set -euo pipefail
+          ARGS=""
+          if [ -n "${{ inputs.digital_media_lead }}" ]; then
+            ARGS="$ARGS --set digital-media=${{ inputs.digital_media_lead }}"
+          fi
+          if [ -n "${{ inputs.tech_product_lead }}" ]; then
+            ARGS="$ARGS --set tech-product=${{ inputs.tech_product_lead }}"
+          fi
+          if [ -z "$ARGS" ]; then ARGS="--dry-run"; fi
+
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
+            "cd /srv/ethree10/ethree10 && pnpm assign:branch-heads $ARGS"
+
+      - name: Readiness afterwards
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
+            "cd /srv/ethree10/ethree10 && pnpm check:readiness:db 2>&1 | grep -E 'Team heads'" || true
