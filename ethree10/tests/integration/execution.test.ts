@@ -4,7 +4,6 @@ import { TRPCError } from "@trpc/server";
 import { createCallerFactory } from "@/server/trpc/trpc";
 import { appRouter } from "@/server/trpc/routers/_app";
 import { AuthorizationService } from "@/server/services/authorization";
-import { scopedDb } from "@/server/db/client";
 
 const db = new PrismaClient();
 const createCaller = createCallerFactory(appRouter);
@@ -13,7 +12,6 @@ const stamp = Date.now();
 function caller(userId: string) {
   return createCaller({
     db,
-    scopedDb,
     userId,
     session: { user: { id: userId } } as never,
     headers: new Headers(),

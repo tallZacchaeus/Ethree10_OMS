@@ -3,7 +3,6 @@ import { PrismaClient, type Skill, type SubUnit, type Team, type User } from "@p
 import type { Session } from "next-auth";
 import { TRPCError } from "@trpc/server";
 import { AuthorizationService } from "@/server/services/authorization";
-import { scopedDb } from "@/server/db/client";
 import { appRouter } from "@/server/trpc/routers/_app";
 import { createCallerFactory } from "@/server/trpc/trpc";
 
@@ -24,7 +23,6 @@ const createCaller = createCallerFactory(appRouter);
 function getCaller(userId: string | null) {
   return createCaller({
     db,
-    scopedDb,
     userId,
     session: userId ? ({ user: { id: userId } } as Session) : null,
     headers: new Headers(),

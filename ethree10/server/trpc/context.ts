@@ -2,7 +2,7 @@ import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import type { Session } from "next-auth";
 import { TRPCError } from "@trpc/server";
 import { auth } from "@/server/auth";
-import { db, scopedDb } from "@/server/db/client";
+import { db } from "@/server/db/client";
 import { AuthorizationService } from "@/server/services/authorization";
 import type { Action } from "@/server/auth/permissions";
 
@@ -18,7 +18,6 @@ export async function createTRPCContext(opts: FetchCreateContextFnOptions) {
     session,
     userId,
     headers,
-    scopedDb,
     authorize: createAuthorize(userId),
   };
 }
