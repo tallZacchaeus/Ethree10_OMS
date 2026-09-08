@@ -328,6 +328,53 @@ async function searchByEmail(fragment: string) {
   );
 }
 
+/**
+ * Soft-remove every active membership for one account.
+ *
+ * The counterpart to --restore, and it exists for the case that produced it:
+ * access granted to the wrong one of two records for the same person. Soft,
+ * not hard — removedAt is set and the row stays, so this is undoable with
+ * --restore and the mistake stays visible rather than being erased.
+ *
+ * Refuses to strip a branch lead, because Team.leadId would then point at
+ * somebody with no membership on the branch they supposedly run.
+ */
+async function removeAccess(email: string) {
+  const user = await db.user.findUnique({ where: { email }, select: { id: true, email: true } });
+  if (!user) {
+    console.log(`No user with email "${email}".`);
+    return;
+  }
+
+  const led = await db.team.findMany({
+    where: { leadId: user.id, archivedAt: null },
+    select: { name: true },
+  });
+  if (led.length > 0) {
+    console.log(
+      `Refusing: ${user.email} leads ${led.map((t) => t.name).join(", ")}. ` +
+        "Reassign the branch lead first, or Team.leadId points at someone with no membership there.",
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  const active = await db.membership.findMany({
+    where: { userId: user.id, removedAt: null },
+    include: INCLUDE,
+  });
+  if (active.length === 0) {
+    console.log(`${user.email} has no active membership — nothing to remove.`);
+    return;
+  }
+
+  for (const m of active) {
+    await db.membership.update({ where: { id: m.id }, data: { removedAt: new Date() } });
+    console.log(`- removed: ${describe({ ...m, removedAt: new Date() })}`);
+  }
+  console.log(`\nUndo with:  pnpm memberships --restore ${user.email}`);
+}
+
 async function main() {
   const email = arg("restore");
   const membershipId = arg("restore-id");
@@ -335,6 +382,7 @@ async function main() {
   const reactivateEmail = arg("reactivate-user");
   const inviteEmail = arg("invite");
   const emailLike = arg("email-like");
+  const removeEmail = arg("remove");
   const copyFrom = arg("copy-from");
 
   if (email || membershipId) {
@@ -352,6 +400,10 @@ async function main() {
       throw new Error("--invite and --copy-from must be given together.");
     }
     await inviteCopyingFrom(inviteEmail.trim().toLowerCase(), copyFrom.trim().toLowerCase());
+    console.log();
+  }
+  if (removeEmail) {
+    await removeAccess(removeEmail.trim().toLowerCase());
     console.log();
   }
   if (emailLike) {

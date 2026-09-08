@@ -35,6 +35,10 @@ on:
         description: "List accounts whose email contains this text, with their access. Read-only."
         type: string
         required: false
+      remove_email:
+        description: "Email whose active memberships to remove. Soft and undoable via restore."
+        type: string
+        required: false
 
 env:
   SSH_USER: root
@@ -71,6 +75,9 @@ jobs:
           fi
           if [ -n "${{ inputs.email_like }}" ]; then
             ARGS="$ARGS --email-like ${{ inputs.email_like }}"
+          fi
+          if [ -n "${{ inputs.remove_email }}" ]; then
+            ARGS="$ARGS --remove ${{ inputs.remove_email }}"
           fi
           ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
             "cd /srv/ethree10/ethree10 && pnpm memberships $ARGS"
