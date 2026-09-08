@@ -7,13 +7,24 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 
 import { formatDate } from "@/lib/format";
 import { CreateTemplateDialog } from "@/components/templates/create-template-dialog";
+import { useAgencyContext } from "@/components/providers/agency-provider";
+import { AGENCY_CONFIG_ROLES } from "@/server/auth/role-groups";
+import type { Role } from "@prisma/client";
 
 export default function TemplatesPage() {
-  const isSuperAdmin = false; // Stub
-  const roles: string[] = [];
+  // Was `const isSuperAdmin = false` with an empty roles array, so isAgencyAdmin
+  // was always false and nobody could create a template — including a super
+  // admin. That also disabled "Apply template" downstream in every practical
+  // sense: the project page offered to apply templates that could not be
+  // authored.
+  const { isSuperAdmin, roles } = useAgencyContext();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  const isAgencyAdmin = isSuperAdmin || roles.includes("agency_admin");
+  // AGENCY_CONFIG_ROLES rather than a literal "agency_admin": the COO holds
+  // configuration authority too, and inlined role arrays are how the previous
+  // model drifted apart.
+  const isAgencyAdmin =
+    isSuperAdmin || roles.some((r) => AGENCY_CONFIG_ROLES.includes(r as Role));
 
   const { data: templates, isLoading, refetch } = trpc.templates.list.useQuery();
 

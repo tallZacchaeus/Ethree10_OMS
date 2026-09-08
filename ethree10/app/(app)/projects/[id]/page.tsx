@@ -14,6 +14,7 @@ import { KanbanBoard } from "@/components/tasks/kanban-board";
 import { TaskCreateDialog } from "@/components/tasks/task-create-dialog";
 import { TemplateApplyDialog } from "@/components/tasks/template-apply-dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { useAgencyContext } from "@/components/providers/agency-provider";
 
 import { formatDate } from "@/lib/format";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,8 +26,7 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const { toast } = useToast();
-  const isSuperAdmin = false; // Stub until proper auth context is used
-  const roles: string[] = [];
+  const { isSuperAdmin, roles } = useAgencyContext();
   const utils = trpc.useUtils();
   const [creating, setCreating] = useState(false);
   const [applyingTemplate, setApplyingTemplate] = useState(false);

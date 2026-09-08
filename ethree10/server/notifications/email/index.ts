@@ -9,6 +9,15 @@ function resend(): Resend {
   return client;
 }
 
+function shouldSkipProviderSend() {
+  return (
+    env.NODE_ENV !== "production" &&
+    (env.RESEND_API_KEY === "re_replace_me" ||
+      env.RESEND_API_KEY === "re_local_stub_key_not_real" ||
+      env.RESEND_API_KEY.startsWith("re_test_"))
+  );
+}
+
 export interface SendNotificationEmailArgs {
   to: string;
   title: string;
@@ -24,6 +33,9 @@ export interface SendNotificationEmailArgs {
 export class EmailService {
   static async sendNotification(args: SendNotificationEmailArgs): Promise<boolean> {
     try {
+      if (shouldSkipProviderSend()) {
+        return false;
+      }
       const html = await render(
         NotificationEmail({
           title: args.title,
