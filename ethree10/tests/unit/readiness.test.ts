@@ -62,6 +62,30 @@ describe("launch readiness", () => {
     expect(failures).toContain("runtime.node");
   });
 
+  it("warns specifically about error reporting, naming what is lost", () => {
+    // Split from a lumped "Observability keys" warning that said nothing about
+    // consequence. The error boundaries and every captureCriticalFailure call
+    // depend on this, so the message has to say so.
+    const checks = evaluateEnvironmentReadiness(
+      { ...READY_ENV, SENTRY_DSN: "", NEXT_PUBLIC_SENTRY_DSN: "" },
+      { production: true, nodeVersion: "v24.18.0" },
+    );
+    const sentry = checks.find((item) => item.key === "observability.sentry");
+    expect(sentry?.status).toBe("warn");
+    expect(sentry?.detail).toContain("SENTRY_DSN");
+  });
+
+  it("keeps observability a warning, never a failure", () => {
+    // Failing here would skip the smoke test, security headers and backup
+    // verification — trading the checks that confirm production is alive for a
+    // missing key. That is the trade the Paystack check used to make.
+    const checks = evaluateEnvironmentReadiness(
+      { ...READY_ENV, SENTRY_DSN: "", NEXT_PUBLIC_SENTRY_DSN: "", NEXT_PUBLIC_POSTHOG_KEY: "" },
+      { production: true, nodeVersion: "v24.18.0" },
+    );
+    expect(summarizeReadiness(checks).failures).toBe(0);
+  });
+
   it("fails production when the password-less dev login flag is set", () => {
     // Defence in depth for the worst finding in the audit: the provider signs
     // anyone in from an email alone, and this variable used to be its only gate.
