@@ -8,6 +8,23 @@ import { ProjectService } from "@/server/services/project";
 import { ApprovalService } from "@/server/services/approval";
 import { generateCode, generatePublicToken, parseCode } from "@/lib/utils/codes";
 
+/**
+ * How long a client tracking link stays valid.
+ *
+ * Was 365 days, written out at four separate call sites. A capability URL good
+ * for a year outlives the engagement, the email thread it was sent in, and
+ * sometimes the client contact's employment — and the link is the whole
+ * credential, so anyone who ever had it keeps that access.
+ *
+ * 90 days is safe to shorten to because `rotatePublicToken` already exists and
+ * emails the client their new link, so an expiry is a reissue rather than a
+ * dead end. Existing links keep the expiry they were issued with; this only
+ * affects tokens minted from here on.
+ */
+const PUBLIC_TOKEN_DAYS = 90;
+const publicTokenExpiry = () => new Date(Date.now() + PUBLIC_TOKEN_DAYS * 24 * 60 * 60 * 1000);
+
+
 export const ALLOWED_TRANSITIONS: Record<RequestStage, RequestStage[]> = {
   submitted: ["under_review", "needs_clarification", "rejected", "cancelled", "pending_approval"],
   needs_clarification: ["under_review", "rejected", "cancelled"],
@@ -265,7 +282,7 @@ export class RequestService {
         // logging a request on a client's behalf still needs something to send
         // them — without this, "Copy tracking link" had nothing to copy.
         publicToken: generatePublicToken(),
-        publicTokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        publicTokenExpiresAt: publicTokenExpiry(),
         organizationId: args.organizationId,
         submittedById: args.actorId,
         title: args.input.title,
@@ -342,7 +359,7 @@ export class RequestService {
       data: {
         code,
         publicToken,
-        publicTokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        publicTokenExpiresAt: publicTokenExpiry(),
         organizationId: organization.id,
         submittedById: null,
         requesterName: args.requesterName,
@@ -407,7 +424,7 @@ export class RequestService {
       data: {
         publicToken,
         publicTokenRevokedAt: null,
-        publicTokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        publicTokenExpiresAt: publicTokenExpiry(),
       },
     });
     await AuditService.log({

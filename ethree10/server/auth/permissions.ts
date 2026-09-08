@@ -147,6 +147,12 @@ export const ROLE_PERMISSIONS: Record<Role, Action[]> = {
   // Issues invoices, confirms funds received, issues receipts, and pays
   // approved expenses. Cannot approve a budget — only spend within one.
   finance_manager: [
+    // Deliberately absent: task.read and lead.read. Finance issues invoices,
+    // confirms payments and pays expenses — none of which needs the individual
+    // work items or the sales pipeline. project.read and request.read already
+    // give the context an invoice needs. Removing them costs finance nothing
+    // they use and stops the role reading the whole agency's delivery detail.
+    // audit.read is kept: finance is a legitimate consumer of the money trail.
     "organization.read",
     "team.read",
     "subunit.read",
@@ -154,9 +160,7 @@ export const ROLE_PERMISSIONS: Record<Role, Action[]> = {
     "service.read",
     "request.read",
     "project.read",
-    "task.read",
-    "comment.create",
-    "lead.read", "lead.update",
+    "comment.create", "lead.update",
     "audit.read",
     "report.read", "report.generate",
     "invoice.read", "invoice.manage",

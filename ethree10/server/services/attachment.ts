@@ -1,9 +1,10 @@
 import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomBytes } from "crypto";
+import { isDeclaredTypeConsistent, describeMismatch } from "@/server/services/content-sniff";
 import { TRPCError } from "@trpc/server";
 import { db } from "@/server/db/client";
-import { s3, publicUrl, deleteFile } from "@/lib/storage";
+import { s3, publicUrl, deleteFile, readHeadBytes } from "@/lib/storage";
 import { env } from "@/lib/env";
 import { AuditService } from "@/server/services/audit";
 import { requireAgencyAction } from "@/server/services/agency";
@@ -203,6 +204,19 @@ export class AttachmentService {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: `The uploaded file is ${humanBytes(size)}, over the ${humanBytes(rule.maxBytes)} limit. It has been discarded.`,
+      });
+    }
+
+    // Verify the file is what the uploader said it is. The allowlist above keys
+    // on `input.mimeType`, which the client supplies — so without this the one
+    // check between the bucket and arbitrary content is a string the uploader
+    // chose. A ranged read: sixteen bytes, not the whole file.
+    const head = await readHeadBytes(input.key, 16).catch(() => new Uint8Array());
+    if (head.length > 0 && !isDeclaredTypeConsistent(input.mimeType, head)) {
+      await deleteFile(input.key).catch(() => undefined);
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: describeMismatch(input.mimeType, head),
       });
     }
 

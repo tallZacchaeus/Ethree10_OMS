@@ -4,6 +4,8 @@ import { db } from "@/server/db/client";
 import { NotificationService } from "@/server/services/notification";
 import { ClientTrackingService } from "@/server/services/client-tracking";
 import { enforcePublicRateLimit } from "@/server/security/public-rate-limit";
+import { clientIp } from "@/server/security/client-ip";
+import { AuditService } from "@/server/services/audit";
 
 async function agencyLeadUserIds() {
   const leads = await db.membership.findMany({
@@ -49,9 +51,20 @@ const tokenInput = z.string().min(32).max(128);
 export const trackRouter = router({
   get: publicProcedure
     .input(z.object({ token: tokenInput }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       await enforcePublicRateLimit({ action: "track-read", secret: input.token, limit: 60 });
-      return ClientTrackingService.project(await ClientTrackingService.findRequest(input.token));
+      const request = await ClientTrackingService.findRequest(input.token);
+      // Record that the link was used. A capability URL is the whole
+      // credential, so "who opened it and when" is the only trace that exists
+      // if one leaks — without this a shared or forwarded link is invisible.
+      await AuditService.log({
+        actorId: null,
+        action: "request.tracking_link_used",
+        entityType: "Request",
+        entityId: request.id,
+        ip: clientIp(ctx.headers),
+      });
+      return ClientTrackingService.project(request);
     }),
 
   addComment: publicProcedure
