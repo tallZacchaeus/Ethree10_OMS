@@ -23,6 +23,14 @@ on:
         description: "Email whose deactivated ACCOUNT to reactivate (a separate lockout)."
         type: string
         required: false
+      invite_email:
+        description: "Email to grant access to, copying another account's access. Needs copy_from."
+        type: string
+        required: false
+      copy_from_email:
+        description: "Email whose role/branch/department to copy. Not modified."
+        type: string
+        required: false
 
 env:
   SSH_USER: root
@@ -50,6 +58,12 @@ jobs:
           fi
           if [ -n "${{ inputs.reactivate_user_email }}" ]; then
             ARGS="$ARGS --reactivate-user ${{ inputs.reactivate_user_email }}"
+          fi
+          if [ -n "${{ inputs.invite_email }}" ]; then
+            ARGS="$ARGS --invite ${{ inputs.invite_email }}"
+          fi
+          if [ -n "${{ inputs.copy_from_email }}" ]; then
+            ARGS="$ARGS --copy-from ${{ inputs.copy_from_email }}"
           fi
           ssh -i ~/.ssh/ethree10_deploy_key "${SSH_USER}@${{ secrets.VPS_HOST }}" \
             "cd /srv/ethree10/ethree10 && pnpm memberships $ARGS"
