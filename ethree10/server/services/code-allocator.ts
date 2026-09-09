@@ -63,3 +63,32 @@ export async function allocateWithCode<T>(args: AllocateArgs<T>): Promise<T> {
 
   throw lastError;
 }
+
+/**
+ * The same retry, for codes that are drawn rather than counted.
+ *
+ * Invoice and receipt codes are random (see server/security/secure-code.ts) so
+ * there is no sequence to re-read — a collision just means draw again. At 60
+ * bits this should never fire; it exists so that if it ever does the caller
+ * gets an invoice instead of a 500, and so that a collision on some *other*
+ * unique column is still surfaced rather than swallowed by a blind retry.
+ */
+export async function allocateRandomCode<T>(args: {
+  generate: () => string;
+  create: (code: string) => Promise<T>;
+  attempts?: number;
+}): Promise<T> {
+  const attempts = args.attempts ?? 5;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await args.create(args.generate());
+    } catch (error) {
+      if (!isCodeCollision(error)) throw error;
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}

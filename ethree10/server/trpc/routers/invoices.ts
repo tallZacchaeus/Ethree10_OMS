@@ -16,9 +16,8 @@ import { EmailService } from "@/server/notifications/email";
 import { AuditService } from "@/server/services/audit";
 import { NotificationService } from "@/server/services/notification";
 import { NotificationAudience } from "@/server/services/notification-audience";
-function generateCode() {
-  return Math.random().toString(36).substring(2, 10).toUpperCase();
-}
+import { secureCode } from "@/server/security/secure-code";
+import { allocateRandomCode } from "@/server/services/code-allocator";
 
 export const invoicesRouter = router({
   list: protectedProcedure
@@ -111,17 +110,23 @@ export const invoicesRouter = router({
         0
       );
 
-      const invoice = await db.invoice.create({
-        data: {
-          code: `INV-${generateCode()}`,
-          organizationId: input.organizationId,
-          projectId: input.projectId,
-          currency: input.currency,
-          amount: totalAmount,
-          lineItems: input.lineItems,
-          dueAt: input.dueAt ? new Date(input.dueAt) : null,
-          status: "draft",
-        },
+      // The code is the only thing standing between a stranger and this
+      // invoice's public page and pay link, so it is drawn from the CSPRNG.
+      const invoice = await allocateRandomCode({
+        generate: () => `INV-${secureCode()}`,
+        create: (code) =>
+          db.invoice.create({
+            data: {
+              code,
+              organizationId: input.organizationId,
+              projectId: input.projectId,
+              currency: input.currency,
+              amount: totalAmount,
+              lineItems: input.lineItems,
+              dueAt: input.dueAt ? new Date(input.dueAt) : null,
+              status: "draft",
+            },
+          }),
       });
 
       return invoice;

@@ -27,24 +27,27 @@ model VerificationToken {
 // ============================================================
 
 model User {
-  id                    String    @id @default(cuid())
-  email                 String    @unique
-  emailVerified         DateTime?
-  hashedPassword        String?
-  name                  String
-  avatarUrl             String?
-  phone                 String?
-  phoneVerifiedAt       DateTime?
-  phoneVerificationCode String?
-  timezone              String    @default("Africa/Lagos")
-  workingHoursPerWeek   Int       @default(40)
-  isSuperAdmin          Boolean   @default(false)
-  mfaEnabled            Boolean   @default(false)
-  mfaSecret             String?
-  mfaRecoveryCodes      String[]
-  deactivatedAt         DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id                         String    @id @default(cuid())
+  email                      String    @unique
+  emailVerified              DateTime?
+  hashedPassword             String?
+  name                       String
+  avatarUrl                  String?
+  phone                      String?
+  phoneVerifiedAt            DateTime?
+  phoneVerificationCode      String?
+  // A six-digit code is a million guesses. Randomness alone does not carry
+  // it, so the code also stops being valid — see server/trpc/routers/whatsapp.ts.
+  phoneVerificationExpiresAt DateTime?
+  timezone                   String    @default("Africa/Lagos")
+  workingHoursPerWeek        Int       @default(40)
+  isSuperAdmin               Boolean   @default(false)
+  mfaEnabled                 Boolean   @default(false)
+  mfaSecret                  String?
+  mfaRecoveryCodes           String[]
+  deactivatedAt              DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
 
   memberships             Membership[]
   skills                  UserSkill[]
