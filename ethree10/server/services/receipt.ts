@@ -5,11 +5,15 @@ import { db } from "@/server/db/client";
 import { uploadFile } from "@/lib/storage";
 import { ReceiptDocument } from "@/server/documents/receipt-pdf";
 import { captureCriticalFailure } from "@/lib/observability";
+import { secureCode } from "@/server/security/secure-code";
+import { allocateRandomCode } from "./code-allocator";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
+// A receipt code is the whole of the authorisation for /receipt/<code>, so it
+// is drawn from the CSPRNG. See server/security/secure-code.ts.
 function generateCode() {
-  return `RCPT-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+  return `RCPT-${secureCode()}`;
 }
 
 /** Public, shareable URL for a receipt by its code. */
@@ -106,15 +110,19 @@ export class ReceiptService {
       });
     }
 
-    const receipt = await db.receipt.create({
-      data: {
-        code: generateCode(),
-        organizationId: input.organizationId,
-        amount: new Prisma.Decimal(input.amount),
-        currency: input.currency,
-        paymentMethod: input.paymentMethod,
-        paymentRef: input.paymentRef ?? null,
-      },
+    const receipt = await allocateRandomCode({
+      generate: generateCode,
+      create: (code) =>
+        db.receipt.create({
+          data: {
+            code,
+            organizationId: input.organizationId,
+            amount: new Prisma.Decimal(input.amount),
+            currency: input.currency,
+            paymentMethod: input.paymentMethod,
+            paymentRef: input.paymentRef ?? null,
+          },
+        }),
     });
     // Best-effort. The receipt ROW is the financial record of account; the PDF is
     // a rendering of it. A storage outage must not roll back a confirmed payment
