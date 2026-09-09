@@ -21,6 +21,14 @@ allowBuilds:
 # the only way to move them is an override. Each is the minimum patched version
 # named by `pnpm audit`. Remove an entry once the parent ships the fix itself.
 overrides:
+  # next-auth v4 declares nodemailer ^7.0.7 as an OPTIONAL peer and requires it
+  # eagerly in providers/email.js. But createTransport is only called inside the
+  # default sendVerificationRequest, and server/auth/config.ts replaces that
+  # wholesale with a Resend call — so the module must load and is never invoked.
+  # The peer range is therefore about a code path this app does not execute, and
+  # holding nodemailer at 7.x to respect it keeps two high advisories that are
+  # only patched in 9.x.
+  "nodemailer": ">=9.1.0"
   # Deliberately NOT overriding brace-expansion. Forcing it forward breaks
   # minimatch@3, which eslint depends on, and `pnpm lint` dies with a
   # FlatConfigArray error. The advisory is a denial of service in a build-time
